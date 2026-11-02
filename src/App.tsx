@@ -99,6 +99,8 @@ function App() {
   );
   const [isPanelClosing, setIsPanelClosing] = useState(false);
   const [isTagHot, setIsTagHot] = useState(false);
+  const [isTagDragging, setIsTagDragging] = useState(false);
+  const [isPanelFromBottom, setIsPanelFromBottom] = useState(false);
   const panelOpenRef = useRef(panelOpen);
   panelOpenRef.current = panelOpen;
   const isPickingRef = useRef(false);
@@ -135,9 +137,12 @@ function App() {
     void invoke("sync_dock_geometry", { expanded: true }).then(show, show);
   }, []);
 
+  const [isCheckOpen, setIsCheckOpen] = useState(false);
   const envReady = preflight?.ready === true;
   const inIntro = introStep >= 0;
   const inMain = introComplete && !inIntro && envReady && !preflightLoading;
+  const isEnvFailed =
+    introComplete && !inIntro && !preflightLoading && preflight?.ready === false;
 
   const hasUnreadFailure = useMemo(
     () => rows.some((r) => r.uiState === "failure"),
@@ -185,6 +190,9 @@ function App() {
     try {
       const result = await invoke<PreflightResult>("preflight");
       setPreflight(result);
+      if (result.ready) {
+        setIsCheckOpen(false);
+      }
     } catch (e) {
       setPreflight({
         ready: false,
@@ -233,14 +241,26 @@ function App() {
     }).then((stop) => {
       unlisten = stop;
     });
+    let unlistenDrag: (() => void) | undefined;
+    void listen<boolean>("tag-dragging", (event) => {
+      setIsTagDragging(event.payload);
+    }).then((stop) => {
+      unlistenDrag = stop;
+    });
+    let unlistenAnchor: (() => void) | undefined;
+    void listen<boolean>("panel-from-bottom", (event) => {
+      setIsPanelFromBottom(event.payload);
+    }).then((stop) => {
+      unlistenAnchor = stop;
+      void invoke("sync_dock_geometry", {
+        expanded: panelOpenRef.current,
+      }).catch(() => {});
+    });
     return () => {
       unlisten?.();
+      unlistenDrag?.();
+      unlistenAnchor?.();
     };
-  }, []);
-
-  useEffect(() => {
-    if (captureBoot || !isTauri) return;
-    void invoke("sync_dock_geometry", { expanded: true }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -393,27 +413,40 @@ function App() {
   const showHeaderAdd = inMain;
 
   return (
-    <div className={`desktop${panelOpen ? " desktop--expanded" : " desktop--tag"}`}>
+    <div
+      className={`desktop${panelOpen ? " desktop--expanded" : " desktop--tag"}${
+        isTagHot ? " is-hot" : ""
+      }${isTagDragging ? " is-dragging" : ""}`}
+    >
       {panelOpen ? null : (
-        <button
-          type="button"
-          className={`tag${isTagHot ? " tag--hot" : ""}`}
-          aria-expanded={false}
-          aria-label="Asurada"
-          title="Asurada"
-          onClick={onExpandPanel}
-        >
+        <>
+          <div className="tag-handle" aria-hidden>
+            <span />
+            <span />
+            <span />
+          </div>
+          <button
+            type="button"
+            className={`tag${isTagHot ? " tag--hot" : ""}`}
+            aria-expanded={false}
+            aria-label="Asurada"
+            title="Asurada"
+            onClick={onExpandPanel}
+          >
           {hasUnreadFailure ? <span className="tag-dot" aria-hidden /> : null}
           <img className="tag-logo" src={logoUrl} alt="" />
           <span className="tag-chevron" aria-hidden>
             ‹
           </span>
         </button>
+        </>
       )}
 
       {panelOpen ? (
         <aside
-          className={`panel${isPanelClosing ? " panel--closing" : ""}`}
+          className={`panel${isPanelFromBottom ? " panel--up" : ""}${
+            isPanelClosing ? " panel--closing" : ""
+          }`}
           role="dialog" aria-label="Asurada 面板">
           <header className="chrome">
             <div className="title-wrap">
@@ -421,6 +454,17 @@ function App() {
                 <img src={logoUrl} alt="" />
               </div>
               <h1 className="title">Asurada</h1>
+              {isEnvFailed ? (
+                <button
+                  type="button"
+                  className="env-warn"
+                  aria-label="环境异常，查看检查"
+                  title="环境异常，查看检查"
+                  onClick={() => setIsCheckOpen((open) => !open)}
+                >
+                  <Icon d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" />
+                </button>
+              ) : null}
             </div>
             <div className="chrome-actions">
               {showHeaderAdd ? (
@@ -470,13 +514,6 @@ function App() {
           {loadError ? <p className="banner-error">{loadError}</p> : null}
 
           {inMain && projectCount > 0 ? (
-            <div className="env-pill">
-              <span className="dot" aria-hidden />
-              本机环境就绪
-            </div>
-          ) : null}
-
-          {inMain && projectCount > 0 ? (
             <div className="risk" role="status">
               <span className="ico">!</span>
               <span>一键会暂存、提交并推送到远端哦，不会再确认～</span>
@@ -497,10 +534,11 @@ function App() {
               />
             ) : preflightLoading ? (
               <PreflightGateView loading checks={preflight?.checks} />
-            ) : preflight && !preflight.ready ? (
+            ) : isCheckOpen && isEnvFailed && preflight ? (
               <PreflightFailView
                 result={preflight}
                 onRecheck={() => void runPreflight()}
+                onBack={() => setIsCheckOpen(false)}
               />
             ) : loading ? (
               <p className="muted">加载中…</p>
@@ -630,9 +668,11 @@ function PreflightGateView({
 function PreflightFailView({
   result,
   onRecheck,
+  onBack,
 }: {
   result: PreflightResult;
   onRecheck: () => void;
+  onBack: () => void;
 }) {
   return (
     <div className="gate">
@@ -645,6 +685,9 @@ function PreflightFailView({
         ))}
       </div>
       <div className="gate-actions">
+        <button type="button" className="btn-text" onClick={onBack}>
+          返回
+        </button>
         <button type="button" className="btn-primary" onClick={onRecheck}>
           重新检查
         </button>
@@ -722,17 +765,17 @@ function ProjectRow({
         >
           {pres.btnBusy ? "提交中…" : "提交并推送"}
         </button>
+        {isRunning ? null : (
+          <button
+            type="button"
+            className={`row-remove${isConfirming ? " is-open" : ""}`}
+            aria-label="移除项目"
+            onClick={() => setIsConfirming(true)}
+          >
+            <Icon d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
+          </button>
+        )}
       </div>
-      {isRunning ? null : (
-        <button
-          type="button"
-          className={`row-remove${isConfirming ? " is-open" : ""}`}
-          aria-label="移除项目"
-          onClick={() => setIsConfirming(true)}
-        >
-          <Icon d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
-        </button>
-      )}
       {isConfirming ? (
         <div className="row-confirm" role="alertdialog" aria-label="确认移除">
           <span>从列表移除？本地仓库还在</span>

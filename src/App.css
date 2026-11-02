@@ -56,10 +56,52 @@ body {
   cursor: pointer;
 }
 
-/* 收起态：窗口略大于 tag，悬停时整块从右上角轻微放大 */
+/* 收起态：窗口上方留出手柄，悬停时整块 tag 从右上角轻微放大 */
+.tag-handle {
+  position: absolute;
+  top: 3px;
+  right: 6px;
+  z-index: 2;
+  width: 28px;
+  height: 16px;
+  border-radius: 8px 8px 5px 5px;
+  background: linear-gradient(180deg, #3c3260 0%, #241c3c 100%);
+  box-shadow:
+    0 4px 10px rgba(23, 18, 42, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition:
+    opacity 0.16s ease,
+    transform 0.28s cubic-bezier(0.34, 1.45, 0.64, 1);
+}
+
+.tag-handle span {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.desktop--tag.is-hot .tag-handle,
+.desktop--tag:hover .tag-handle,
+.desktop--tag.is-dragging .tag-handle {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.desktop--tag.is-dragging .tag-handle {
+  transform: scale(1.08);
+}
+
 .tag {
   position: absolute;
-  top: 0;
+  top: 22px;
   right: 0;
   width: 40px;
   height: 88px;
@@ -129,6 +171,12 @@ body {
 
 .panel--closing {
   animation: panel-out 0.22s ease-in forwards;
+}
+
+/* 标签靠近屏幕底部时，面板从入口往上长，底边仍贴着标签 */
+.panel--up {
+  top: auto;
+  bottom: 10px;
 }
 
 @keyframes panel-in {
@@ -207,6 +255,31 @@ body {
     4px 5px 8px rgba(240, 160, 126, 0.3);
 }
 
+.env-warn {
+  appearance: none;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff0e4;
+  color: #d4783a;
+  cursor: pointer;
+}
+
+.env-warn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.env-warn:hover {
+  background: #ffe0c8;
+}
+
 .chrome-actions {
   display: flex;
   align-items: center;
@@ -262,28 +335,6 @@ body {
 .btn-text:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-.env-pill {
-  margin: 0 16px 10px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: #eaf9f1;
-  border: 1px solid #c7efda;
-  color: #2f9a64;
-  font-size: 11px;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  align-self: flex-start;
-}
-
-.env-pill .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--ok);
 }
 
 .risk {
@@ -736,8 +787,22 @@ body {
   flex-shrink: 0;
 }
 
+.status.dirty {
+  width: fit-content;
+  margin-top: 8px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 999px;
+  background: var(--peach-soft);
+  color: #c45e22;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .status.dirty .pip {
-  background: var(--mint);
+  width: 8px;
+  height: 8px;
+  background: #ef8a3a;
+  box-shadow: 0 0 0 2px rgba(239, 138, 58, 0.35);
 }
 .status.clean .pip {
   background: #cfc8d8;
@@ -774,14 +839,13 @@ body {
 
 .actions {
   display: flex;
+  flex-direction: column;
   align-items: flex-end;
-  align-self: end;
+  justify-content: space-between;
+  align-self: stretch;
 }
 
 .row-remove {
-  position: absolute;
-  top: 8px;
-  right: 8px;
   width: 24px;
   height: 24px;
   border-radius: 999px;

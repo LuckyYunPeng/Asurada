@@ -1,4 +1,5 @@
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 
 use tauri::{
     menu::{Menu, MenuItem},
@@ -14,8 +15,16 @@ static IS_FILE_DIALOG_OPEN: AtomicBool = AtomicBool::new(false);
 /// 收起态的第一下点击经常只用来激活窗口，到不了页面按钮。
 static IS_PANEL_EXPANDED: AtomicBool = AtomicBool::new(true);
 static IS_TAG_HOT: AtomicBool = AtomicBool::new(false);
+static IS_DRAGGING: AtomicBool = AtomicBool::new(false);
+/// 标签顶边距工作区顶边的逻辑距离。空表示还没拖过，用默认位置。
+static DOCK_TAG_OFFSET: Mutex<Option<f64>> = Mutex::new(None);
 
-const DOCK_COLLAPSED: LogicalSize<f64> = LogicalSize::new(48.0, 102.0);
+/// 收起态窗口比标签高出这一截，用来放拖拽手柄。和 CSS `.tag` 的 top 一致。
+const HANDLE_BAND: f64 = 22.0;
+/// 和 CSS `.tag` 的 height、`.panel` 的 top/bottom 留白一致。
+const TAG_HEIGHT: f64 = 88.0;
+const PANEL_INSET: f64 = 10.0;
+const DOCK_COLLAPSED: LogicalSize<f64> = LogicalSize::new(48.0, 122.0);
 const DOCK_EXPANDED: LogicalSize<f64> = LogicalSize::new(384.0, 600.0);
 
 const TRAY_SHOW_ID: &str = "tray-show-panel";
@@ -43,37 +52,89 @@ pub fn place_dock_window(window: &WebviewWindow, expanded: bool) -> Result<(), S
     } else {
         DOCK_COLLAPSED
     };
-    place_frame(window, logical, 0.0)
-}
-
-fn place_frame(
-    window: &WebviewWindow,
-    logical: LogicalSize<f64>,
-    lift: f64,
-) -> Result<(), String> {
     window
         .set_size(Size::Logical(logical))
         .map_err(|e| format!("无法调整窗口大小: {e}"))?;
+    position_dock(window, expanded)
+}
 
+fn position_dock(window: &WebviewWindow, expanded: bool) -> Result<(), String> {
     let monitor = active_monitor(window)?;
-    // 每块屏缩放比不同，统一换算成逻辑坐标（macOS 全局 point）
     let scale = monitor.scale_factor();
     let area = monitor.work_area();
     let origin = area.position.to_logical::<f64>(scale);
     let mon = area.size.to_logical::<f64>(scale);
-    let x = origin.x + mon.width - logical.width;
-    // 展开、收起共用面板顶边。悬停放大时以这块 tag 的中心往上抬，避免只往下长。
-    let y = (origin.y
-        + (mon.height * 0.36 - DOCK_EXPANDED.height / 2.0)
-            .min(mon.height - DOCK_EXPANDED.height)
-            .max(8.0)
-        - lift)
-        .max(origin.y + 8.0);
-
+    let width = if expanded {
+        DOCK_EXPANDED.width
+    } else {
+        DOCK_COLLAPSED.width
+    };
+    let x = origin.x + mon.width - width;
+    let collapsed_max = (mon.height - DOCK_COLLAPSED.height + HANDLE_BAND).max(HANDLE_BAND);
+    let raw = lock_dock(&DOCK_TAG_OFFSET).unwrap_or_else(|| {
+        (mon.height * 0.36 - DOCK_EXPANDED.height / 2.0)
+            .clamp(HANDLE_BAND, collapsed_max)
+    });
+    let tag_top = origin.y + raw.clamp(HANDLE_BAND, collapsed_max);
+    let work_bottom = origin.y + mon.height;
+    // 下面放得下整块面板时，面板顶边贴着标签顶边。放不下就改成底边贴着标签底边，往上长。
+    let is_from_bottom = expanded && tag_top + DOCK_EXPANDED.height > work_bottom;
+    let y = if !expanded {
+        tag_top - HANDLE_BAND
+    } else if is_from_bottom {
+        ((tag_top + TAG_HEIGHT + PANEL_INSET).min(work_bottom) - DOCK_EXPANDED.height).max(origin.y)
+    } else {
+        tag_top
+    };
     window
         .set_position(LogicalPosition::new(x, y))
         .map_err(|e| format!("无法移动窗口: {e}"))?;
+    if expanded {
+        let _ = window.emit("panel-from-bottom", is_from_bottom);
+    }
     Ok(())
+}
+
+fn lock_dock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|err| err.into_inner())
+}
+
+fn load_dock_offset(app: &AppHandle) {
+    let Ok(dir) = app.path().app_data_dir() else {
+        return;
+    };
+    let Ok(raw) = std::fs::read_to_string(dir.join("dock.json")) else {
+        return;
+    };
+    #[derive(serde::Deserialize)]
+    struct DockFile {
+        tag_offset: f64,
+    }
+    if let Ok(file) = serde_json::from_str::<DockFile>(&raw) {
+        *lock_dock(&DOCK_TAG_OFFSET) = Some(file.tag_offset);
+    }
+}
+
+fn save_dock_offset(app: &AppHandle) {
+    let Some(tag_offset) = *lock_dock(&DOCK_TAG_OFFSET) else {
+        return;
+    };
+    let Ok(dir) = app.path().app_data_dir() else {
+        return;
+    };
+    let _ = std::fs::create_dir_all(&dir);
+    #[derive(serde::Serialize)]
+    struct DockFile {
+        tag_offset: f64,
+    }
+    if let Ok(raw) = serde_json::to_string(&DockFile { tag_offset }) {
+        let _ = std::fs::write(dir.join("dock.json"), raw);
+    }
+}
+
+pub(super) fn commit_dock_offset(app: &AppHandle, tag_offset: f64) {
+    *lock_dock(&DOCK_TAG_OFFSET) = Some(tag_offset);
+    save_dock_offset(app);
 }
 
 /// 鼠标所在的显示器，取不到时回退主显示器。
@@ -155,6 +216,7 @@ fn init_panel(app_handle: &AppHandle) -> Result<(), String> {
     panel.set_collection_behavior(
         CollectionBehavior::new()
             .full_screen_auxiliary()
+            .full_screen_disallows_tiling()
             .can_join_all_spaces()
             .stationary()
             .into(),
@@ -260,6 +322,7 @@ pub fn setup_tray(app: &mut App) -> Result<(), String> {
 
 pub fn setup(app: &mut App) -> Result<(), String> {
     app.set_activation_policy(tauri::ActivationPolicy::Regular);
+    load_dock_offset(app.handle());
     let ready = match init_panel(app.handle()) {
         Ok(()) => Ok(()),
         Err(e) => {
@@ -277,23 +340,41 @@ fn install_outside_click_monitor(app_handle: AppHandle) {
 }
 
 mod outside_click {
-    use super::{apply_panel_open, IS_FILE_DIALOG_OPEN, IS_PANEL_EXPANDED, IS_TAG_HOT};
+    use super::{
+        apply_panel_open, commit_dock_offset, HANDLE_BAND, IS_DRAGGING,
+        IS_FILE_DIALOG_OPEN, IS_PANEL_EXPANDED, IS_TAG_HOT,
+    };
     use objc2_app_kit::{
-        NSAutoresizingMaskOptions, NSCursor, NSEvent, NSEventMask, NSTrackingArea,
+        NSAutoresizingMaskOptions, NSCursor, NSEvent, NSEventMask, NSScreen, NSTrackingArea,
         NSTrackingAreaOptions, NSView, NSWindow,
     };
     use std::ffi::{c_char, c_int, c_void, CStr};
     use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
     use std::sync::OnceLock;
+    use dispatch2::{DispatchQueue, DispatchTime};
     use tauri::{AppHandle, Emitter, Manager};
+    use tauri_nspanel::objc2::ffi::class_addMethod;
     use tauri_nspanel::objc2::rc::Retained;
-    use tauri_nspanel::objc2::runtime::AnyObject;
+    use tauri_nspanel::objc2::runtime::{AnyObject, Imp, Sel};
     use tauri_nspanel::objc2::{define_class, msg_send, AllocAnyThread, MainThreadMarker, MainThreadOnly};
-    use tauri_nspanel::objc2_foundation::NSPoint;
+    use tauri_nspanel::objc2_foundation::{NSPoint, NSRect, NSSize};
 
     static APP: OnceLock<AppHandle> = OnceLock::new();
     static CURSOR_VIEW: AtomicPtr<TagCursorView> = AtomicPtr::new(std::ptr::null_mut());
     static IS_HAND_SHOWN: AtomicBool = AtomicBool::new(false);
+    static IN_DRAG_MOVE: AtomicBool = AtomicBool::new(false);
+
+    struct LiveDrag {
+        start_mouse_y: f64,
+        start_origin_y: f64,
+        origin_x: f64,
+        width: f64,
+        height: f64,
+    }
+
+
+
+    static LIVE_DRAG: std::sync::Mutex<Option<LiveDrag>> = std::sync::Mutex::new(None);
 
     unsafe extern "C" {
         fn dlopen(filename: *const c_char, flags: c_int) -> *mut c_void;
@@ -344,7 +425,30 @@ mod outside_click {
                 if IS_PANEL_EXPANDED.load(Ordering::SeqCst) {
                     return;
                 }
-                self.addCursorRect_cursor(self.bounds(), &NSCursor::pointingHandCursor());
+                let bounds = self.bounds();
+                self.addCursorRect_cursor(
+                    NSRect {
+                        origin: NSPoint {
+                            x: bounds.origin.x,
+                            y: bounds.origin.y + bounds.size.height - HANDLE_BAND,
+                        },
+                        size: NSSize {
+                            width: bounds.size.width,
+                            height: HANDLE_BAND,
+                        },
+                    },
+                    &NSCursor::openHandCursor(),
+                );
+                self.addCursorRect_cursor(
+                    NSRect {
+                        origin: bounds.origin,
+                        size: NSSize {
+                            width: bounds.size.width,
+                            height: bounds.size.height - HANDLE_BAND,
+                        },
+                    },
+                    &NSCursor::pointingHandCursor(),
+                );
             }
 
             #[unsafe(method(mouseEntered:))]
@@ -364,6 +468,9 @@ mod outside_click {
 
             #[unsafe(method(mouseExited:))]
             fn mouse_exited(&self, _event: &NSEvent) {
+                if IS_DRAGGING.load(Ordering::SeqCst) {
+                    return;
+                }
                 release_hand();
             }
 
@@ -389,7 +496,13 @@ mod outside_click {
             return;
         }
         IS_HAND_SHOWN.store(true, Ordering::SeqCst);
-        NSCursor::pointingHandCursor().set();
+        if IS_DRAGGING.load(Ordering::SeqCst) {
+            NSCursor::closedHandCursor().set();
+        } else if cursor_over_handle() {
+            NSCursor::openHandCursor().set();
+        } else {
+            NSCursor::pointingHandCursor().set();
+        }
         if let Some(app) = APP.get() {
             if !IS_TAG_HOT.swap(true, Ordering::SeqCst) {
                 let _ = app.emit("tag-hot", true);
@@ -529,19 +642,192 @@ mod outside_click {
             return;
         };
         let ns_window = unsafe { &*ns_window.cast::<NSWindow>() };
+        // 系统拖动会在屏幕底边弹出贴边引导，松手后把窗口放到屏幕中间。
+        keep_off_system_drag(ns_window);
         install_cursor_view(ns_window);
-        install_collapsed_click(app_handle, ns_window.windowNumber());
+        install_collapsed_click(app_handle.clone(), ns_window);
         install_tag_hot(ns_window as *const NSWindow);
+        install_drag(app_handle, ns_window);
     }
 
-    fn install_collapsed_click(app_handle: AppHandle, window_number: isize) {
+    fn keep_off_system_drag(window: &NSWindow) {
+        window.setMovable(false);
+        window.setMovableByWindowBackground(false);
+        static ADDED: AtomicBool = AtomicBool::new(false);
+        if ADDED.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        unsafe extern "C-unwind" fn implicitly_disallow_tiling(
+            _this: *mut AnyObject,
+            _cmd: Sel,
+        ) -> bool {
+            true
+        }
+        let class = std::ptr::from_ref(
+            unsafe { &*(window as *const NSWindow as *const AnyObject) }.class(),
+        )
+        .cast_mut();
+        let _ = unsafe {
+            class_addMethod(
+                class,
+                Sel::register(c"_implicitlyDisallowTiling"),
+                std::mem::transmute::<
+                    unsafe extern "C-unwind" fn(*mut AnyObject, Sel) -> bool,
+                    Imp,
+                >(implicitly_disallow_tiling),
+                c"B@:".as_ptr(),
+            )
+        };
+    }
+
+    fn begin_live_drag(app: &AppHandle, window: &NSWindow) {
+        let frame = window.frame();
+        let mut drag = LIVE_DRAG.lock().unwrap_or_else(|err| err.into_inner());
+        *drag = Some(LiveDrag {
+            start_mouse_y: NSEvent::mouseLocation().y,
+            start_origin_y: frame.origin.y,
+            origin_x: frame.origin.x,
+            width: frame.size.width,
+            height: frame.size.height,
+        });
+        drop(drag);
+        IS_DRAGGING.store(true, Ordering::SeqCst);
+        let _ = app.emit("tag-dragging", true);
+    }
+
+    fn move_live_drag(window: &NSWindow) {
+        if IN_DRAG_MOVE.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        let drag = LIVE_DRAG
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .as_ref()
+            .map(|drag| LiveDrag {
+                start_mouse_y: drag.start_mouse_y,
+                start_origin_y: drag.start_origin_y,
+                origin_x: drag.origin_x,
+                width: drag.width,
+                height: drag.height,
+            });
+        let Some(drag) = drag else {
+            IN_DRAG_MOVE.store(false, Ordering::SeqCst);
+            return;
+        };
+        let origin_y = clamp_origin_y(
+            window,
+            drag.start_origin_y + (NSEvent::mouseLocation().y - drag.start_mouse_y),
+            drag.height,
+        );
+        if (origin_y - window.frame().origin.y).abs() >= 0.5
+            || (window.frame().size.width - drag.width).abs() >= 0.5
+            || (window.frame().size.height - drag.height).abs() >= 0.5
+        {
+            put_frame(window, drag.origin_x, origin_y, drag.width, drag.height);
+        }
+        IN_DRAG_MOVE.store(false, Ordering::SeqCst);
+    }
+
+    fn put_frame(window: &NSWindow, x: f64, y: f64, width: f64, height: f64) {
+        window.setFrame_display(
+            NSRect::new(NSPoint::new(x, y), NSSize::new(width, height)),
+            false,
+        );
+    }
+
+    fn clamp_origin_y(window: &NSWindow, origin_y: f64, height: f64) -> f64 {
+        let frame = window.frame();
+        let visible = screen_for(frame, MainThreadMarker::from(window)).visibleFrame();
+        let max_origin = (visible.origin.y + visible.size.height - height).max(visible.origin.y);
+        origin_y.clamp(visible.origin.y, max_origin)
+    }
+
+    fn screen_for(frame: NSRect, mtm: MainThreadMarker) -> Retained<NSScreen> {
+        let screens = NSScreen::screens(mtm);
+        let center_x = frame.origin.x + frame.size.width / 2.0;
+        let center_y = frame.origin.y + frame.size.height / 2.0;
+        for index in 0..screens.count() {
+            let screen = screens.objectAtIndex(index);
+            let bounds = screen.frame();
+            if center_x >= bounds.origin.x
+                && center_x < bounds.origin.x + bounds.size.width
+                && center_y >= bounds.origin.y
+                && center_y < bounds.origin.y + bounds.size.height
+            {
+                return screen;
+            }
+        }
+        NSScreen::mainScreen(mtm).unwrap_or_else(|| screens.objectAtIndex(0))
+    }
+
+    fn finish_live_drag(app: &AppHandle, window: &NSWindow) {
+        let Some(drag) = LIVE_DRAG
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .take()
+        else {
+            return;
+        };
+        IS_DRAGGING.store(false, Ordering::SeqCst);
+        let origin_y = clamp_origin_y(
+            window,
+            drag.start_origin_y + (NSEvent::mouseLocation().y - drag.start_mouse_y),
+            drag.height,
+        );
+        put_frame(window, drag.origin_x, origin_y, drag.width, drag.height);
+        let visible = screen_for(
+            NSRect::new(
+                NSPoint::new(drag.origin_x, origin_y),
+                NSSize::new(drag.width, drag.height),
+            ),
+            MainThreadMarker::from(window),
+        )
+        .visibleFrame();
+        let tag_top = origin_y + drag.height - HANDLE_BAND;
+        let work_top = visible.origin.y + visible.size.height;
+        let max_offset = (visible.size.height - drag.height + HANDLE_BAND).max(HANDLE_BAND);
+        commit_dock_offset(app, (work_top - tag_top).clamp(HANDLE_BAND, max_offset));
+        // 贴边引导在鼠标松开后才改窗口，下一轮和稍后再摆回去。
+        hold_frame_later(window, drag.origin_x, origin_y, drag.width, drag.height, 0);
+        hold_frame_later(
+            window,
+            drag.origin_x,
+            origin_y,
+            drag.width,
+            drag.height,
+            300_000_000,
+        );
+        let _ = app.emit("tag-dragging", false);
+    }
+
+    fn hold_frame_later(window: &NSWindow, x: f64, y: f64, width: f64, height: f64, delay_ns: i64) {
+        let window = window as *const NSWindow as usize;
+        let restore = move || {
+            put_frame(unsafe { &*(window as *const NSWindow) }, x, y, width, height);
+        };
+        if delay_ns <= 0 {
+            DispatchQueue::main().exec_async(restore);
+        } else {
+            let _ = DispatchQueue::main().after(DispatchTime::NOW.time(delay_ns), restore);
+        }
+    }
+
+    fn install_collapsed_click(app_handle: AppHandle, window: *const NSWindow) {
+        let window_number = unsafe { &*window }.windowNumber();
         let block = block2::RcBlock::new(move |event: std::ptr::NonNull<NSEvent>| {
             let mouse_down = unsafe { event.as_ref() };
             if !IS_FILE_DIALOG_OPEN.load(Ordering::SeqCst)
                 && !IS_PANEL_EXPANDED.load(Ordering::SeqCst)
                 && mouse_down.windowNumber() == window_number
             {
-                let _ = apply_panel_open(&app_handle, true);
+                let frame = unsafe { &*window }.frame();
+                let in_handle = mouse_down.locationInWindow().y >= frame.size.height - HANDLE_BAND;
+                if in_handle {
+                    begin_live_drag(&app_handle, unsafe { &*window });
+                    show_hand();
+                } else {
+                    let _ = apply_panel_open(&app_handle, true);
+                }
             }
             event.as_ptr()
         });
@@ -576,7 +862,48 @@ mod outside_click {
         }
     }
 
+    fn install_drag(app_handle: AppHandle, window: *const NSWindow) {
+        let local_dragged = block2::RcBlock::new(move |event: std::ptr::NonNull<NSEvent>| {
+            move_live_drag(unsafe { &*window });
+            event.as_ptr()
+        });
+        if let Some(monitor) = unsafe {
+            NSEvent::addLocalMonitorForEventsMatchingMask_handler(
+                NSEventMask::LeftMouseDragged,
+                &local_dragged,
+            )
+        } {
+            std::mem::forget(monitor);
+        }
+
+        let up_app = app_handle.clone();
+        let up = block2::RcBlock::new(move |_event: std::ptr::NonNull<NSEvent>| {
+            finish_live_drag(&up_app, unsafe { &*window });
+        });
+        if let Some(monitor) =
+            NSEvent::addGlobalMonitorForEventsMatchingMask_handler(NSEventMask::LeftMouseUp, &up)
+        {
+            std::mem::forget(monitor);
+        }
+
+        let local_up = block2::RcBlock::new(move |event: std::ptr::NonNull<NSEvent>| {
+            finish_live_drag(&app_handle, unsafe { &*window });
+            event.as_ptr()
+        });
+        if let Some(monitor) = unsafe {
+            NSEvent::addLocalMonitorForEventsMatchingMask_handler(
+                NSEventMask::LeftMouseUp,
+                &local_up,
+            )
+        } {
+            std::mem::forget(monitor);
+        }
+    }
+
     fn note_tag_hot(window: *const NSWindow) {
+        if IS_DRAGGING.load(Ordering::SeqCst) {
+            return;
+        }
         let hot = !IS_PANEL_EXPANDED.load(Ordering::SeqCst)
             && !IS_FILE_DIALOG_OPEN.load(Ordering::SeqCst)
             && cursor_inside(window);
@@ -585,6 +912,24 @@ mod outside_click {
         } else if IS_TAG_HOT.load(Ordering::SeqCst) {
             release_hand();
         }
+    }
+
+    fn cursor_over_handle() -> bool {
+        let Some(app) = APP.get() else {
+            return false;
+        };
+        let Some(window) = app.get_webview_window("main") else {
+            return false;
+        };
+        let Ok(ns_window) = window.ns_window() else {
+            return false;
+        };
+        let frame = unsafe { &*ns_window.cast::<NSWindow>() }.frame();
+        let mouse = NSEvent::mouseLocation();
+        mouse.x >= frame.origin.x
+            && mouse.x < frame.origin.x + frame.size.width
+            && mouse.y >= frame.origin.y + frame.size.height - HANDLE_BAND
+            && mouse.y < frame.origin.y + frame.size.height
     }
 
     fn cursor_inside(window: *const NSWindow) -> bool {

@@ -20,7 +20,7 @@ pub fn git_is_clean(project_path: &Path) -> Result<bool, String> {
 
 pub fn run_pi_print(project_path: &Path) -> Result<String, String> {
     let output = Command::new("pi")
-        .args(["--print", PI_COMMIT_PROMPT])
+        .args(["--no-session", "--print", PI_COMMIT_PROMPT])
         .current_dir(project_path)
         .output()
         .map_err(|e| format!("无法执行 pi（请确认已安装并在 PATH 中）: {e}"))?;
