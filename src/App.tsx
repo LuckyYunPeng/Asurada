@@ -751,7 +751,7 @@ function App() {
                         onRecordingChange={handleShortcutRecordingChange}
                       />
                       <button type="button" onClick={replayIntro}>
-                        重看引导
+                        查看引导
                       </button>
                     </div>
                   ) : null}
