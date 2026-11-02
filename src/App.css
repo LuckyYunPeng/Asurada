@@ -1050,7 +1050,7 @@ body {
 
 .settings-row .theme-segment {
   flex: 1;
-  max-width: 220px;
+  max-width: 128px;
 }
 
 .settings-row-action {
@@ -1088,17 +1088,15 @@ body {
 
 .theme-segment button {
   flex: 1;
-  min-width: 0;
+  min-width: 36px;
   border: none;
   background: transparent;
-  padding: 7px 6px;
+  padding: 8px 0;
   border-radius: 9px;
-  font: inherit;
-  font-size: 11px;
-  font-weight: 600;
+  display: grid;
+  place-items: center;
   color: var(--ink-3);
   cursor: pointer;
-  text-align: center;
   transition:
     background 0.12s ease,
     color 0.12s ease,
@@ -1109,6 +1107,14 @@ body {
   background: var(--segment-on-bg);
   color: var(--heading);
   box-shadow: var(--segment-on-shadow);
+}
+
+.theme-segment button.on svg {
+  stroke: var(--heading);
+}
+
+[data-theme="dark"] .theme-segment button:not(.on) svg {
+  stroke: var(--ink-2);
 }
 
 .toast {
