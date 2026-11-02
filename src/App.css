@@ -905,7 +905,8 @@ body {
 .btn-primary {
   appearance: none;
   border: none;
-  background: linear-gradient(135deg, #5ec8d4, #7ed9c8);
+  /* 与标题品牌色一致；白字对比度约 2.4:1，低于 WCAG 4.5:1 */
+  background: #3fb6c6;
   color: #fff;
   font: inherit;
   font-size: 13px;
@@ -913,12 +914,12 @@ body {
   padding: 7px 14px;
   border-radius: 999px;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(94, 200, 212, 0.32);
+  box-shadow: 0 4px 12px rgba(63, 182, 198, 0.35);
   white-space: nowrap;
 }
 
 .btn-primary:hover:not(:disabled) {
-  filter: brightness(1.03);
+  filter: brightness(1.1);
 }
 
 .btn-primary:disabled {
@@ -974,7 +975,10 @@ body {
   grid-row: 1;
   padding: 4px 11px;
   font-size: 12px;
-  box-shadow: 0 2px 8px rgba(94, 200, 212, 0.28);
+}
+
+.row > .btn-primary:not(:disabled):not(.busy) {
+  box-shadow: 0 2px 8px rgba(63, 182, 198, 0.35);
 }
 
 .name {
