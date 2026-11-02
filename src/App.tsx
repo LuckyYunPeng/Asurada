@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { CommitPushResult, ProjectRowState, ProjectView } from "./types";
+import type {
+  CommitPushResult,
+  PreflightResult,
+  ProjectRowState,
+  ProjectView,
+} from "./types";
 import "./App.css";
 
 function summarizeCommitMessage(msg: string): string {
@@ -14,6 +19,10 @@ function App() {
   const [rows, setRows] = useState<ProjectRowState[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [preflight, setPreflight] = useState<PreflightResult | null>(null);
+  const [preflightLoading, setPreflightLoading] = useState(false);
+
+  const envReady = preflight?.ready === true;
 
   const hasUnreadFailure = useMemo(
     () => rows.some((r) => r.uiState === "failure"),
@@ -48,7 +57,30 @@ function App() {
     void refreshList();
   }, [refreshList]);
 
+  const runPreflight = useCallback(async () => {
+    setPreflightLoading(true);
+    try {
+      const result = await invoke<PreflightResult>("preflight");
+      setPreflight(result);
+    } catch (e) {
+      setPreflight({
+        ready: false,
+        checks: [],
+        summary: String(e),
+      });
+    } finally {
+      setPreflightLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (panelOpen) {
+      void runPreflight();
+    }
+  }, [panelOpen, runPreflight]);
+
   async function handleAddProject() {
+    if (!envReady || preflightLoading) return;
     const selected = await open({
       directory: true,
       multiple: false,
@@ -73,7 +105,9 @@ function App() {
   }
 
   async function handleCommitPush(row: ProjectRowState) {
-    if (row.project.gitClean || row.uiState === "running") return;
+    if (!envReady || preflightLoading || row.project.gitClean || row.uiState === "running") {
+      return;
+    }
 
     setRows((prev) =>
       prev.map((r) =>
@@ -171,7 +205,12 @@ function App() {
           <header className="panel-header">
             <h1 className="panel-title">CommitDock</h1>
             <div className="panel-header-actions">
-              <button type="button" className="btn-text" onClick={() => void handleAddProject()}>
+              <button
+                type="button"
+                className="btn-text"
+                disabled={!envReady || preflightLoading}
+                onClick={() => void handleAddProject()}
+              >
                 添加项目
               </button>
               <button
@@ -185,6 +224,22 @@ function App() {
           </header>
 
           {loadError ? <p className="banner-error">{loadError}</p> : null}
+
+          {preflightLoading || (preflight && !preflight.ready) ? (
+            <div className="preflight-banner" role="status">
+              <span className="preflight-banner-text">
+                {preflightLoading ? "环境检测中…" : preflight?.summary}
+              </span>
+              <button
+                type="button"
+                className="btn-text preflight-retry"
+                disabled={preflightLoading}
+                onClick={() => void runPreflight()}
+              >
+                重新检查
+              </button>
+            </div>
+          ) : null}
 
           {projectCount > 0 ? (
             <div className="risk-banner" role="status">
@@ -201,7 +256,15 @@ function App() {
                 <p className="empty-desc">
                   添加本地 git 仓库后，可一键生成中文提交并推送
                 </p>
-                <button type="button" className="btn-primary" onClick={() => void handleAddProject()}>
+                {!envReady && preflight && !preflightLoading ? (
+                  <p className="empty-preflight">{preflight.summary}</p>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn-primary"
+                  disabled={!envReady || preflightLoading}
+                  onClick={() => void handleAddProject()}
+                >
                   添加项目
                 </button>
               </div>
@@ -211,6 +274,8 @@ function App() {
                   <ProjectRow
                     key={row.project.id}
                     row={row}
+                    envReady={envReady}
+                    preflightLoading={preflightLoading}
                     onCommit={() => void handleCommitPush(row)}
                     onRemove={() => void handleRemove(row.project.id)}
                     onToggleResult={() => toggleResult(row.project.id)}
@@ -236,11 +301,15 @@ function App() {
 
 function ProjectRow({
   row,
+  envReady,
+  preflightLoading,
   onCommit,
   onRemove,
   onToggleResult,
 }: {
   row: ProjectRowState;
+  envReady: boolean;
+  preflightLoading: boolean;
   onCommit: () => void;
   onRemove: () => void;
   onToggleResult: () => void;
@@ -248,7 +317,7 @@ function ProjectRow({
   const { project, uiState } = row;
   const isRunning = uiState === "running";
   const isClean = project.gitClean;
-  const primaryDisabled = isClean || isRunning;
+  const primaryDisabled = isClean || isRunning || !envReady || preflightLoading;
 
   const statusClass = isClean ? "status-clean" : "status-dirty";
 

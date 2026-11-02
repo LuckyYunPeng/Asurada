@@ -1,4 +1,5 @@
 use crate::git::{git_add_commit_push, git_is_clean, run_pi_print};
+use crate::preflight::{self, PreflightResult};
 use crate::store::{default_display_name, load_projects, save_projects, StoredProject};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -115,7 +116,22 @@ pub fn refresh_project_status(app: tauri::AppHandle, id: String) -> Result<Proje
 }
 
 #[tauri::command]
+pub fn check_environment() -> PreflightResult {
+    preflight::check_environment()
+}
+
+#[tauri::command]
+pub fn preflight() -> PreflightResult {
+    preflight::check_environment()
+}
+
+#[tauri::command]
 pub fn run_commit_push(app: tauri::AppHandle, id: String) -> Result<CommitPushResult, String> {
+    let env = preflight::check_environment();
+    if !env.ready {
+        return Err(env.summary);
+    }
+
     let dir = app_data_dir(&app)?;
     let projects = load_projects(&dir)?;
     let project = projects
