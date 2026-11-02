@@ -894,9 +894,8 @@ function ProjectRow({
   return (
     <li className="row">
       <div className="meta">
-        <div className="name">{row.project.displayName}</div>
-        <div className="path" title={row.project.path}>
-          {row.project.shortPath}
+        <div className="name" title={row.project.path}>
+          {row.project.displayName}
         </div>
       </div>
       <button
