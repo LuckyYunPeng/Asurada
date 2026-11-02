@@ -2,7 +2,7 @@ use std::path::Path;
 use std::process::Command;
 
 /// Fixed prompt for `pi --print` (configurable later). Documented in README.
-pub const PI_COMMIT_PROMPT: &str = r#"你是 CommitDock 提交助手。请根据当前仓库的 git status 与 git diff（含已暂存与未暂存）生成一条 Conventional Commits 格式的提交标题：type 使用英文（如 feat、fix、chore、docs），冒号后使用简体中文简述变更。只输出一行提交信息，不要引号、不要解释、不要 Markdown。"#;
+pub const PI_COMMIT_PROMPT: &str = r#"你是 Asurada 提交助手。请根据当前仓库的 git status 与 git diff（含已暂存与未暂存）生成一条 Conventional Commits 格式的提交标题：type 使用英文（如 feat、fix、chore、docs），冒号后使用简体中文简述变更。只输出一行提交信息，不要引号、不要解释、不要 Markdown。"#;
 
 pub fn git_is_clean(project_path: &Path) -> Result<bool, String> {
     let output = Command::new("git")

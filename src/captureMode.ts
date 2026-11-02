@@ -61,6 +61,7 @@ export const mockPreflightFail: PreflightResult = {
 };
 
 export interface CaptureBootstrap {
+  panelOpen: boolean;
   introComplete: boolean;
   introStep: number;
   loading: boolean;
@@ -73,6 +74,7 @@ export interface CaptureBootstrap {
 
 export function bootstrapCapture(scene: CaptureScene): CaptureBootstrap {
   const base: CaptureBootstrap = {
+    panelOpen: true,
     introComplete: true,
     introStep: -1,
     loading: false,

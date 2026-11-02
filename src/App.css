@@ -40,7 +40,7 @@ body {
   min-height: 100vh;
 }
 
-.desktop {
+.desktop--expanded {
   position: relative;
   min-height: 100vh;
   width: 100%;
@@ -50,6 +50,23 @@ body {
     radial-gradient(700px 420px at 70% 88%, #dff6fb 0%, transparent 55%),
     linear-gradient(160deg, var(--bg1), var(--bg2) 55%, var(--bg3));
   overflow: hidden;
+}
+
+.desktop--tag {
+  position: relative;
+  width: 100%;
+  min-height: 148px;
+  height: 100vh;
+  background: transparent;
+}
+
+.desktop--tag .deco {
+  display: none;
+}
+
+.desktop {
+  position: relative;
+  width: 100%;
 }
 
 .deco {

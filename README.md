@@ -22,6 +22,8 @@
 
 ## 产品行为
 
+- **macOS**：Accessory 应用 + **NSPanel** 浮层，吸附屏幕右缘；默认仅显示边缘 tag，点击展开面板
+- 收起：再点 tag、**Esc**、窗口失焦（点击其他应用）
 - 首次打开：**三步引导**（可跳过）→ **本机预检** → 项目列表
 - 设置 → **重看引导**
 - **工作区干净**：主按钮禁用 +「无变更」，不调用 `pi`
@@ -83,10 +85,15 @@ npm run tauri build -- --bundles app,dmg
 
 ## CI/CD
 
-- Workflow： [`.github/workflows/build-macos.yml`](./.github/workflows/build-macos.yml)
-- 触发：`push` 到 `main`、`push` tag `v*`、手动 **workflow_dispatch**
-- Runner：`macos-latest`
-- 产物名：`asurada-macos-<sha>`（及 tag 时 `asurada-macos-release-<tag>`）
+| Workflow | Runner | 作用 |
+|---|---|---|
+| [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) | `ubuntu-latest` | 前端 `npm run build`、`cargo check`、预检单元测试 |
+| [`.github/workflows/build-macos.yml`](./.github/workflows/build-macos.yml) | `macos-latest` | 产出未签名 `.app` / `.dmg`（整体验收请下载此产物） |
+
+macOS 边缘吸附与 **NSPanel** 行为只能在 macOS 上验证；Linux CI 不跑 UI，但保证 Rust/前端可编译。
+
+- 触发：`push` / PR 到 `main`、`push` tag `v*`、手动 **workflow_dispatch**
+- DMG 产物名：`asurada-macos-<sha>`（及 tag 时 `asurada-macos-release-<tag>`）
 
 ## 许可证
 

@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { bootstrapCapture, getCaptureScene } from "./captureMode";
 import logoUrl from "./assets/asurada-logo.png";
@@ -44,9 +46,12 @@ function Mascot() {
 
 const captureScene = getCaptureScene();
 const captureBoot = captureScene ? bootstrapCapture(captureScene) : null;
+const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 function App() {
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(
+    () => captureBoot?.panelOpen ?? false,
+  );
   const [introComplete, setIntroComplete] = useState(
     () => captureBoot?.introComplete ?? readIntroComplete(),
   );
@@ -69,6 +74,8 @@ function App() {
   const [toast, setToast] = useState<{ message: string; kind: ToastKind } | null>(
     () => captureBoot?.toast ?? null,
   );
+  const panelOpenRef = useRef(panelOpen);
+  panelOpenRef.current = panelOpen;
 
   const envReady = preflight?.ready === true;
   const inIntro = introStep >= 0;
@@ -137,6 +144,49 @@ function App() {
       void runPreflight();
     }
   }, [panelOpen, introComplete, inIntro, runPreflight]);
+
+  useEffect(() => {
+    if (captureBoot || !isTauri) return;
+    void invoke("sync_dock_geometry", { expanded: panelOpen }).catch(() => {});
+  }, [panelOpen]);
+
+  useEffect(() => {
+    if (captureBoot) return;
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && panelOpenRef.current) {
+        setPanelOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    if (captureBoot || !isTauri) return;
+
+    let unlistenBlur: (() => void) | undefined;
+    let unlistenDock: (() => void) | undefined;
+
+    void (async () => {
+      const win = getCurrentWindow();
+      unlistenBlur = await win.listen("tauri://blur", () => {
+        if (panelOpenRef.current) {
+          setPanelOpen(false);
+        }
+      });
+      unlistenDock = await listen("dock-blur", () => {
+        if (panelOpenRef.current) {
+          setPanelOpen(false);
+        }
+      });
+    })();
+
+    return () => {
+      unlistenBlur?.();
+      unlistenDock?.();
+    };
+  }, []);
 
   function finishIntro() {
     try {
@@ -249,7 +299,7 @@ function App() {
   const showHeaderAdd = inMain;
 
   return (
-    <div className="desktop">
+    <div className={`desktop${panelOpen ? " desktop--expanded" : " desktop--tag"}`}>
       <span className="deco deco-a" aria-hidden>
         ✿
       </span>
