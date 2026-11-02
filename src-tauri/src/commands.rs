@@ -127,11 +127,6 @@ pub async fn preflight() -> PreflightResult {
 
 #[tauri::command]
 pub async fn run_commit_push(app: tauri::AppHandle, id: String) -> Result<CommitPushResult, String> {
-    let env = preflight::check_environment();
-    if !env.ready {
-        return Err(env.summary);
-    }
-
     let dir = app_data_dir(&app)?;
     let projects = load_projects(&dir)?;
     let project = projects

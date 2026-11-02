@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { open } from "@tauri-apps/plugin-dialog";
 import { bootstrapCapture, getCaptureScene } from "./captureMode";
 import logoUrl from "./assets/asurada-logo.png";
 import {
@@ -101,17 +100,38 @@ function App() {
   const [isPanelClosing, setIsPanelClosing] = useState(false);
   const panelOpenRef = useRef(panelOpen);
   panelOpenRef.current = panelOpen;
+  const isPickingRef = useRef(false);
+  const isClosingRef = useRef(false);
 
   // 先播放收起动画，结束后再缩窗
   const onCollapsePanel = useCallback(() => {
-    if (!panelOpenRef.current) {
+    if (!panelOpenRef.current || isPickingRef.current || isClosingRef.current) {
       return;
     }
+    isClosingRef.current = true;
     setIsPanelClosing(true);
     window.setTimeout(() => {
+      isClosingRef.current = false;
       setPanelOpen(false);
       setIsPanelClosing(false);
     }, 220);
+  }, []);
+
+  // 先把壳窗拉到展开尺寸，再挂上面板。否则面板会在收起态的矮窗口里排一次，高度被 100vh 压住，窗变大后再撑开。
+  const onExpandPanel = useCallback(() => {
+    if (panelOpenRef.current) {
+      return;
+    }
+    const show = () => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setPanelOpen(true));
+      });
+    };
+    if (!isTauri) {
+      setPanelOpen(true);
+      return;
+    }
+    void invoke("sync_dock_geometry", { expanded: true }).then(show, show);
   }, []);
 
   const envReady = preflight?.ready === true;
@@ -177,10 +197,10 @@ function App() {
 
   useEffect(() => {
     if (captureBoot) return;
-    if (panelOpen && introComplete && !inIntro) {
+    if (introComplete && !inIntro) {
       void runPreflight();
     }
-  }, [panelOpen, introComplete, inIntro, runPreflight]);
+  }, [introComplete, inIntro, runPreflight]);
 
   useEffect(() => {
     if (captureBoot || !isTauri) return;
@@ -190,7 +210,9 @@ function App() {
     void (async () => {
       unlistenPanel = await listen<boolean>("set-panel-open", (event) => {
         if (event.payload) {
-          setPanelOpen(true);
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => setPanelOpen(true));
+          });
         } else {
           onCollapsePanel();
         }
@@ -204,7 +226,15 @@ function App() {
 
   useEffect(() => {
     if (captureBoot || !isTauri) return;
-    void invoke("sync_dock_geometry", { expanded: panelOpen }).catch(() => {});
+    void invoke("sync_dock_geometry", { expanded: true }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (captureBoot || !isTauri) return;
+    if (panelOpen) {
+      return;
+    }
+    void invoke("sync_dock_geometry", { expanded: false }).catch(() => {});
   }, [panelOpen]);
 
   useEffect(() => {
@@ -245,7 +275,6 @@ function App() {
     }
     setIntroComplete(true);
     setIntroStep(-1);
-    void runPreflight();
     void refreshList();
   }
 
@@ -256,12 +285,14 @@ function App() {
 
   async function handleAddProject() {
     if (!inMain) return;
-    const selected = await open({
-      directory: true,
-      multiple: false,
-      title: "选择本地 git 仓库",
-    });
-    if (selected == null || Array.isArray(selected)) return;
+    isPickingRef.current = true;
+    let selected: string | null = null;
+    try {
+      selected = await invoke<string | null>("pick_project_directory");
+    } finally {
+      isPickingRef.current = false;
+    }
+    if (selected == null) return;
     try {
       const added = await invoke<ProjectView>("add_project", { path: selected });
       setRows((prev) => [...prev, { project: added, uiState: "idle" }]);
@@ -356,7 +387,7 @@ function App() {
           aria-expanded={false}
           aria-label="Asurada"
           title="Asurada"
-          onClick={() => setPanelOpen(true)}
+          onClick={onExpandPanel}
         >
           {hasUnreadFailure ? <span className="tag-dot" aria-hidden /> : null}
           <img className="tag-logo" src={logoUrl} alt="" />

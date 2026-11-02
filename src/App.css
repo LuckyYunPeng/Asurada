@@ -120,18 +120,17 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transform-origin: right center;
-  animation: panel-in 0.42s cubic-bezier(0.34, 1.4, 0.64, 1);
+  animation: panel-in 0.22s ease-out;
 }
 
 .panel--closing {
-  animation: panel-out 0.22s cubic-bezier(0.5, 0, 0.75, 0) forwards;
+  animation: panel-out 0.22s ease-in forwards;
 }
 
 @keyframes panel-in {
   from {
     opacity: 0;
-    transform: translateX(80px) scale(0.86);
+    transform: translateX(28px);
   }
   to {
     opacity: 1;
@@ -142,7 +141,7 @@ body {
 @keyframes panel-out {
   to {
     opacity: 0;
-    transform: translateX(80px) scale(0.86);
+    transform: translateX(28px);
   }
 }
 

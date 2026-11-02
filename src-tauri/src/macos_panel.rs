@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
@@ -6,6 +8,9 @@ use tauri::{
 use tauri_nspanel::{
     tauri_panel, CollectionBehavior, PanelLevel, StyleMask, WebviewWindowExt,
 };
+
+/// 选目录对话框打开时，忽略失焦和窗外点击，避免收起并重新摆放面板。
+static IS_FILE_DIALOG_OPEN: AtomicBool = AtomicBool::new(false);
 
 const DOCK_COLLAPSED: LogicalSize<f64> = LogicalSize::new(40.0, 88.0);
 const DOCK_EXPANDED: LogicalSize<f64> = LogicalSize::new(384.0, 600.0);
@@ -138,10 +143,15 @@ fn init_panel(app_handle: &AppHandle) -> Result<(), String> {
             .stationary()
             .into(),
     );
+    // 默认会在应用失活时整窗隐藏，点外面就看不到 tag
+    panel.set_hides_on_deactivate(false);
 
     let handler = AsuradaPanelHandler::new();
     let emit_handle = app_handle.clone();
     handler.window_did_resign_key(move |_notification| {
+        if IS_FILE_DIALOG_OPEN.load(Ordering::SeqCst) {
+            return;
+        }
         let _ = emit_handle.emit("dock-blur", ());
     });
     panel.set_event_handler(Some(handler.as_ref()));
@@ -233,13 +243,62 @@ pub fn setup_tray(app: &mut App) -> Result<(), String> {
 
 pub fn setup(app: &mut App) -> Result<(), String> {
     app.set_activation_policy(tauri::ActivationPolicy::Regular);
-    match init_panel(app.handle()) {
+    let ready = match init_panel(app.handle()) {
         Ok(()) => Ok(()),
         Err(e) => {
             eprintln!("Asurada: NSPanel 初始化失败 ({e})，回退为普通置顶小窗");
             fallback_regular_window(app)
         }
+    };
+    install_outside_click_monitor(app.handle().clone());
+    ready
+}
+
+/// 非激活面板点到别的 App 时不会 resign key，用全局鼠标监听补上。
+fn install_outside_click_monitor(app_handle: AppHandle) {
+    outside_click::install(app_handle);
+}
+
+mod outside_click {
+    use super::IS_FILE_DIALOG_OPEN;
+    use objc2_app_kit::{NSEvent, NSEventMask};
+    use std::sync::atomic::Ordering;
+    use tauri::{AppHandle, Emitter};
+
+    pub fn install(app_handle: AppHandle) {
+        let mask = NSEventMask::LeftMouseDown | NSEventMask::RightMouseDown;
+        let block = block2::RcBlock::new(move |_event: std::ptr::NonNull<NSEvent>| {
+            if IS_FILE_DIALOG_OPEN.load(Ordering::SeqCst) {
+                return;
+            }
+            let _ = app_handle.emit("dock-blur", ());
+        });
+        if let Some(monitor) =
+            NSEvent::addGlobalMonitorForEventsMatchingMask_handler(mask, &block)
+        {
+            std::mem::forget(monitor);
+        }
     }
+}
+
+/// 独立模态选目录，不挂到面板上。挂成 sheet 时 AppKit 会挪动父窗口。
+#[tauri::command]
+pub async fn pick_project_directory(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    IS_FILE_DIALOG_OPEN.store(true, Ordering::SeqCst);
+    let picked = tauri::async_runtime::spawn_blocking(|| {
+        rfd::FileDialog::new()
+            .set_title("选择本地 git 仓库")
+            .pick_folder()
+    })
+    .await;
+
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = place_dock_window(&window, true);
+    }
+    IS_FILE_DIALOG_OPEN.store(false, Ordering::SeqCst);
+    let picked = picked.map_err(|e| e.to_string())?;
+
+    Ok(picked.map(|path| path.to_string_lossy().to_string()))
 }
 
 #[tauri::command]
