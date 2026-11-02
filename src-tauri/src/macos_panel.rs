@@ -2,7 +2,7 @@ use tauri::{
     App, AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, Size, WebviewWindow,
 };
 use tauri_nspanel::{
-    tauri_panel, CollectionBehavior, ManagerExt, PanelLevel, StyleMask, WebviewWindowExt,
+    tauri_panel, CollectionBehavior, PanelLevel, StyleMask, WebviewWindowExt,
 };
 
 const DOCK_COLLAPSED: LogicalSize<f64> = LogicalSize::new(52.0, 148.0);
@@ -44,7 +44,9 @@ pub fn place_dock_window(window: &WebviewWindow, expanded: bool) -> Result<(), S
     let phys_w = (logical.width * scale).round() as u32;
     let phys_h = (logical.height * scale).round() as u32;
     let x = mon_w.saturating_sub(phys_w);
-    let y = ((mon_h as f64 * 0.36) - (phys_h as f64 / 2.0)).max(8.0).round() as i32;
+    let y = ((mon_h as f64 * 0.36) - (phys_h as f64 / 2.0))
+        .max(8.0)
+        .round() as u32;
 
     window
         .set_position(PhysicalPosition::new(x, y))
@@ -88,7 +90,7 @@ fn init_panel(app_handle: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-pub fn setup(app: &App) -> Result<(), String> {
+pub fn setup(app: &mut App) -> Result<(), String> {
     app.set_activation_policy(tauri::ActivationPolicy::Accessory);
     init_panel(app.handle())?;
     Ok(())
