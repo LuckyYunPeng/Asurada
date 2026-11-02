@@ -44,12 +44,13 @@ pub fn place_dock_window(window: &WebviewWindow, expanded: bool) -> Result<(), S
     let phys_w = (logical.width * scale).round() as u32;
     let phys_h = (logical.height * scale).round() as u32;
     let x = mon_w.saturating_sub(phys_w);
-    let y = ((mon_h as f64 * 0.36) - (phys_h as f64 / 2.0))
-        .max(8.0)
-        .round() as u32;
+    let y_anchor = mon_h as f64 * 0.36;
+    let y_ideal = y_anchor - (phys_h as f64 / 2.0);
+    let y_max = mon_h.saturating_sub(phys_h).max(0) as f64;
+    let y = y_ideal.max(8.0).min(y_max).round() as i32;
 
     window
-        .set_position(PhysicalPosition::new(x, y))
+        .set_position(PhysicalPosition::new(x as i32, y))
         .map_err(|e| format!("无法移动窗口: {e}"))?;
     Ok(())
 }
@@ -90,10 +91,37 @@ fn init_panel(app_handle: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+pub fn fallback_regular_window(app: &mut App) -> Result<(), String> {
+    app.set_activation_policy(tauri::ActivationPolicy::Regular);
+
+    let window = app
+        .handle()
+        .get_webview_window("main")
+        .ok_or_else(|| "未找到主窗口".to_string())?;
+
+    window
+        .set_always_on_top(true)
+        .map_err(|e| format!("无法设置置顶: {e}"))?;
+    place_dock_window(&window, false)?;
+    window
+        .show()
+        .map_err(|e| format!("无法显示窗口: {e}"))?;
+    window
+        .set_focus()
+        .map_err(|e| format!("无法聚焦窗口: {e}"))?;
+
+    Ok(())
+}
+
 pub fn setup(app: &mut App) -> Result<(), String> {
     app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-    init_panel(app.handle())?;
-    Ok(())
+    match init_panel(app.handle()) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            eprintln!("Asurada: NSPanel 初始化失败 ({e})，回退为普通置顶小窗");
+            fallback_regular_window(app)
+        }
+    }
 }
 
 #[tauri::command]

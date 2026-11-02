@@ -31,7 +31,12 @@ pub fn run() {
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
-            macos_panel::setup(app)?;
+            {
+                if let Err(e) = macos_panel::setup(app) {
+                    eprintln!("Asurada: 边缘壳层 setup 失败 ({e})");
+                    return Err(e.into());
+                }
+            }
             Ok(())
         })
         .run(tauri::generate_context!())

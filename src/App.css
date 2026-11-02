@@ -110,6 +110,22 @@ body {
   padding: 0;
 }
 
+/* 收起态壳窗约 52×148：tag 铺满窗体，勿用全屏 fixed + top:36% */
+.desktop--tag .tag {
+  position: absolute;
+  inset: 0;
+  top: 0;
+  right: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 16px 0 0 16px;
+}
+
+.desktop--tag .tag-dot {
+  top: 6px;
+  left: 6px;
+}
+
 .tag-logo {
   width: 28px;
   height: 28px;
