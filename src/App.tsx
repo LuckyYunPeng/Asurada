@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -108,6 +109,11 @@ function App() {
     message: string;
     kind: ToastKind;
   } | null>(() => captureBoot?.toast ?? null);
+  const cloudRef = useRef<HTMLDivElement>(null);
+  const [rowOrder, setRowOrder] = useState<string[]>([]);
+  // 启动后首次拿到列表也排一次
+  const [isOrderPending, setIsOrderPending] = useState(true);
+  const [cloudBand, setCloudBand] = useState(0);
   const [isPanelClosing, setIsPanelClosing] = useState(false);
   const [isTagHot, setIsTagHot] = useState(false);
   const [isTagDragging, setIsTagDragging] = useState(false);
@@ -201,8 +207,22 @@ function App() {
     if (captureBoot || !panelOpen || !inMain) {
       return;
     }
-    void refreshList();
+    void refreshList().then(() => setIsOrderPending(true));
   }, [panelOpen, inMain, refreshList]);
+
+  // 只在展开面板（及启动）时排一次：待提交在前；之后刷新、提交不再换位置
+  useEffect(() => {
+    // 列表还没加载时先等着，否则会拿空列表把这次排序用掉
+    if (!isOrderPending || rows.length === 0) {
+      return;
+    }
+    setIsOrderPending(false);
+    setRowOrder(
+      [...rows]
+        .sort((a, b) => Number(a.project.gitClean) - Number(b.project.gitClean))
+        .map((r) => r.project.id),
+    );
+  }, [isOrderPending, rows]);
 
   // 收起时定时刷新，让 Tag 上的待提交圆点跟上外部改动；展开时已由上面的 effect 刷新
   useEffect(() => {
@@ -310,14 +330,25 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  // 按云朵实际高度给窗口留位，文案长短不同时 Tag 不会被盖住
+  useLayoutEffect(() => {
+    const el = cloudRef.current;
+    if (panelOpen || !el) {
+      setCloudBand(0);
+      return;
+    }
+    // Tag 顶边 = band + 22，尾巴尖 = 8 + 高度 + 6；+4 让尾巴尖停在 Tag 上方 12px
+    setCloudBand(Math.ceil(el.offsetHeight + 4));
+  }, [panelOpen, toast]);
+
   useEffect(() => {
     if (captureBoot || !isTauri) {
       return;
     }
-    void invoke("set_result_cloud", { open: !panelOpen && toast != null }).catch(
-      () => {},
-    );
-  }, [panelOpen, toast]);
+    void invoke("set_result_cloud", { band: cloudBand }).catch((error) => {
+      console.error("同步结果提示高度失败", error);
+    });
+  }, [cloudBand]);
 
   useEffect(() => {
     if (captureBoot) return;
@@ -467,13 +498,14 @@ function App() {
   return (
     <div
       className={`desktop${panelOpen ? " desktop--expanded" : " desktop--tag"}${
-        !panelOpen && toast ? " desktop--cloud" : ""
-      }${isTagHot ? " is-hot" : ""}${isTagDragging ? " is-dragging" : ""}`}
+        isTagHot ? " is-hot" : ""
+      }${isTagDragging ? " is-dragging" : ""}`}
+      style={{ "--cloud-band": `${cloudBand}px` } as CSSProperties}
     >
       {panelOpen ? null : (
         <>
           {toast ? (
-            <div className={`cloud cloud--${toast.kind}`} role="status">
+            <div ref={cloudRef} className={`cloud cloud--${toast.kind}`} role="status">
               <span className="cloud-icon" aria-hidden>
                 <Icon d={toast.kind === "ok" ? "M20 6 9 17l-5-5" : "M18 6 6 18M6 6l12 12"} />
               </span>
@@ -633,7 +665,14 @@ function App() {
               </div>
             ) : (
               <ul className="list">
-                {rows.map((row) => (
+                {/* 按展开时定下的顺序；之后新加的项目排在末尾 */}
+                {[...rows]
+                  .sort(
+                    (a, b) =>
+                      (rowOrder.indexOf(a.project.id) + 1 || rowOrder.length + 1) -
+                      (rowOrder.indexOf(b.project.id) + 1 || rowOrder.length + 1),
+                  )
+                  .map((row) => (
                   <ProjectRow
                     key={row.project.id}
                     row={row}

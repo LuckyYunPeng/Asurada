@@ -16,8 +16,8 @@ static IS_FILE_DIALOG_OPEN: AtomicBool = AtomicBool::new(false);
 static IS_PANEL_EXPANDED: AtomicBool = AtomicBool::new(true);
 static IS_TAG_HOT: AtomicBool = AtomicBool::new(false);
 static IS_DRAGGING: AtomicBool = AtomicBool::new(false);
-/// 收起且有提交结果时，窗口上方多出一朵云。
-static SHOW_RESULT_CLOUD: AtomicBool = AtomicBool::new(false);
+/// 收起且有提交结果时，窗口上方多出一朵云；值为云朵占用的高度，0 表示没有。
+static RESULT_CLOUD_BAND: Mutex<f64> = Mutex::new(0.0);
 /// 标签顶边距工作区顶边的逻辑距离。空表示还没拖过，用默认位置。
 static DOCK_TAG_OFFSET: Mutex<Option<f64>> = Mutex::new(None);
 /// 在别的屏幕上真实点下后，下一次摆放贴到这块屏。空表示留在当前屏。
@@ -25,8 +25,6 @@ static CLICKED_SCREEN: Mutex<Option<(f64, f64, f64, f64)>> = Mutex::new(None);
 
 /// 收起态窗口比标签高出这一截，用来放拖拽手柄。和 CSS `.tag` 的 top 一致。
 const HANDLE_BAND: f64 = 22.0;
-/// 和 CSS `.desktop--cloud` 的 `--cloud-band`、云朵高度一致。
-const CLOUD_BAND: f64 = 72.0;
 const CLOUD_WIDTH: f64 = 220.0;
 /// 和 CSS `.tag` 的 height、`.panel` 的 top/bottom 留白一致。
 const TAG_HEIGHT: f64 = 60.0;
@@ -35,11 +33,7 @@ const DOCK_COLLAPSED: LogicalSize<f64> = LogicalSize::new(42.0, 94.0);
 const DOCK_EXPANDED: LogicalSize<f64> = LogicalSize::new(384.0, 600.0);
 
 fn result_cloud_band() -> f64 {
-    if SHOW_RESULT_CLOUD.load(Ordering::SeqCst) {
-        CLOUD_BAND
-    } else {
-        0.0
-    }
+    *lock_dock(&RESULT_CLOUD_BAND)
 }
 
 const TRAY_SHOW_ID: &str = "tray-show-panel";
@@ -66,7 +60,7 @@ pub fn place_dock_window(window: &WebviewWindow, expanded: bool) -> Result<(), S
     let (width, height) = if expanded {
         (DOCK_EXPANDED.width, DOCK_EXPANDED.height)
     } else if cloud > 0.0 {
-        (CLOUD_WIDTH, DOCK_COLLAPSED.height + CLOUD_BAND)
+        (CLOUD_WIDTH, DOCK_COLLAPSED.height + cloud)
     } else {
         (DOCK_COLLAPSED.width, DOCK_COLLAPSED.height)
     };
@@ -1153,9 +1147,10 @@ pub fn sync_dock_geometry(app: tauri::AppHandle, expanded: bool) -> Result<(), S
 }
 
 /// 收起态有提交结果时，把窗口向上、向左撑开，给入口上方的云朵留位置。标签屏幕坐标不变。
+/// `band` 由前端按云朵实际高度量出，0 表示收起云朵。
 #[tauri::command]
-pub fn set_result_cloud(app: tauri::AppHandle, open: bool) -> Result<(), String> {
-    SHOW_RESULT_CLOUD.store(open, Ordering::SeqCst);
+pub fn set_result_cloud(app: tauri::AppHandle, band: f64) -> Result<(), String> {
+    *lock_dock(&RESULT_CLOUD_BAND) = band.max(0.0);
     if IS_PANEL_EXPANDED.load(Ordering::SeqCst) {
         return Ok(());
     }

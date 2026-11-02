@@ -61,10 +61,6 @@ body {
   cursor: pointer;
 }
 
-.desktop--cloud {
-  --cloud-band: 72px;
-}
-
 /* 收起态：窗口上方留出手柄，悬停时整块 tag 从右上角轻微放大 */
 .tag-handle {
   position: absolute;
@@ -188,12 +184,12 @@ body {
   --cloud-tint: #effbf7;
   position: absolute;
   z-index: 3;
-  /* 底边贴近 Tag 手柄，尾巴对准 Tag 中线 */
-  top: 20px;
+  /* 高度随文案变化，窗口按实际高度留位（App.tsx cloudBand） */
+  top: 8px;
   right: 2px;
   width: 204px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   padding: 9px 12px 11px 10px;
   border-radius: 16px;
@@ -267,12 +263,14 @@ body {
   color: var(--cloud-ink);
 }
 
+/* 最多 6 行，控制云朵最大高度；完整原因在面板状态行 */
 .cloud-body span {
-  display: block;
-  margin-top: 1px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  margin-top: 1px;
+  overflow-wrap: anywhere;
   font-size: 12px;
   line-height: 1.35;
   color: var(--ink-2);

@@ -135,9 +135,10 @@ export function bootstrapCapture(scene: CaptureScene): CaptureBootstrap {
     case "list":
       return {
         ...base,
+        // 干净项目故意放前面，验证待提交的会被排到上面
         rows: [
-          { project: mockProjectA, uiState: "idle" },
           { project: mockProjectB, uiState: "idle" },
+          { project: mockProjectA, uiState: "idle" },
         ],
       };
     case "running":
@@ -180,7 +181,11 @@ export function bootstrapCapture(scene: CaptureScene): CaptureBootstrap {
       return {
         ...base,
         panelOpen: false,
-        toast: { title: "失败", message: "push 被拒（non-fast-forward）", kind: "err" },
+        toast: {
+          title: "失败",
+          message: "push 被拒（non-fast-forward）：远端包含本地没有的提交，请先 git pull --rebase 再重试",
+          kind: "err",
+        },
         rows: [
           { project: mockProjectB, uiState: "failure", resultSummary: "push 被拒（non-fast-forward）" },
         ],
