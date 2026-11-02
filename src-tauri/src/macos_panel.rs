@@ -29,9 +29,9 @@ const HANDLE_BAND: f64 = 22.0;
 const CLOUD_BAND: f64 = 72.0;
 const CLOUD_WIDTH: f64 = 220.0;
 /// 和 CSS `.tag` 的 height、`.panel` 的 top/bottom 留白一致。
-const TAG_HEIGHT: f64 = 88.0;
+const TAG_HEIGHT: f64 = 60.0;
 const PANEL_INSET: f64 = 10.0;
-const DOCK_COLLAPSED: LogicalSize<f64> = LogicalSize::new(48.0, 122.0);
+const DOCK_COLLAPSED: LogicalSize<f64> = LogicalSize::new(42.0, 94.0);
 const DOCK_EXPANDED: LogicalSize<f64> = LogicalSize::new(384.0, 600.0);
 
 fn result_cloud_band() -> f64 {

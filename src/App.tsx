@@ -159,6 +159,8 @@ function App() {
     () => rows.some((r) => r.uiState === "failure"),
     [rows],
   );
+  const isAnyDirty = rows.some((r) => !r.project.gitClean);
+  const isAnyRunning = rows.some((r) => r.uiState === "running");
 
   const refreshList = useCallback(async () => {
     if (captureBoot?.skipInvoke) {
@@ -201,6 +203,17 @@ function App() {
     }
     void refreshList();
   }, [panelOpen, inMain, refreshList]);
+
+  // 收起时定时刷新，让 Tag 上的待提交圆点跟上外部改动；展开时已由上面的 effect 刷新
+  useEffect(() => {
+    if (captureBoot || panelOpen || !introComplete) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      void refreshList();
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [panelOpen, introComplete, refreshList]);
 
   const runPreflight = useCallback(async () => {
     if (captureBoot?.skipInvoke) return;
@@ -478,11 +491,14 @@ function App() {
             title="Asurada"
             onClick={onExpandPanel}
           >
-          {hasUnreadFailure ? <span className="tag-dot" aria-hidden /> : null}
-          <img className="tag-logo" src={logoUrl} alt="" />
-          <span className="tag-chevron" aria-hidden>
-            ‹
+          <span className={`tag-logo-wrap${isAnyRunning ? " is-running" : ""}`}>
+            <img className="tag-logo" src={logoUrl} alt="" />
           </span>
+          {hasUnreadFailure ? (
+            <span className="tag-pending is-failed" aria-label="有项目提交失败" />
+          ) : isAnyDirty ? (
+            <span className="tag-pending" aria-label="有项目待提交" />
+          ) : null}
         </button>
         </>
       )}

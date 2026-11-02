@@ -69,7 +69,7 @@ body {
 .tag-handle {
   position: absolute;
   top: calc(3px + var(--cloud-band, 0px));
-  right: 6px;
+  right: 3px;
   z-index: 2;
   width: 28px;
   height: 16px;
@@ -112,9 +112,10 @@ body {
   position: absolute;
   top: calc(22px + var(--cloud-band, 0px));
   right: 0;
-  width: 40px;
-  height: 88px;
-  padding: 0;
+  width: 34px;
+  height: 60px;
+  /* 左侧圆角显窄，光学居中 */
+  padding: 0 0 0 2px;
   border: none;
   border-radius: 14px 0 0 14px;
   background: linear-gradient(160deg, #2a2140 0%, #17122a 100%);
@@ -135,29 +136,48 @@ body {
   transform: scale(1.12);
 }
 
+.tag-logo-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+}
+
+.tag-logo-wrap.is-running::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    var(--peach) 120deg,
+    var(--mint) 260deg,
+    transparent 360deg
+  );
+  mask: radial-gradient(circle, transparent 12px, #000 12.5px);
+  animation: spin 1.1s linear infinite;
+}
+
+.tag-pending {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #ef8a3a;
+  box-shadow: 0 0 0 2px rgba(239, 138, 58, 0.25);
+}
+
+.tag-pending.is-failed {
+  background: var(--err);
+  box-shadow: 0 0 0 2px rgba(255, 107, 138, 0.25);
+}
+
 .tag-logo {
-  width: 26px;
-  height: 26px;
+  width: 20px;
+  height: 20px;
   border-radius: 7px;
   object-fit: cover;
-}
-
-.tag-chevron {
-  color: var(--mint);
-  font-size: 16px;
-  line-height: 1;
-  font-weight: 700;
-}
-
-.tag-dot {
-  position: absolute;
-  top: 7px;
-  left: 7px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--err);
-  box-shadow: 0 0 0 2px #1d1734;
 }
 
 .cloud {
@@ -173,18 +193,6 @@ body {
   box-shadow: 0 8px 18px rgba(23, 18, 42, 0.14);
   pointer-events: none;
   animation: cloud-in 0.22s ease-out;
-}
-
-.cloud::before {
-  content: "";
-  position: absolute;
-  top: -8px;
-  left: 28px;
-  width: 22px;
-  height: 22px;
-  background: inherit;
-  border: 1.5px solid rgba(94, 200, 196, 0.7);
-  border-radius: 50%;
 }
 
 .cloud::after {
@@ -221,10 +229,6 @@ body {
 
 .cloud--err {
   background: #fff6f8;
-  border-color: rgba(255, 140, 164, 0.75);
-}
-
-.cloud--err::before {
   border-color: rgba(255, 140, 164, 0.75);
 }
 
@@ -925,6 +929,7 @@ body {
   background: none;
   box-shadow: none;
   color: var(--ink-2);
+  font-weight: 400;
 }
 
 .git-status .status-text {
@@ -933,8 +938,8 @@ body {
 }
 
 .git-status .pip {
-  width: 7px;
-  height: 7px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: #cfc8d8;
   flex-shrink: 0;
@@ -949,9 +954,6 @@ body {
   border-radius: 999px;
   background: var(--peach-soft);
   color: #c45e22;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.4;
 }
 
 .git-status.dirty .pip {
@@ -960,11 +962,15 @@ body {
   background: #ef8a3a;
   box-shadow: 0 0 0 2px rgba(239, 138, 58, 0.35);
 }
-.git-status.clean {
+.git-status.clean,
+.git-status.ok,
+.git-status.err {
   align-items: flex-start;
 }
 
-.git-status.clean .status-text {
+.git-status.clean .status-text,
+.git-status.ok .status-text,
+.git-status.err .status-text {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
@@ -976,14 +982,16 @@ body {
   text-align: left;
 }
 
-.git-status.clean .pip {
-  margin-top: 4px;
+.git-status.clean .pip,
+.git-status.err .pip {
+  margin-top: 7.5px;
   background: #cfc8d8;
 }
 .git-status.ok {
   color: var(--ok);
 }
 .git-status.ok .pip {
+  margin-top: 7.5px;
   background: var(--ok);
 }
 .git-status.err {

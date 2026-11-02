@@ -20,6 +20,17 @@ export function getRowPresentation(row: ProjectRowState): {
     };
   }
 
+  if (uiState === "failure") {
+    const summary = row.resultSummary ?? "提交失败";
+    return {
+      kind: "err",
+      statusText: summary.startsWith("失败") ? summary : `失败 · ${summary}`,
+      btnDisabled: project.gitClean,
+      btnBusy: false,
+      btnTitle: project.gitClean ? "无变更" : undefined,
+    };
+  }
+
   if (!project.gitClean) {
     return {
       kind: "dirty",
@@ -30,7 +41,7 @@ export function getRowPresentation(row: ProjectRowState): {
   }
 
   return {
-    kind: "clean",
+    kind: uiState === "success" ? "ok" : "clean",
     statusText: project.lastCommitMessage ?? "暂无变更",
     btnDisabled: true,
     btnBusy: false,
