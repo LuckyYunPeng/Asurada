@@ -406,7 +406,7 @@ pub fn setup_tray(app: &mut App) -> Result<(), String> {
         TRAY_SHOW_ID,
         "显示面板",
         true,
-        None::<&str>,
+        Some(TOGGLE_SHORTCUT),
     )
     .map_err(|e| format!("无法创建菜单项: {e}"))?;
     let collapse_item = MenuItem::with_id(
@@ -463,7 +463,30 @@ pub fn setup(app: &mut App) -> Result<(), String> {
         }
     };
     install_outside_click_monitor(app.handle().clone());
+    if let Err(e) = register_toggle_shortcut(app) {
+        eprintln!("Asurada: 快捷键注册失败 ({e})，可能已被其他 App 占用");
+    }
     ready
+}
+
+/// 全局快捷键：展开 / 收起面板。
+const TOGGLE_SHORTCUT: &str = "Alt+Super+KeyG";
+
+fn register_toggle_shortcut(app: &mut App) -> Result<(), String> {
+    use tauri_plugin_global_shortcut::{Builder, ShortcutState};
+    app.handle()
+        .plugin(
+            Builder::new()
+                .with_shortcut(TOGGLE_SHORTCUT)
+                .map_err(|e| e.to_string())?
+                .with_handler(|app, _shortcut, event| {
+                    if event.state == ShortcutState::Pressed {
+                        let _ = apply_panel_open(app, !IS_PANEL_EXPANDED.load(Ordering::SeqCst));
+                    }
+                })
+                .build(),
+        )
+        .map_err(|e| e.to_string())
 }
 
 /// 非激活面板点到别的 App 时不会 resign key，用全局鼠标监听补上。

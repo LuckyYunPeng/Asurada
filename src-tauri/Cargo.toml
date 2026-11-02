@@ -32,6 +32,8 @@ block2 = "0.6"
 dispatch2 = "0.3"
 objc2-app-kit = { version = "0.3", features = ["NSEvent", "block2"] }
 rfd = "0.17"
+tauri-plugin-global-shortcut = "2"
+
 
 [profile.release]
 codegen-units = 1
