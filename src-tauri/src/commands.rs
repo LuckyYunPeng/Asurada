@@ -60,14 +60,14 @@ fn to_view(p: &StoredProject) -> ProjectView {
 }
 
 #[tauri::command]
-pub fn list_projects(app: tauri::AppHandle) -> Result<Vec<ProjectView>, String> {
+pub async fn list_projects(app: tauri::AppHandle) -> Result<Vec<ProjectView>, String> {
     let dir = app_data_dir(&app)?;
     let projects = load_projects(&dir)?;
     Ok(projects.iter().map(to_view).collect())
 }
 
 #[tauri::command]
-pub fn add_project(app: tauri::AppHandle, path: String) -> Result<ProjectView, String> {
+pub async fn add_project(app: tauri::AppHandle, path: String) -> Result<ProjectView, String> {
     let path = path.trim().to_string();
     if path.is_empty() {
         return Err("路径不能为空".to_string());
@@ -93,7 +93,7 @@ pub fn add_project(app: tauri::AppHandle, path: String) -> Result<ProjectView, S
 }
 
 #[tauri::command]
-pub fn remove_project(app: tauri::AppHandle, id: String) -> Result<(), String> {
+pub async fn remove_project(app: tauri::AppHandle, id: String) -> Result<(), String> {
     let dir = app_data_dir(&app)?;
     let mut projects = load_projects(&dir)?;
     let len_before = projects.len();
@@ -105,7 +105,7 @@ pub fn remove_project(app: tauri::AppHandle, id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn refresh_project_status(app: tauri::AppHandle, id: String) -> Result<ProjectView, String> {
+pub async fn refresh_project_status(app: tauri::AppHandle, id: String) -> Result<ProjectView, String> {
     let dir = app_data_dir(&app)?;
     let projects = load_projects(&dir)?;
     let project = projects
@@ -116,17 +116,17 @@ pub fn refresh_project_status(app: tauri::AppHandle, id: String) -> Result<Proje
 }
 
 #[tauri::command]
-pub fn check_environment() -> PreflightResult {
+pub async fn check_environment() -> PreflightResult {
     preflight::check_environment()
 }
 
 #[tauri::command]
-pub fn preflight() -> PreflightResult {
+pub async fn preflight() -> PreflightResult {
     preflight::check_environment()
 }
 
 #[tauri::command]
-pub fn run_commit_push(app: tauri::AppHandle, id: String) -> Result<CommitPushResult, String> {
+pub async fn run_commit_push(app: tauri::AppHandle, id: String) -> Result<CommitPushResult, String> {
     let env = preflight::check_environment();
     if !env.ready {
         return Err(env.summary);

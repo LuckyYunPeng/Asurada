@@ -34,12 +34,17 @@ function readIntroComplete(): boolean {
   }
 }
 
-function Mascot() {
+/** 以 logo 为中心的插画：虚线光环慢转 + logo 悬浮 + 可选角标 */
+function LogoHero({ badge }: { badge?: "+" | "!" }) {
   return (
-    <div className="mascot" aria-hidden>
-      <span className="blush-l" />
-      <span className="blush-r" />
-      <span className="mouth" />
+    <div className="logo-idle" aria-hidden>
+      <span className="logo-idle-ring" />
+      <img src={logoUrl} alt="" />
+      {badge ? (
+        <span className={`logo-idle-badge${badge === "!" ? " is-warn" : ""}`}>
+          {badge}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -93,8 +98,21 @@ function App() {
   const [toast, setToast] = useState<{ message: string; kind: ToastKind } | null>(
     () => captureBoot?.toast ?? null,
   );
+  const [isPanelClosing, setIsPanelClosing] = useState(false);
   const panelOpenRef = useRef(panelOpen);
   panelOpenRef.current = panelOpen;
+
+  // 先播放收起动画，结束后再缩窗
+  const onCollapsePanel = useCallback(() => {
+    if (!panelOpenRef.current) {
+      return;
+    }
+    setIsPanelClosing(true);
+    window.setTimeout(() => {
+      setPanelOpen(false);
+      setIsPanelClosing(false);
+    }, 220);
+  }, []);
 
   const envReady = preflight?.ready === true;
   const inIntro = introStep >= 0;
@@ -171,14 +189,18 @@ function App() {
 
     void (async () => {
       unlistenPanel = await listen<boolean>("set-panel-open", (event) => {
-        setPanelOpen(event.payload);
+        if (event.payload) {
+          setPanelOpen(true);
+        } else {
+          onCollapsePanel();
+        }
       });
     })();
 
     return () => {
       unlistenPanel?.();
     };
-  }, []);
+  }, [onCollapsePanel]);
 
   useEffect(() => {
     if (captureBoot || !isTauri) return;
@@ -189,13 +211,13 @@ function App() {
     if (captureBoot) return;
 
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && panelOpenRef.current) {
-        setPanelOpen(false);
+      if (event.key === "Escape") {
+        onCollapsePanel();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [onCollapsePanel]);
 
   useEffect(() => {
     if (captureBoot || !isTauri) return;
@@ -205,23 +227,15 @@ function App() {
 
     void (async () => {
       const win = getCurrentWindow();
-      unlistenBlur = await win.listen("tauri://blur", () => {
-        if (panelOpenRef.current) {
-          setPanelOpen(false);
-        }
-      });
-      unlistenDock = await listen("dock-blur", () => {
-        if (panelOpenRef.current) {
-          setPanelOpen(false);
-        }
-      });
+      unlistenBlur = await win.listen("tauri://blur", onCollapsePanel);
+      unlistenDock = await listen("dock-blur", onCollapsePanel);
     })();
 
     return () => {
       unlistenBlur?.();
       unlistenDock?.();
     };
-  }, []);
+  }, [onCollapsePanel]);
 
   function finishIntro() {
     try {
@@ -353,7 +367,9 @@ function App() {
       )}
 
       {panelOpen ? (
-        <aside className="panel" role="dialog" aria-label="Asurada 面板">
+        <aside
+          className={`panel${isPanelClosing ? " panel--closing" : ""}`}
+          role="dialog" aria-label="Asurada 面板">
           <header className="chrome">
             <div className="title-wrap">
               <div className="badge">
@@ -399,7 +415,7 @@ function App() {
                 className="btn-icon"
                 aria-label="收起"
                 title="收起"
-                onClick={() => setPanelOpen(false)}
+                onClick={onCollapsePanel}
               >
                 <Icon d="m9 18 6-6-6-6" />
               </button>
@@ -445,7 +461,7 @@ function App() {
               <p className="muted">加载中…</p>
             ) : projectCount === 0 ? (
               <div className="empty">
-                <Mascot />
+                <LogoHero badge="+" />
                 <h2>还没有项目呢</h2>
                 <p>添加本地 git 仓库后，就能一键生成提交并推送啦</p>
                 <button
@@ -501,7 +517,7 @@ function IntroView({
 
   return (
     <div className="intro step">
-      <Mascot />
+      <LogoHero />
       <h2>{content.title}</h2>
       {"sub" in content && content.sub ? (
         <p className="sub">{content.sub}</p>
@@ -545,7 +561,16 @@ function PreflightGateView({
 
   return (
     <div className="gate">
-      {loading ? <div className="spin" aria-hidden /> : null}
+      {loading ? (
+        <div className="logo-loader" aria-hidden>
+          <span className="logo-loader-ring" />
+          <span className="logo-loader-orbit">
+            <i />
+            <i />
+          </span>
+          <img src={logoUrl} alt="" />
+        </div>
+      ) : null}
       <h2>{loading ? "正在检查本机环境" : "环境检查"}</h2>
       <p>依赖本机 pi agent，先确认能不能跑～</p>
       <div className="checks">
@@ -566,7 +591,7 @@ function PreflightFailView({
 }) {
   return (
     <div className="gate">
-      <Mascot />
+      <LogoHero badge="!" />
       <h2>本机还差一点</h2>
       <p>环境没齐的话没法提交并推送，先修好再来呀</p>
       <div className="checks">

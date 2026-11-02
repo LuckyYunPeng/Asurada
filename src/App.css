@@ -120,17 +120,42 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: panel-in 0.18s ease-out;
+  transform-origin: right center;
+  animation: panel-in 0.42s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.panel--closing {
+  animation: panel-out 0.22s cubic-bezier(0.5, 0, 0.75, 0) forwards;
 }
 
 @keyframes panel-in {
   from {
     opacity: 0;
-    transform: translateX(12px);
+    transform: translateX(80px) scale(0.86);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: none;
+  }
+}
+
+@keyframes panel-out {
+  to {
+    opacity: 0;
+    transform: translateX(80px) scale(0.86);
+  }
+}
+
+.tag {
+  animation: tag-in 0.36s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes tag-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
   }
 }
 
@@ -311,7 +336,19 @@ body {
   padding-top: 32px;
 }
 
-.empty p {
+.gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.gate .checks {
+  align-self: stretch;
+}
+
+.panel .empty p,
+.panel .gate > p {
   text-align: center;
 }
 
@@ -347,60 +384,6 @@ body {
 
 .intro.step .lead {
   text-align: left;
-}
-
-.mascot {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  margin: 0 auto 10px;
-  background: linear-gradient(160deg, #fff, #e8f8f6);
-  border: 2px solid #b8e8e0;
-  position: relative;
-  box-shadow: 0 8px 18px rgba(94, 200, 212, 0.18);
-}
-
-.mascot::before,
-.mascot::after {
-  content: "";
-  position: absolute;
-  top: 24px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #5a5468;
-}
-.mascot::before {
-  left: 20px;
-}
-.mascot::after {
-  right: 20px;
-}
-
-.mouth {
-  position: absolute;
-  left: 24px;
-  right: 24px;
-  bottom: 18px;
-  height: 8px;
-  border-bottom: 2.5px solid #5ec8d4;
-  border-radius: 0 0 10px 10px;
-}
-
-.blush-l,
-.blush-r {
-  position: absolute;
-  top: 28px;
-  width: 8px;
-  height: 4px;
-  border-radius: 50%;
-  background: rgba(240, 184, 154, 0.55);
-}
-.blush-l {
-  left: 10px;
-}
-.blush-r {
-  right: 10px;
 }
 
 .dots {
@@ -441,19 +424,142 @@ body {
   padding: 6px 8px;
 }
 
-.spin {
-  width: 36px;
-  height: 36px;
-  margin: 8px auto 14px;
+/* 预检 loading：logo 呼吸 + 渐变光环旋转 + 双色轨道点 */
+.logo-loader {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  margin: 8px auto 16px;
+  display: grid;
+  place-items: center;
+}
+
+.logo-loader img {
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  box-shadow: 0 6px 20px rgba(94, 200, 212, 0.45);
+  animation: logo-breathe 1.6s ease-in-out infinite;
+}
+
+.logo-loader-ring {
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
-  border: 3px solid #dff6f8;
-  border-top-color: #5ec8d4;
-  animation: spin 0.8s linear infinite;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    var(--peach) 120deg,
+    var(--mint) 260deg,
+    transparent 360deg
+  );
+  mask: radial-gradient(circle, transparent 37px, #000 38px);
+  animation: spin 1.1s linear infinite;
+}
+
+.logo-loader-orbit {
+  position: absolute;
+  inset: -6px;
+  animation: spin 2.4s linear infinite reverse;
+}
+
+.logo-loader-orbit i {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mint);
+  box-shadow: 0 0 10px var(--mint);
+  top: 0;
+  left: calc(50% - 4px);
+}
+
+.logo-loader-orbit i + i {
+  background: var(--peach);
+  box-shadow: 0 0 10px var(--peach);
+  top: auto;
+  bottom: 0;
 }
 
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* 空态：logo 悬浮 + 虚线光环慢转 + “添加”角标 */
+.logo-idle {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(94, 200, 212, 0.18) 0%,
+    rgba(240, 184, 154, 0.12) 55%,
+    transparent 70%
+  );
+}
+
+.logo-idle img {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  box-shadow: 0 8px 22px rgba(94, 200, 212, 0.4);
+  animation: logo-float 3s ease-in-out infinite;
+}
+
+.logo-idle-ring {
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  border: 2px dashed rgba(94, 200, 212, 0.55);
+  animation: spin 14s linear infinite;
+}
+
+.logo-idle-badge {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--peach), #f5a483);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 0 3px #fff, 0 4px 10px rgba(240, 184, 154, 0.5);
+  animation: logo-float 3s ease-in-out infinite;
+}
+
+.logo-idle-badge.is-warn {
+  background: linear-gradient(135deg, #ff8fa6, var(--err));
+  box-shadow: 0 0 0 3px #fff, 0 4px 10px rgba(255, 107, 138, 0.45);
+}
+
+@keyframes logo-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes logo-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
   }
 }
 
