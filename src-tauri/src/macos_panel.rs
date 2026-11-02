@@ -11,8 +11,11 @@ use tauri_nspanel::{
 
 /// 选目录对话框打开时，忽略失焦和窗外点击，避免收起并重新摆放面板。
 static IS_FILE_DIALOG_OPEN: AtomicBool = AtomicBool::new(false);
+/// 收起态的第一下点击经常只用来激活窗口，到不了页面按钮。
+static IS_PANEL_EXPANDED: AtomicBool = AtomicBool::new(true);
+static IS_TAG_HOT: AtomicBool = AtomicBool::new(false);
 
-const DOCK_COLLAPSED: LogicalSize<f64> = LogicalSize::new(40.0, 88.0);
+const DOCK_COLLAPSED: LogicalSize<f64> = LogicalSize::new(48.0, 102.0);
 const DOCK_EXPANDED: LogicalSize<f64> = LogicalSize::new(384.0, 600.0);
 
 const TRAY_SHOW_ID: &str = "tray-show-panel";
@@ -40,6 +43,14 @@ pub fn place_dock_window(window: &WebviewWindow, expanded: bool) -> Result<(), S
     } else {
         DOCK_COLLAPSED
     };
+    place_frame(window, logical, 0.0)
+}
+
+fn place_frame(
+    window: &WebviewWindow,
+    logical: LogicalSize<f64>,
+    lift: f64,
+) -> Result<(), String> {
     window
         .set_size(Size::Logical(logical))
         .map_err(|e| format!("无法调整窗口大小: {e}"))?;
@@ -51,11 +62,13 @@ pub fn place_dock_window(window: &WebviewWindow, expanded: bool) -> Result<(), S
     let origin = area.position.to_logical::<f64>(scale);
     let mon = area.size.to_logical::<f64>(scale);
     let x = origin.x + mon.width - logical.width;
-    // 展开、收起共用面板顶边。按各自中心对齐时，88 高的 tag 会落到 600 高面板的中部。
-    let y = origin.y
+    // 展开、收起共用面板顶边。悬停放大时以这块 tag 的中心往上抬，避免只往下长。
+    let y = (origin.y
         + (mon.height * 0.36 - DOCK_EXPANDED.height / 2.0)
             .min(mon.height - DOCK_EXPANDED.height)
-            .max(8.0);
+            .max(8.0)
+        - lift)
+        .max(origin.y + 8.0);
 
     window
         .set_position(LogicalPosition::new(x, y))
@@ -106,6 +119,7 @@ fn show_window_collapsed(window: &WebviewWindow) -> Result<(), String> {
 }
 
 pub fn apply_panel_open(app: &AppHandle, expanded: bool) -> Result<(), String> {
+    IS_PANEL_EXPANDED.store(expanded, Ordering::SeqCst);
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| "未找到主窗口".to_string())?;
@@ -117,6 +131,7 @@ pub fn apply_panel_open(app: &AppHandle, expanded: bool) -> Result<(), String> {
     }
 
     let _ = app.emit("set-panel-open", expanded);
+    outside_click::refresh_collapsed_cursor(&window);
     Ok(())
 }
 
@@ -146,6 +161,7 @@ fn init_panel(app_handle: &AppHandle) -> Result<(), String> {
     );
     // 默认会在应用失活时整窗隐藏，点外面就看不到 tag
     panel.set_hides_on_deactivate(false);
+    panel.set_accepts_mouse_moved_events(true);
 
     let handler = AsuradaPanelHandler::new();
     let emit_handle = app_handle.clone();
@@ -261,24 +277,323 @@ fn install_outside_click_monitor(app_handle: AppHandle) {
 }
 
 mod outside_click {
-    use super::IS_FILE_DIALOG_OPEN;
-    use objc2_app_kit::{NSEvent, NSEventMask};
-    use std::sync::atomic::Ordering;
-    use tauri::{AppHandle, Emitter};
+    use super::{apply_panel_open, IS_FILE_DIALOG_OPEN, IS_PANEL_EXPANDED, IS_TAG_HOT};
+    use objc2_app_kit::{
+        NSAutoresizingMaskOptions, NSCursor, NSEvent, NSEventMask, NSTrackingArea,
+        NSTrackingAreaOptions, NSView, NSWindow,
+    };
+    use std::ffi::{c_char, c_int, c_void, CStr};
+    use std::sync::atomic::{AtomicBool, AtomicPtr, Ordering};
+    use std::sync::OnceLock;
+    use tauri::{AppHandle, Emitter, Manager};
+    use tauri_nspanel::objc2::rc::Retained;
+    use tauri_nspanel::objc2::runtime::AnyObject;
+    use tauri_nspanel::objc2::{define_class, msg_send, AllocAnyThread, MainThreadMarker, MainThreadOnly};
+    use tauri_nspanel::objc2_foundation::NSPoint;
+
+    static APP: OnceLock<AppHandle> = OnceLock::new();
+    static CURSOR_VIEW: AtomicPtr<TagCursorView> = AtomicPtr::new(std::ptr::null_mut());
+    static IS_HAND_SHOWN: AtomicBool = AtomicBool::new(false);
+
+    unsafe extern "C" {
+        fn dlopen(filename: *const c_char, flags: c_int) -> *mut c_void;
+        fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
+        fn CFStringCreateWithCString(
+            alloc: *const c_void,
+            c_str: *const c_char,
+            encoding: u32,
+        ) -> *const c_void;
+        fn CFRelease(cf: *const c_void);
+        static kCFBooleanTrue: *const c_void;
+    }
+
+    define_class!(
+        #[unsafe(super(NSView))]
+        #[thread_kind = MainThreadOnly]
+        #[ivars = ()]
+        #[name = "AsuradaTagCursorView"]
+        struct TagCursorView;
+
+        impl TagCursorView {
+            #[unsafe(method(updateTrackingAreas))]
+            fn update_tracking_areas(&self) {
+                unsafe { msg_send![super(self), updateTrackingAreas] }
+                if self.trackingAreas().count() > 0 {
+                    return;
+                }
+                let area = unsafe {
+                    NSTrackingArea::initWithRect_options_owner_userInfo(
+                        NSTrackingArea::alloc(),
+                        self.bounds(),
+                        NSTrackingAreaOptions::MouseEnteredAndExited
+                            | NSTrackingAreaOptions::MouseMoved
+                            | NSTrackingAreaOptions::CursorUpdate
+                            | NSTrackingAreaOptions::ActiveAlways
+                            | NSTrackingAreaOptions::InVisibleRect
+                            | NSTrackingAreaOptions::AssumeInside,
+                        Some(&*(self as *const Self as *const AnyObject)),
+                        None,
+                    )
+                };
+                self.addTrackingArea(&area);
+            }
+
+            #[unsafe(method(resetCursorRects))]
+            fn reset_cursor_rects(&self) {
+                unsafe { msg_send![super(self), resetCursorRects] }
+                if IS_PANEL_EXPANDED.load(Ordering::SeqCst) {
+                    return;
+                }
+                self.addCursorRect_cursor(self.bounds(), &NSCursor::pointingHandCursor());
+            }
+
+            #[unsafe(method(mouseEntered:))]
+            fn mouse_entered(&self, _event: &NSEvent) {
+                show_hand();
+            }
+
+            #[unsafe(method(mouseMoved:))]
+            fn mouse_moved(&self, _event: &NSEvent) {
+                show_hand();
+            }
+
+            #[unsafe(method(cursorUpdate:))]
+            fn cursor_update(&self, _event: &NSEvent) {
+                show_hand();
+            }
+
+            #[unsafe(method(mouseExited:))]
+            fn mouse_exited(&self, _event: &NSEvent) {
+                release_hand();
+            }
+
+            #[unsafe(method(acceptsFirstMouse:))]
+            fn accepts_first_mouse(&self, _event: &NSEvent) -> bool {
+                true
+            }
+
+            #[unsafe(method_id(hitTest:))]
+            fn hit_test(&self, point: NSPoint) -> Option<Retained<NSView>> {
+                if IS_PANEL_EXPANDED.load(Ordering::SeqCst) {
+                    None
+                } else {
+                    unsafe { msg_send![super(self), hitTest: point] }
+                }
+            }
+        }
+    );
+
+    fn show_hand() {
+        if IS_PANEL_EXPANDED.load(Ordering::SeqCst) || IS_FILE_DIALOG_OPEN.load(Ordering::SeqCst) {
+            release_hand();
+            return;
+        }
+        IS_HAND_SHOWN.store(true, Ordering::SeqCst);
+        NSCursor::pointingHandCursor().set();
+        if let Some(app) = APP.get() {
+            if !IS_TAG_HOT.swap(true, Ordering::SeqCst) {
+                let _ = app.emit("tag-hot", true);
+            }
+        }
+    }
+
+    fn release_hand() {
+        if IS_HAND_SHOWN.swap(false, Ordering::SeqCst) {
+            NSCursor::arrowCursor().set();
+        }
+        if let Some(app) = APP.get() {
+            if IS_TAG_HOT.swap(false, Ordering::SeqCst) {
+                let _ = app.emit("tag-hot", false);
+            }
+        }
+    }
+
+    pub(super) fn refresh_collapsed_cursor(window: &tauri::WebviewWindow) {
+        let Ok(ns_window) = window.ns_window() else {
+            return;
+        };
+        let ns_window = unsafe { &*ns_window.cast::<NSWindow>() };
+        let view = CURSOR_VIEW.load(Ordering::SeqCst);
+        if !view.is_null() {
+            ns_window.invalidateCursorRectsForView(unsafe { &*view });
+        }
+        if cursor_inside(ns_window) {
+            show_hand();
+        } else {
+            release_hand();
+        }
+    }
+
+    /// 别的 App 在前台时，系统只显示那个 App 的光标。给这个窗口打上后台改光标的标记后，
+    /// 鼠标停在收起态上时 `NSCursor.set` 才会画到手型。
+    fn allow_background_cursor(window_number: isize) {
+        let Some(main_conn) = (unsafe {
+            sky_symbol::<unsafe extern "C" fn() -> c_int>(c"CGSMainConnectionID")
+                .or_else(|| sky_symbol(c"SLSMainConnectionID"))
+        }) else {
+            return;
+        };
+        let cid = unsafe { main_conn() };
+        if let Some(set_tags) = unsafe {
+            sky_symbol::<unsafe extern "C" fn(c_int, u32, *const u64, c_int) -> c_int>(
+                c"SLSSetWindowTags",
+            )
+            .or_else(|| sky_symbol(c"CGSSetWindowTags"))
+        } {
+            let tags: u64 = 1 << 5;
+            let _ = unsafe { set_tags(cid, window_number as u32, &tags, 64) };
+        }
+        if let Some(set_prop) = unsafe {
+            sky_symbol::<unsafe extern "C" fn(c_int, c_int, *const c_void, *const c_void) -> c_int>(
+                c"CGSSetConnectionProperty",
+            )
+            .or_else(|| sky_symbol(c"SLSSetConnectionProperty"))
+        } {
+            let key = unsafe {
+                CFStringCreateWithCString(
+                    std::ptr::null(),
+                    c"SetsCursorInBackground".as_ptr(),
+                    0x0800_0100,
+                )
+            };
+            if !key.is_null() {
+                let _ = unsafe { set_prop(cid, cid, key, kCFBooleanTrue) };
+                unsafe { CFRelease(key) };
+            }
+        }
+    }
+
+    unsafe fn sky_symbol<T>(name: &CStr) -> Option<T> {
+        const RTLD_DEFAULT: *mut c_void = -2isize as *mut c_void;
+        const RTLD_LAZY: c_int = 1;
+        let mut symbol = unsafe { dlsym(RTLD_DEFAULT, name.as_ptr()) };
+        if symbol.is_null() {
+            let sky = unsafe {
+                dlopen(
+                    c"/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight".as_ptr(),
+                    RTLD_LAZY,
+                )
+            };
+            if !sky.is_null() {
+                symbol = unsafe { dlsym(sky, name.as_ptr()) };
+            }
+        }
+        if symbol.is_null() {
+            None
+        } else {
+            Some(unsafe { std::mem::transmute_copy(&symbol) })
+        }
+    }
+
+    fn install_cursor_view(window: &NSWindow) {
+        allow_background_cursor(window.windowNumber());
+        let Some(content) = window.contentView() else {
+            return;
+        };
+        let view = TagCursorView::alloc(MainThreadMarker::from(window)).set_ivars(());
+        let view: Retained<TagCursorView> =
+            unsafe { msg_send![super(view), initWithFrame: content.bounds()] };
+        view.setAutoresizingMask(
+            NSAutoresizingMaskOptions::ViewWidthSizable
+                | NSAutoresizingMaskOptions::ViewHeightSizable,
+        );
+        content.addSubview(&view);
+        CURSOR_VIEW.store(
+            Retained::as_ptr(&view) as *mut TagCursorView,
+            Ordering::SeqCst,
+        );
+        view.updateTrackingAreas();
+        window.invalidateCursorRectsForView(&view);
+    }
 
     pub fn install(app_handle: AppHandle) {
+        let _ = APP.set(app_handle.clone());
         let mask = NSEventMask::LeftMouseDown | NSEventMask::RightMouseDown;
+        let blur_handle = app_handle.clone();
         let block = block2::RcBlock::new(move |_event: std::ptr::NonNull<NSEvent>| {
             if IS_FILE_DIALOG_OPEN.load(Ordering::SeqCst) {
                 return;
             }
-            let _ = app_handle.emit("dock-blur", ());
+            let _ = blur_handle.emit("dock-blur", ());
         });
         if let Some(monitor) =
             NSEvent::addGlobalMonitorForEventsMatchingMask_handler(mask, &block)
         {
             std::mem::forget(monitor);
         }
+
+        let Some(window) = app_handle.get_webview_window("main") else {
+            return;
+        };
+        let Ok(ns_window) = window.ns_window() else {
+            return;
+        };
+        let ns_window = unsafe { &*ns_window.cast::<NSWindow>() };
+        install_cursor_view(ns_window);
+        install_collapsed_click(app_handle, ns_window.windowNumber());
+        install_tag_hot(ns_window as *const NSWindow);
+    }
+
+    fn install_collapsed_click(app_handle: AppHandle, window_number: isize) {
+        let block = block2::RcBlock::new(move |event: std::ptr::NonNull<NSEvent>| {
+            let mouse_down = unsafe { event.as_ref() };
+            if !IS_FILE_DIALOG_OPEN.load(Ordering::SeqCst)
+                && !IS_PANEL_EXPANDED.load(Ordering::SeqCst)
+                && mouse_down.windowNumber() == window_number
+            {
+                let _ = apply_panel_open(&app_handle, true);
+            }
+            event.as_ptr()
+        });
+        if let Some(monitor) = unsafe {
+            NSEvent::addLocalMonitorForEventsMatchingMask_handler(
+                NSEventMask::LeftMouseDown,
+                &block,
+            )
+        } {
+            std::mem::forget(monitor);
+        }
+    }
+
+    fn install_tag_hot(window: *const NSWindow) {
+        let global = block2::RcBlock::new(move |_event: std::ptr::NonNull<NSEvent>| {
+            note_tag_hot(window);
+        });
+        if let Some(monitor) =
+            NSEvent::addGlobalMonitorForEventsMatchingMask_handler(NSEventMask::MouseMoved, &global)
+        {
+            std::mem::forget(monitor);
+        }
+
+        let local = block2::RcBlock::new(move |event: std::ptr::NonNull<NSEvent>| {
+            note_tag_hot(window);
+            event.as_ptr()
+        });
+        if let Some(monitor) = unsafe {
+            NSEvent::addLocalMonitorForEventsMatchingMask_handler(NSEventMask::MouseMoved, &local)
+        } {
+            std::mem::forget(monitor);
+        }
+    }
+
+    fn note_tag_hot(window: *const NSWindow) {
+        let hot = !IS_PANEL_EXPANDED.load(Ordering::SeqCst)
+            && !IS_FILE_DIALOG_OPEN.load(Ordering::SeqCst)
+            && cursor_inside(window);
+        if hot {
+            show_hand();
+        } else if IS_TAG_HOT.load(Ordering::SeqCst) {
+            release_hand();
+        }
+    }
+
+    fn cursor_inside(window: *const NSWindow) -> bool {
+        let mouse = NSEvent::mouseLocation();
+        let frame = unsafe { &*window }.frame();
+        mouse.x >= frame.origin.x
+            && mouse.x < frame.origin.x + frame.size.width
+            && mouse.y >= frame.origin.y
+            && mouse.y < frame.origin.y + frame.size.height
     }
 }
 

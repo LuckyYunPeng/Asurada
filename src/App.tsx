@@ -98,6 +98,7 @@ function App() {
     () => captureBoot?.toast ?? null,
   );
   const [isPanelClosing, setIsPanelClosing] = useState(false);
+  const [isTagHot, setIsTagHot] = useState(false);
   const panelOpenRef = useRef(panelOpen);
   panelOpenRef.current = panelOpen;
   const isPickingRef = useRef(false);
@@ -223,6 +224,19 @@ function App() {
       unlistenPanel?.();
     };
   }, [onCollapsePanel]);
+
+  useEffect(() => {
+    if (captureBoot || !isTauri) return;
+    let unlisten: (() => void) | undefined;
+    void listen<boolean>("tag-hot", (event) => {
+      setIsTagHot(event.payload);
+    }).then((stop) => {
+      unlisten = stop;
+    });
+    return () => {
+      unlisten?.();
+    };
+  }, []);
 
   useEffect(() => {
     if (captureBoot || !isTauri) return;
@@ -383,7 +397,7 @@ function App() {
       {panelOpen ? null : (
         <button
           type="button"
-          className="tag"
+          className={`tag${isTagHot ? " tag--hot" : ""}`}
           aria-expanded={false}
           aria-label="Asurada"
           title="Asurada"
@@ -680,9 +694,11 @@ function ProjectRow({
   onCommit: () => void;
   onRemove: () => void;
 }) {
+  const [isConfirming, setIsConfirming] = useState(false);
   const pres = getRowPresentation(row);
   const primaryDisabled =
     pres.btnDisabled || !canCommit || row.uiState === "running";
+  const isRunning = row.uiState === "running";
 
   return (
     <li className="row">
@@ -699,15 +715,6 @@ function ProjectRow({
       <div className="actions">
         <button
           type="button"
-          className="menu"
-          aria-label="移除项目"
-          disabled={row.uiState === "running"}
-          onClick={onRemove}
-        >
-          ⋯
-        </button>
-        <button
-          type="button"
           className={`btn-primary${pres.btnBusy ? " busy" : ""}`}
           disabled={primaryDisabled}
           title={pres.btnTitle}
@@ -716,6 +723,27 @@ function ProjectRow({
           {pres.btnBusy ? "提交中…" : "提交并推送"}
         </button>
       </div>
+      {isRunning ? null : (
+        <button
+          type="button"
+          className={`row-remove${isConfirming ? " is-open" : ""}`}
+          aria-label="移除项目"
+          onClick={() => setIsConfirming(true)}
+        >
+          <Icon d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
+        </button>
+      )}
+      {isConfirming ? (
+        <div className="row-confirm" role="alertdialog" aria-label="确认移除">
+          <span>从列表移除？本地仓库还在</span>
+          <button type="button" onClick={() => setIsConfirming(false)}>
+            取消
+          </button>
+          <button type="button" className="is-danger" onClick={onRemove}>
+            移除
+          </button>
+        </div>
+      ) : null}
     </li>
   );
 }
