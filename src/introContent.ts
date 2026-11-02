@@ -1,8 +1,5 @@
 export const INTRO_STORAGE_KEY = "asurada_intro_complete";
 
-/** 设置页「查看引导」行标签 */
-export const VIEW_INTRO_LABEL = "查看引导";
-
 export const INTRO_STEPS = [
   {
     title: "验收时，项目总在换",
