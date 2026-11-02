@@ -180,76 +180,139 @@ body {
   object-fit: cover;
 }
 
+/* 收起态结果气泡：状态图标 + 标题/摘要 + 底部倒计时条，从 Tag 方向弹出 */
 .cloud {
+  --cloud-c1: #5ec8d4;
+  --cloud-c2: #4ecb8b;
+  --cloud-ink: #1c9a78;
+  --cloud-tint: #effbf7;
   position: absolute;
   z-index: 3;
-  top: 10px;
+  top: 8px;
   right: 8px;
-  width: 200px;
-  padding: 8px 12px 9px;
-  border-radius: 18px;
-  background: #f4fffb;
-  border: 1.5px solid rgba(94, 200, 196, 0.7);
-  box-shadow: 0 8px 18px rgba(23, 18, 42, 0.14);
+  width: 204px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px 11px 10px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fff 40%, var(--cloud-tint));
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 10px 24px rgba(23, 18, 42, 0.16),
+    0 2px 6px rgba(23, 18, 42, 0.08),
+    inset 0 0 0 1px rgba(94, 200, 212, 0.18);
   pointer-events: none;
-  animation: cloud-in 0.22s ease-out;
-}
-
-.cloud::after {
-  content: "";
-  position: absolute;
-  right: 18px;
-  bottom: -6px;
-  width: 12px;
-  height: 12px;
-  background: #f4fffb;
-  border-right: 1.5px solid rgba(94, 200, 196, 0.7);
-  border-bottom: 1.5px solid rgba(94, 200, 196, 0.7);
-  border-radius: 2px;
-  transform: rotate(45deg);
-}
-
-.cloud strong {
-  display: block;
-  font-size: 13px;
-  line-height: 1.3;
-  color: #1c9a78;
-}
-
-.cloud span {
-  display: -webkit-box;
-  margin-top: 2px;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  font-size: 12px;
-  line-height: 1.35;
-  color: #4a4458;
+  transform-origin: 85% 100%;
+  animation: cloud-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .cloud--err {
-  background: #fff6f8;
-  border-color: rgba(255, 140, 164, 0.75);
+  --cloud-c1: #ff8aa3;
+  --cloud-c2: #f06a6a;
+  --cloud-ink: #d4405f;
+  --cloud-tint: #fff1f4;
+  box-shadow:
+    0 10px 24px rgba(23, 18, 42, 0.16),
+    0 2px 6px rgba(23, 18, 42, 0.08),
+    inset 0 0 0 1px rgba(255, 107, 138, 0.2);
 }
 
-.cloud--err::after {
-  background: #fff6f8;
-  border-right-color: rgba(255, 140, 164, 0.75);
-  border-bottom-color: rgba(255, 140, 164, 0.75);
+.cloud-icon {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(135deg, var(--cloud-c1), var(--cloud-c2));
+  box-shadow: 0 3px 8px color-mix(in srgb, var(--cloud-c2) 45%, transparent);
+  animation: cloud-icon-pop 0.5s 0.12s cubic-bezier(0.34, 1.8, 0.64, 1) both;
 }
 
-.cloud--err strong {
-  color: #d45370;
+.cloud-icon svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 3;
+}
+
+.cloud-body {
+  min-width: 0;
+}
+
+.cloud-body strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--cloud-ink);
+}
+
+.cloud-body span {
+  display: block;
+  margin-top: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ink-2);
+}
+
+/* 与 App.tsx 里 4200ms 自动消失同步 */
+.cloud-timer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.cloud-timer stop:first-child {
+  stop-color: var(--cloud-c1);
+}
+
+.cloud-timer stop:last-child {
+  stop-color: var(--cloud-c2);
+}
+
+/* 描边沿卡片四周顺时针逐渐收起 */
+.cloud-timer rect {
+  fill: none;
+  stroke: url(#cloud-timer-grad);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-dasharray: 100 100;
+  animation: cloud-timer 4.2s linear forwards;
 }
 
 @keyframes cloud-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(10px) scale(0.85);
   }
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes cloud-icon-pop {
+  from {
+    transform: scale(0) rotate(-30deg);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes cloud-timer {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -100;
   }
 }
 

@@ -13,7 +13,9 @@ export type CaptureScene =
   | "list"
   | "empty"
   | "running"
-  | "result";
+  | "result"
+  | "cloud-ok"
+  | "cloud-err";
 
 export function getCaptureScene(): CaptureScene | null {
   if (!import.meta.env.DEV) return null;
@@ -165,6 +167,22 @@ export function bootstrapCapture(scene: CaptureScene): CaptureBootstrap {
             uiState: "failure",
             resultSummary: "失败 · push 被拒（non-fast-forward）",
           },
+        ],
+      };
+    case "cloud-ok":
+      return {
+        ...base,
+        panelOpen: false,
+        toast: { title: "已推送", message: "feat: 调整落地页导航间距", kind: "ok" },
+        rows: [{ project: mockProjectB, uiState: "idle" }],
+      };
+    case "cloud-err":
+      return {
+        ...base,
+        panelOpen: false,
+        toast: { title: "失败", message: "push 被拒（non-fast-forward）", kind: "err" },
+        rows: [
+          { project: mockProjectB, uiState: "failure", resultSummary: "push 被拒（non-fast-forward）" },
         ],
       };
     default:

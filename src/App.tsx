@@ -474,8 +474,22 @@ function App() {
         <>
           {toast ? (
             <div className={`cloud cloud--${toast.kind}`} role="status">
-              <strong>{toast.title}</strong>
-              <span>{toast.message}</span>
+              <span className="cloud-icon" aria-hidden>
+                <Icon d={toast.kind === "ok" ? "M20 6 9 17l-5-5" : "M18 6 6 18M6 6l12 12"} />
+              </span>
+              <span className="cloud-body">
+                <strong>{toast.title}</strong>
+                <span>{toast.message}</span>
+              </span>
+              <svg className="cloud-timer" aria-hidden>
+                <defs>
+                  <linearGradient id="cloud-timer-grad" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" />
+                    <stop offset="1" />
+                  </linearGradient>
+                </defs>
+                <rect width="100%" height="100%" rx="15" pathLength="100" />
+              </svg>
             </div>
           ) : null}
           <div className="tag-handle" aria-hidden>
