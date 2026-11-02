@@ -1,5 +1,8 @@
 export const INTRO_STORAGE_KEY = "asurada_intro_complete";
 
+/** 设置页脚链：重看引导（深浅色统一文案） */
+export const REPLAY_INTRO_LABEL = "重看引导";
+
 export const INTRO_STEPS = [
   {
     title: "验收时，项目总在换",

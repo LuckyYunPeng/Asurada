@@ -9,6 +9,7 @@ import {
   INTRO_STEPS,
   INTRO_STORAGE_KEY,
   PREFLIGHT_CHECK_META,
+  REPLAY_INTRO_LABEL,
 } from "./introContent";
 import { getRowPresentation } from "./rowPresentation";
 import { Toast, type ToastKind } from "./Toast";
@@ -593,8 +594,13 @@ function SettingsView({
         >
           返回
         </button>
-        <button type="button" className="settings-extra" onClick={onReplayIntro}>
-          重看引导
+        <button
+          type="button"
+          className="settings-extra"
+          aria-label={REPLAY_INTRO_LABEL}
+          onClick={onReplayIntro}
+        >
+          {REPLAY_INTRO_LABEL}
         </button>
       </div>
     </div>
