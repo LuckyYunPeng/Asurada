@@ -348,6 +348,17 @@ body {
   min-width: 0;
 }
 
+.title-cluster {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.title-cluster .title-plain {
+  white-space: nowrap;
+}
+
 .badge {
   width: 24px;
   height: 24px;
@@ -417,7 +428,7 @@ body {
   color: var(--mint-hover-ink);
   font-weight: 600;
   font-size: 12px;
-  padding: 5px 6px 5px 0;
+  padding: 5px 4px;
   flex: none;
 }
 

@@ -423,21 +423,23 @@ function App() {
         >
           <header className="chrome">
             <div className="title-wrap">
-              {inSettings ? (
-                <button
-                  type="button"
-                  className="btn-text btn-chrome-back"
-                  onClick={closeSettings}
-                >
-                  返回
-                </button>
-              ) : null}
               <div className="badge">
                 <img src={logoUrl} alt="" />
               </div>
-              <h1 className={inSettings ? "title-plain" : "title"}>
-                {inSettings ? "设置" : "Asurada"}
-              </h1>
+              {inSettings ? (
+                <div className="title-cluster">
+                  <button
+                    type="button"
+                    className="btn-text btn-chrome-back"
+                    onClick={closeSettings}
+                  >
+                    返回
+                  </button>
+                  <h1 className="title-plain">设置</h1>
+                </div>
+              ) : (
+                <h1 className="title">Asurada</h1>
+              )}
             </div>
             <div className="chrome-actions">
               {showHeaderAdd ? (
