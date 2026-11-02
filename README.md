@@ -1,5 +1,8 @@
 # Asurada
 
+- 产品需求：[docs/REQUIREMENTS.md](./docs/REQUIREMENTS.md)
+- 工程交接：[docs/HANDOFF.md](./docs/HANDOFF.md)
+
 [![Build macOS](https://github.com/LuckyYunPeng/asurada/actions/workflows/build-macos.yml/badge.svg)](https://github.com/LuckyYunPeng/asurada/actions/workflows/build-macos.yml)
 
 **Asurada** 是 macOS 边缘吸附小标签 + 浮层面板：管理本地 git 仓库，一键用本机 `pi --print` 生成中文 Conventional Commit 并无确认地 `git add -A && git commit && git push`。
