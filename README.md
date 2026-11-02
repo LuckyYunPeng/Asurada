@@ -12,7 +12,9 @@
 
 1. 打开 [Actions → Build macOS](https://github.com/LuckyYunPeng/asurada/actions/workflows/build-macos.yml)，选最近一次成功的 workflow run。
 2. 在 **Artifacts** 下载 `asurada-macos-<commit>`（含 `.dmg` 与 `.app`）。
-3. 当前 CI **未做 Apple 代码签名与公证**，首次打开可能需：系统设置 → 隐私与安全性 → 仍要打开，或右键 App → 打开。
+3. 打开 `.dmg` 后，将 **Asurada** 拖到「应用程序」文件夹即可（无单独安装向导，属正常）。
+4. 当前 CI **未做 Apple 代码签名与公证**，首次打开可能需：系统设置 → 隐私与安全性 → 仍要打开，或右键 App → 打开。
+5. 启动后可在 **Dock** 看到 Asurada 图标；若右缘 tag 不好找，点菜单栏 **Asurada 图标** →「显示面板 / 收起 / 退出」。
 
 打 tag `v*` 并 push 时，会额外上传 `asurada-macos-release-<tag>` 产物（便于发版归档）。
 
@@ -22,8 +24,9 @@
 
 ## 产品行为
 
-- **macOS**：Accessory 应用 + **NSPanel** 浮层，吸附屏幕右缘；默认仅显示边缘 tag，点击展开面板
-- 收起：再点 tag、**Esc**、窗口失焦（点击其他应用）
+- **macOS**：Dock 可见 + 菜单栏托盘图标；**NSPanel** 吸附屏幕右缘（失败则回退为置顶无边框窗，不会无 UI 秒退）
+- 首次打开默认**展开面板**（引导 / 预检）；收起后右缘为**高对比 tag**（铺满壳窗）
+- 收起：再点 tag、**Esc**、窗口失焦（点击其他应用）；也可从菜单栏托盘操作
 - 首次打开：**三步引导**（可跳过）→ **本机预检** → 项目列表
 - 设置 → **重看引导**
 - **工作区干净**：主按钮禁用 +「无变更」，不调用 `pi`

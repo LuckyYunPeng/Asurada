@@ -33,8 +33,11 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             {
                 if let Err(e) = macos_panel::setup(app) {
-                    eprintln!("Asurada: 边缘壳层 setup 失败 ({e})");
-                    return Err(e.into());
+                    eprintln!("Asurada: 边缘壳层 setup 失败 ({e})，尝试最后回退");
+                    macos_panel::last_resort_show(app);
+                }
+                if let Err(e) = macos_panel::setup_tray(app) {
+                    eprintln!("Asurada: 菜单栏图标创建失败 ({e})");
                 }
             }
             Ok(())

@@ -50,7 +50,7 @@ const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 
 function App() {
   const [panelOpen, setPanelOpen] = useState(
-    () => captureBoot?.panelOpen ?? false,
+    () => captureBoot?.panelOpen ?? true,
   );
   const [introComplete, setIntroComplete] = useState(
     () => captureBoot?.introComplete ?? readIntroComplete(),
@@ -144,6 +144,22 @@ function App() {
       void runPreflight();
     }
   }, [panelOpen, introComplete, inIntro, runPreflight]);
+
+  useEffect(() => {
+    if (captureBoot || !isTauri) return;
+
+    let unlistenPanel: (() => void) | undefined;
+
+    void (async () => {
+      unlistenPanel = await listen<boolean>("set-panel-open", (event) => {
+        setPanelOpen(event.payload);
+      });
+    })();
+
+    return () => {
+      unlistenPanel?.();
+    };
+  }, []);
 
   useEffect(() => {
     if (captureBoot || !isTauri) return;
