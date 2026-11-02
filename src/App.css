@@ -129,7 +129,8 @@ body {
 
 .tag:hover,
 .tag--hot {
-  transform: scale(1.12);
+  /* 放大后宽度要小于收起窗口宽度（macos_panel.rs DOCK_COLLAPSED） */
+  transform: scale(1.08);
 }
 
 .tag-logo-wrap {
@@ -337,7 +338,8 @@ body {
 .panel {
   position: absolute;
   top: 10px;
-  right: 10px;
+  /* 收起按钮右缘离窗口右侧 39px，落在 Tag 热区（最右 37px，macos_panel.rs DOCK_COLLAPSED）之外，收起后不会立刻触发悬停放大 */
+  right: 22px;
   left: 14px;
   max-height: calc(100vh - 24px);
   border-radius: 18px;

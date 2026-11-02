@@ -29,8 +29,10 @@ const CLOUD_WIDTH: f64 = 220.0;
 /// 和 CSS `.tag` 的 height、`.panel` 的 top/bottom 留白一致。
 const TAG_HEIGHT: f64 = 60.0;
 const PANEL_INSET: f64 = 10.0;
-const DOCK_COLLAPSED: LogicalSize<f64> = LogicalSize::new(42.0, 94.0);
-const DOCK_EXPANDED: LogicalSize<f64> = LogicalSize::new(384.0, 600.0);
+/// 宽度要放得下悬停放大 1.08 倍后的 Tag（34 × 1.08 ≈ 36.7）。
+const DOCK_COLLAPSED: LogicalSize<f64> = LogicalSize::new(37.0, 94.0);
+/// 宽度含 CSS `.panel` 右侧 22px 留白，面板本体 360pt。
+const DOCK_EXPANDED: LogicalSize<f64> = LogicalSize::new(396.0, 600.0);
 
 fn result_cloud_band() -> f64 {
     *lock_dock(&RESULT_CLOUD_BAND)
@@ -216,13 +218,15 @@ fn place_frame(
         })
         .clamp(HANDLE_BAND, collapsed_max);
     // 下面放得下整块面板时，面板顶边贴着标签顶边。放不下就改成底边贴着标签底边，往上长。
-    let is_from_bottom = expanded && raw + DOCK_EXPANDED.height > visible.size.height;
+    // 窗口比面板上下各多 PANEL_INSET（CSS `.panel` 的 top/bottom），对齐时要扣掉。
+    let is_from_bottom =
+        expanded && raw - PANEL_INSET + DOCK_EXPANDED.height > visible.size.height;
     let top_from_work = if !expanded {
         (raw - HANDLE_BAND - cloud).max(0.0)
     } else if is_from_bottom {
         ((raw + TAG_HEIGHT + PANEL_INSET).min(visible.size.height) - DOCK_EXPANDED.height).max(0.0)
     } else {
-        raw
+        (raw - PANEL_INSET).max(0.0)
     };
     window.setFrame_display(
         NSRect::new(
