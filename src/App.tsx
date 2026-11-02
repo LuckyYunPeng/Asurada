@@ -89,7 +89,7 @@ function App() {
     if (captureBoot) return captureBoot.introStep;
     return readIntroComplete() ? -1 : 0;
   });
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [inSettings, setInSettings] = useState(false);
   const [themePreference, setThemePreference] = useState<ThemePreference>(
     () => readThemePreference(),
   );
@@ -110,6 +110,8 @@ function App() {
   const [isPanelClosing, setIsPanelClosing] = useState(false);
   const panelOpenRef = useRef(panelOpen);
   panelOpenRef.current = panelOpen;
+  const inSettingsRef = useRef(inSettings);
+  inSettingsRef.current = inSettings;
 
   // 先播放收起动画，结束后再缩窗
   const onCollapsePanel = useCallback(() => {
@@ -120,6 +122,7 @@ function App() {
     window.setTimeout(() => {
       setPanelOpen(false);
       setIsPanelClosing(false);
+      setInSettings(false);
     }, 220);
   }, []);
 
@@ -241,6 +244,10 @@ function App() {
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (inSettingsRef.current) {
+          setInSettings(false);
+          return;
+        }
         onCollapsePanel();
       }
     };
@@ -279,8 +286,16 @@ function App() {
   }
 
   function replayIntro() {
-    setSettingsOpen(false);
+    setInSettings(false);
     setIntroStep(0);
+  }
+
+  function openSettings() {
+    setInSettings(true);
+  }
+
+  function closeSettings() {
+    setInSettings(false);
   }
 
   async function handleAddProject() {
@@ -374,7 +389,9 @@ function App() {
   }
 
   const projectCount = rows.length;
-  const showHeaderAdd = inMain;
+  const showHeaderAdd = inMain && !inSettings;
+  const showMainChrome = inMain && !inSettings;
+  const panelLabel = inSettings ? "设置" : "Asurada 面板";
 
   return (
     <div className={`desktop${panelOpen ? " desktop--expanded" : " desktop--tag"}`}>
@@ -398,13 +415,17 @@ function App() {
       {panelOpen ? (
         <aside
           className={`panel${isPanelClosing ? " panel--closing" : ""}`}
-          role="dialog" aria-label="Asurada 面板">
+          role="dialog"
+          aria-label={panelLabel}
+        >
           <header className="chrome">
             <div className="title-wrap">
               <div className="badge">
                 <img src={logoUrl} alt="" />
               </div>
-              <h1 className="title">Asurada</h1>
+              <h1 className={inSettings ? "title-plain" : "title"}>
+                {inSettings ? "设置" : "Asurada"}
+              </h1>
             </div>
             <div className="chrome-actions">
               {showHeaderAdd ? (
@@ -418,56 +439,16 @@ function App() {
                   <Icon d="M12 5v14M5 12h14" />
                 </button>
               ) : null}
-              {inMain ? (
-                <div className="settings-menu">
-                  <button
-                    type="button"
-                    className="btn-icon"
-                    aria-label="设置"
-                    title="设置"
-                    aria-expanded={settingsOpen}
-                    onClick={() => setSettingsOpen((o) => !o)}
-                  >
-                    <Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-                  </button>
-                  {settingsOpen ? (
-                    <div className="settings-pop" aria-label="设置">
-                      <div className="settings-pop-head">设置</div>
-                      <div className="settings-section">
-                        <span className="settings-label">主题</span>
-                        <div
-                          className="theme-segment"
-                          role="radiogroup"
-                          aria-label="主题"
-                        >
-                          {(
-                            [
-                              ["light", "浅色"],
-                              ["dark", "深色"],
-                              ["system", "系统"],
-                            ] as const
-                          ).map(([value, label]) => (
-                            <button
-                              key={value}
-                              type="button"
-                              role="radio"
-                              aria-checked={themePreference === value}
-                              className={
-                                themePreference === value ? "on" : undefined
-                              }
-                              onClick={() => setTheme(value)}
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      <button type="button" onClick={replayIntro}>
-                        重看引导
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
+              {showMainChrome ? (
+                <button
+                  type="button"
+                  className="btn-icon"
+                  aria-label="设置"
+                  title="设置"
+                  onClick={openSettings}
+                >
+                  <Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+                </button>
               ) : null}
               <button
                 type="button"
@@ -483,14 +464,14 @@ function App() {
 
           {loadError ? <p className="banner-error">{loadError}</p> : null}
 
-          {inMain && projectCount > 0 ? (
+          {showMainChrome && projectCount > 0 ? (
             <div className="env-pill">
               <span className="dot" aria-hidden />
               本机环境就绪
             </div>
           ) : null}
 
-          {inMain && projectCount > 0 ? (
+          {showMainChrome && projectCount > 0 ? (
             <div className="risk" role="status">
               <span className="ico">!</span>
               <span>一键会暂存、提交并推送到远端哦，不会再确认～</span>
@@ -498,7 +479,14 @@ function App() {
           ) : null}
 
           <div className="panel-body">
-            {inIntro ? (
+            {inMain && inSettings ? (
+              <SettingsView
+                themePreference={themePreference}
+                onThemeChange={setTheme}
+                onBack={closeSettings}
+                onReplayIntro={replayIntro}
+              />
+            ) : inIntro ? (
               <IntroView
                 step={introStep}
                 onSkip={finishIntro}
@@ -556,6 +544,60 @@ function App() {
           onDismiss={() => setToast(null)}
         />
       ) : null}
+    </div>
+  );
+}
+
+const THEME_OPTIONS = [
+  ["light", "浅色"],
+  ["dark", "深色"],
+  ["system", "系统"],
+] as const;
+
+function SettingsView({
+  themePreference,
+  onThemeChange,
+  onBack,
+  onReplayIntro,
+}: {
+  themePreference: ThemePreference;
+  onThemeChange: (next: ThemePreference) => void;
+  onBack: () => void;
+  onReplayIntro: () => void;
+}) {
+  return (
+    <div className="settings-page">
+      <h2 className="settings-page-title">设置</h2>
+      <div className="settings-card">
+        <div className="settings-card-head">
+          <span className="settings-label">主题</span>
+          <p className="settings-hint">
+            跟随系统时按 macOS 浅色/深色自动切换
+          </p>
+        </div>
+        <div className="theme-segment" role="radiogroup" aria-label="主题">
+          {THEME_OPTIONS.map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={themePreference === value}
+              className={themePreference === value ? "on" : undefined}
+              onClick={() => onThemeChange(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="settings-page-actions">
+        <button type="button" className="btn-secondary settings-back" onClick={onBack}>
+          返回
+        </button>
+        <button type="button" className="settings-extra" onClick={onReplayIntro}>
+          重看引导
+        </button>
+      </div>
     </div>
   );
 }
