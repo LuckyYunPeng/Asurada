@@ -1,6 +1,7 @@
 mod commands;
 mod git;
 mod preflight;
+mod settings;
 mod store;
 
 #[cfg(target_os = "macos")]
@@ -15,6 +16,7 @@ pub fn run() {
     #[cfg(target_os = "macos")]
     {
         builder = builder.plugin(tauri_nspanel::init());
+        builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
     }
 
     builder
@@ -28,9 +30,16 @@ pub fn run() {
             commands::run_commit_push,
             #[cfg(target_os = "macos")]
             macos_panel::sync_dock_geometry,
+            #[cfg(target_os = "macos")]
             macos_panel::set_result_cloud,
             #[cfg(target_os = "macos")]
             macos_panel::pick_project_directory,
+            #[cfg(target_os = "macos")]
+            macos_panel::get_toggle_shortcut,
+            #[cfg(target_os = "macos")]
+            macos_panel::set_toggle_shortcut,
+            #[cfg(target_os = "macos")]
+            macos_panel::reset_toggle_shortcut,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]

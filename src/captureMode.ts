@@ -15,7 +15,8 @@ export type CaptureScene =
   | "running"
   | "result"
   | "cloud-ok"
-  | "cloud-err";
+  | "cloud-err"
+  | "settings";
 
 export function getCaptureScene(): CaptureScene | null {
   if (!import.meta.env.DEV) return null;
@@ -74,6 +75,8 @@ export interface CaptureBootstrap {
   rows: ProjectRowState[];
   toast: { title: string; message: string; kind: "ok" | "err" } | null;
   skipInvoke: boolean;
+  settingsOpen?: boolean;
+  toggleShortcutDisplay?: string;
 }
 
 export function bootstrapCapture(scene: CaptureScene): CaptureBootstrap {
@@ -189,6 +192,14 @@ export function bootstrapCapture(scene: CaptureScene): CaptureBootstrap {
         rows: [
           { project: mockProjectB, uiState: "failure", resultSummary: "push 被拒（non-fast-forward）" },
         ],
+      };
+    case "settings":
+      return {
+        ...base,
+        rows: [{ project: mockProjectB, uiState: "idle" }],
+        settingsOpen: true,
+        toggleShortcutDisplay: "⌥⌘G",
+        skipInvoke: true,
       };
     default:
       return base;
