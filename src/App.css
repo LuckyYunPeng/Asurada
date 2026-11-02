@@ -425,11 +425,8 @@ body {
 }
 
 .btn-chrome-back {
-  color: var(--mint-hover-ink);
-  font-weight: 600;
-  font-size: 12px;
-  padding: 5px 4px;
   flex: none;
+  color: var(--mint-hover-ink);
 }
 
 .btn-ghost,

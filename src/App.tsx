@@ -430,10 +430,12 @@ function App() {
                 <div className="title-cluster">
                   <button
                     type="button"
-                    className="btn-text btn-chrome-back"
+                    className="btn-icon btn-chrome-back"
+                    aria-label="返回"
+                    title="返回"
                     onClick={closeSettings}
                   >
-                    返回
+                    <Icon d="m15 18-6-6 6-6" />
                   </button>
                   <h1 className="title-plain">设置</h1>
                 </div>
