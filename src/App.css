@@ -190,11 +190,20 @@ body {
   display: block;
 }
 
+/* 艺术字标题：macOS 自带圆体 + 薄荷→蜜桃渐变 + 彩色投影 */
 .title {
   margin: 0;
-  font-size: 14px;
+  font-family: "Chalkboard SE", "Arial Rounded MT Bold", ui-rounded, var(--font);
+  font-size: 19px;
   font-weight: 700;
-  color: #4a4458;
+  letter-spacing: 0.02em;
+  background: linear-gradient(100deg, #3fb6c6 0%, #7ed9c8 45%, #f0a07e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 0 #fff) drop-shadow(0 2px 4px rgba(240, 160, 126, 0.35));
+  transform: rotate(-3deg);
+  transform-origin: left center;
 }
 
 .chrome-actions {
