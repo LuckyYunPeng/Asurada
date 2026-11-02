@@ -29,6 +29,11 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  background: transparent;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -40,168 +45,102 @@ body {
   min-height: 100vh;
 }
 
-.desktop--expanded {
+.desktop {
   position: relative;
-  min-height: 100vh;
-  width: 100%;
-  background:
-    radial-gradient(900px 520px at 12% 18%, #d4f4f0 0%, transparent 55%),
-    radial-gradient(800px 480px at 88% 12%, #ffe8d9 0%, transparent 50%),
-    radial-gradient(700px 420px at 70% 88%, #dff6fb 0%, transparent 55%),
-    linear-gradient(160deg, var(--bg1), var(--bg2) 55%, var(--bg3));
+  width: 100vw;
+  height: 100vh;
   overflow: hidden;
 }
 
-.desktop--tag {
-  position: relative;
-  width: 100%;
-  min-height: 148px;
-  height: 100vh;
-  background: linear-gradient(180deg, #ffffff 0%, #c8eef2 55%, #9fdce6 100%);
-}
-
-.desktop--tag .deco {
-  display: none;
-}
-
-.desktop {
-  position: relative;
-  width: 100%;
-}
-
-.deco {
-  position: absolute;
-  opacity: 0.45;
-  pointer-events: none;
-  color: var(--pink);
-  font-size: 14px;
-}
-.deco-a {
-  left: 8%;
-  top: 28%;
-}
-.deco-b {
-  left: 22%;
-  top: 62%;
-}
-.deco-c {
-  left: 48%;
-  top: 18%;
-}
-
+/* 收起态：窗口约 40×88，tag 铺满并贴右缘 */
 .tag {
-  position: fixed;
-  right: 0;
-  top: 36%;
-  width: 42px;
-  height: 108px;
-  border-radius: 18px 0 0 18px;
-  background: linear-gradient(180deg, #fffaf5 0%, #e8f8f6 100%);
-  border: 2px solid var(--panel-border);
-  border-right: none;
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: none;
+  border-radius: 14px 0 0 14px;
+  background: linear-gradient(160deg, #2a2140 0%, #17122a 100%);
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   cursor: pointer;
-  box-shadow: -6px 4px 20px rgba(94, 200, 212, 0.22);
-  z-index: 20;
-  padding: 0;
+  transition: background 0.15s ease;
 }
 
-/* 收起态壳窗约 52×148：tag 铺满窗体，勿用全屏 fixed + top:36% */
-.desktop--tag .tag {
-  position: absolute;
-  inset: 0;
-  top: 0;
-  right: 0;
-  width: 100%;
-  height: 100%;
-  border-radius: 14px 0 0 14px;
-  background: #ffffff;
-  border: 3px solid #1a8a9a;
-  border-right: none;
-  box-shadow: -10px 0 28px rgba(26, 138, 154, 0.55);
-}
-
-.desktop--tag .tag-mark {
-  color: #0d6b78;
-  font-size: 10px;
-  font-weight: 800;
-}
-
-.desktop--tag .tag-logo {
-  width: 32px;
-  height: 32px;
-  border: 2px solid #1a8a9a;
-}
-
-.desktop--tag .tag-dot {
-  top: 6px;
-  left: 6px;
+.tag:hover {
+  background: linear-gradient(160deg, #352a52 0%, #1d1734 100%);
 }
 
 .tag-logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
   object-fit: cover;
-  box-shadow: 0 2px 8px rgba(80, 40, 120, 0.28);
-  border: 1px solid rgba(180, 140, 255, 0.35);
 }
 
-.tag-mark {
-  font-size: 9px;
+.tag-chevron {
+  color: var(--mint);
+  font-size: 16px;
+  line-height: 1;
   font-weight: 700;
-  color: #3a9aaa;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
-  letter-spacing: 0.05em;
+  transition: transform 0.15s ease;
+}
+
+.tag:hover .tag-chevron {
+  transform: translateX(-2px);
 }
 
 .tag-dot {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  width: 8px;
-  height: 8px;
+  top: 7px;
+  left: 7px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--err);
-  box-shadow: 0 0 0 2px #fff;
+  box-shadow: 0 0 0 2px #1d1734;
 }
 
+/* 展开态：面板铺满透明窗，四周留白给阴影 */
 .panel {
-  position: fixed;
-  right: 52px;
-  top: 10%;
-  width: 348px;
-  max-height: 540px;
-  border-radius: 22px;
-  background: var(--panel);
-  backdrop-filter: blur(18px);
-  border: 2px solid var(--panel-border);
-  box-shadow: 0 20px 50px rgba(94, 170, 180, 0.18);
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  left: 14px;
+  max-height: calc(100vh - 24px);
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid rgba(61, 58, 74, 0.08);
+  box-shadow: 0 12px 32px rgba(23, 18, 42, 0.18),
+    0 2px 6px rgba(23, 18, 42, 0.08);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  z-index: 30;
+  animation: panel-in 0.18s ease-out;
 }
 
-.panel::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 6px;
-  background: linear-gradient(90deg, #f0b89a, #5ec8d4, #8ed9c0);
-  z-index: 1;
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .chrome {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 14px 10px;
+  padding: 12px 12px 10px 14px;
+  border-bottom: 1px solid rgba(61, 58, 74, 0.06);
+  margin-bottom: 10px;
   flex-shrink: 0;
 }
 
@@ -212,13 +151,11 @@ body {
 }
 
 .badge {
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
   overflow: hidden;
-  border: 1.5px solid rgba(180, 140, 255, 0.35);
   background: #0a0614;
-  box-shadow: 0 2px 8px rgba(80, 40, 120, 0.2);
 }
 
 .badge img {
@@ -230,7 +167,7 @@ body {
 
 .title {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   color: #4a4458;
 }
@@ -256,6 +193,24 @@ body {
 .btn-ghost {
   color: #3a9aaa;
   font-weight: 600;
+}
+
+.btn-icon {
+  appearance: none;
+  border: none;
+  background: transparent;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.btn-icon:hover {
+  background: rgba(94, 200, 212, 0.12);
+  color: #2a8a96;
 }
 
 .btn-text {
@@ -349,6 +304,15 @@ body {
 .gate,
 .empty {
   padding: 8px 4px 12px;
+}
+
+.empty {
+  text-align: center;
+  padding-top: 32px;
+}
+
+.empty p {
+  text-align: center;
 }
 
 .intro.step {

@@ -1,14 +1,14 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    App, AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, Size, WebviewWindow,
+    App, AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Size, WebviewWindow,
 };
 use tauri_nspanel::{
     tauri_panel, CollectionBehavior, PanelLevel, StyleMask, WebviewWindowExt,
 };
 
-const DOCK_COLLAPSED: LogicalSize<f64> = LogicalSize::new(52.0, 148.0);
-const DOCK_EXPANDED: LogicalSize<f64> = LogicalSize::new(452.0, 620.0);
+const DOCK_COLLAPSED: LogicalSize<f64> = LogicalSize::new(40.0, 88.0);
+const DOCK_EXPANDED: LogicalSize<f64> = LogicalSize::new(384.0, 600.0);
 
 const TRAY_SHOW_ID: &str = "tray-show-panel";
 const TRAY_COLLAPSE_ID: &str = "tray-collapse";
@@ -28,12 +28,6 @@ tauri_panel! {
     })
 }
 
-fn monitor_anchor(window: &WebviewWindow) -> Option<(u32, u32, f64)> {
-    let monitor = window.current_monitor().ok().flatten()?;
-    let size = monitor.size();
-    let scale = monitor.scale_factor();
-    Some((size.width, size.height, scale))
-}
 
 pub fn place_dock_window(window: &WebviewWindow, expanded: bool) -> Result<(), String> {
     let logical = if expanded {
@@ -45,20 +39,37 @@ pub fn place_dock_window(window: &WebviewWindow, expanded: bool) -> Result<(), S
         .set_size(Size::Logical(logical))
         .map_err(|e| format!("无法调整窗口大小: {e}"))?;
 
-    let (mon_w, mon_h, scale) =
-        monitor_anchor(window).ok_or_else(|| "无法读取当前显示器".to_string())?;
-    let phys_w = (logical.width * scale).round() as u32;
-    let phys_h = (logical.height * scale).round() as u32;
-    let x = mon_w.saturating_sub(phys_w);
-    let y_anchor = mon_h as f64 * 0.36;
-    let y_ideal = y_anchor - (phys_h as f64 / 2.0);
-    let y_max = mon_h.saturating_sub(phys_h).max(0) as f64;
-    let y = y_ideal.max(8.0).min(y_max).round() as i32;
+    let monitor = active_monitor(window)?;
+    // 每块屏缩放比不同，统一换算成逻辑坐标（macOS 全局 point）
+    let scale = monitor.scale_factor();
+    let area = monitor.work_area();
+    let origin = area.position.to_logical::<f64>(scale);
+    let mon = area.size.to_logical::<f64>(scale);
+    let x = origin.x + mon.width - logical.width;
+    let y = origin.y
+        + (mon.height * 0.36 - logical.height / 2.0)
+            .min(mon.height - logical.height)
+            .max(8.0);
 
     window
-        .set_position(PhysicalPosition::new(x as i32, y))
+        .set_position(LogicalPosition::new(x, y))
         .map_err(|e| format!("无法移动窗口: {e}"))?;
     Ok(())
+}
+
+/// 鼠标所在的显示器，取不到时回退主显示器。
+fn active_monitor(window: &WebviewWindow) -> Result<tauri::Monitor, String> {
+    let by_cursor = window.cursor_position().ok().and_then(|p| {
+        // tao 的 cursor_position 按主屏缩放比转成物理像素，monitor_from_point 要的是全局 point
+        let scale = window.primary_monitor().ok().flatten()?.scale_factor();
+        window
+            .monitor_from_point(p.x / scale, p.y / scale)
+            .ok()
+            .flatten()
+    });
+    by_cursor
+        .or_else(|| window.primary_monitor().ok().flatten())
+        .ok_or_else(|| "无法读取显示器".to_string())
 }
 
 fn show_window_expanded(window: &WebviewWindow) -> Result<(), String> {
@@ -113,6 +124,8 @@ fn init_panel(app_handle: &AppHandle) -> Result<(), String> {
         .map_err(|e| format!("无法转换为 NSPanel: {e}"))?;
 
     panel.set_level(PanelLevel::Floating.value());
+    // 透明窗的系统阴影会勾出整窗外框，阴影交给 CSS
+    panel.set_has_shadow(false);
 
     panel
         .add_style_mask(StyleMask::empty().nonactivating_panel().into())
@@ -149,6 +162,7 @@ pub fn fallback_regular_window(app: &mut App) -> Result<(), String> {
     window
         .set_always_on_top(true)
         .map_err(|e| format!("无法设置置顶: {e}"))?;
+    let _ = window.set_shadow(false);
     show_window_expanded(&window)?;
 
     Ok(())

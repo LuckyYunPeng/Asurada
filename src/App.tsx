@@ -44,6 +44,25 @@ function Mascot() {
   );
 }
 
+/** Lucide 风格线性图标（24×24 viewBox） */
+function Icon({ d }: { d: string }) {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d={d} />
+    </svg>
+  );
+}
+
 const captureScene = getCaptureScene();
 const captureBoot = captureScene ? bootstrapCapture(captureScene) : null;
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -316,30 +335,22 @@ function App() {
 
   return (
     <div className={`desktop${panelOpen ? " desktop--expanded" : " desktop--tag"}`}>
-      <span className="deco deco-a" aria-hidden>
-        ✿
-      </span>
-      <span className="deco deco-b" aria-hidden>
-        ✧
-      </span>
-      <span className="deco deco-c" aria-hidden>
-        ♡
-      </span>
-
-      <button
-        type="button"
-        className="tag"
-        aria-expanded={panelOpen}
-        aria-label="Asurada"
-        title="Asurada"
-        onClick={() => setPanelOpen((o) => !o)}
-      >
-        {hasUnreadFailure && !panelOpen ? (
-          <span className="tag-dot" aria-hidden />
-        ) : null}
-        <img className="tag-logo" src={logoUrl} alt="" />
-        <span className="tag-mark">AS</span>
-      </button>
+      {panelOpen ? null : (
+        <button
+          type="button"
+          className="tag"
+          aria-expanded={false}
+          aria-label="Asurada"
+          title="Asurada"
+          onClick={() => setPanelOpen(true)}
+        >
+          {hasUnreadFailure ? <span className="tag-dot" aria-hidden /> : null}
+          <img className="tag-logo" src={logoUrl} alt="" />
+          <span className="tag-chevron" aria-hidden>
+            ‹
+          </span>
+        </button>
+      )}
 
       {panelOpen ? (
         <aside className="panel" role="dialog" aria-label="Asurada 面板">
@@ -354,21 +365,25 @@ function App() {
               {showHeaderAdd ? (
                 <button
                   type="button"
-                  className="btn-ghost"
+                  className="btn-icon"
+                  aria-label="添加项目"
+                  title="添加项目"
                   onClick={() => void handleAddProject()}
                 >
-                  添加项目
+                  <Icon d="M12 5v14M5 12h14" />
                 </button>
               ) : null}
               {inMain ? (
                 <div className="settings-menu">
                   <button
                     type="button"
-                    className="btn-text"
+                    className="btn-icon"
+                    aria-label="设置"
+                    title="设置"
                     aria-expanded={settingsOpen}
                     onClick={() => setSettingsOpen((o) => !o)}
                   >
-                    设置
+                    <Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
                   </button>
                   {settingsOpen ? (
                     <div className="settings-pop">
@@ -381,10 +396,12 @@ function App() {
               ) : null}
               <button
                 type="button"
-                className="btn-text"
+                className="btn-icon"
+                aria-label="收起"
+                title="收起"
                 onClick={() => setPanelOpen(false)}
               >
-                收起
+                <Icon d="m9 18 6-6-6-6" />
               </button>
             </div>
           </header>
