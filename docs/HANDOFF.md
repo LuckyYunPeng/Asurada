@@ -10,8 +10,8 @@
 | 建议本地目录名 | `asurada`（与 README 一致） |
 | 示例路径 | `~/code/asurada` 或任意 clone 位置 |
 | 应用数据（项目列表） | Tauri `app_data_dir` 下持久化（见 `src-tauri/src/store.rs`） |
-| npm 包名 | `commitdock`（历史名，未改） |
-| Rust crate | `commitdock` / `commitdock_lib`（**安装包展示名仍为 Asurada**，见 `tauri.conf.json` → `productName`） |
+| npm 包名 | `asurada` |
+| Rust crate | `asurada` / `asurada_lib` |
 | Bundle ID | `com.asurada.app` |
 
 ## 本地开发
@@ -101,7 +101,6 @@ asurada/
 | **贴边 / 多屏** | `place_dock_window` 按 **`current_monitor()`** 右缘定位；外接屏、排列变更、Spaces 切换需实机回归；NSPanel 失败时走 **置顶普通窗** 回退，行为与 Panel 路径略有差异 |
 | **失焦自动收起** | 展开态下 `tauri://blur` 与 NSPanel **`dock-blur`** 会收起；系统文件对话框、切 App 等会触发——属当前产品设计，但「添加项目」时易误触，需验收 |
 | **壳层 setup 部分失败** | NSPanel 失败有 `fallback_regular_window`；`setup` 仍 Err 则 `last_resort_show`；托盘创建失败仅 `eprintln`，App 仍可运行 |
-| **crate 仍名 commitdock** | 仅内部标识；对外品牌 Asurada，勿与 npm/Cargo 名混淆 |
 | **pi 提示词仍含 CommitDock 字样** | `git.rs` 内 `PI_COMMIT_PROMPT` 字符串待品牌统一（低优先级） |
 | **⋯ 菜单** | 当前仅 **移除**；设计稿中的 Finder Reveal **未做** |
 

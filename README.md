@@ -9,7 +9,6 @@
 
 - 仓库：<https://github.com/LuckyYunPeng/asurada>
 - 协议：**MIT**（见 [LICENSE](./LICENSE)）
-- 内部 Rust crate 名仍为 `commitdock`（渐进改名，不影响安装包展示名 **Asurada**）
 
 ## 安装（macOS）
 
