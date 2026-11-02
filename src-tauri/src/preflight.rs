@@ -9,9 +9,9 @@ use std::time::Duration;
 pub const PI_PROBE_PROMPT: &str = "只回复 OK，不要解释。";
 pub const PI_PROBE_TIMEOUT: Duration = Duration::from_secs(12);
 
+pub const CHECK_PI_PATH: &str = "pi_path";
 pub const CHECK_PI_PRINT: &str = "pi_print";
 pub const CHECK_GIT: &str = "git";
-pub const CHECK_COMMIT_PROMPT: &str = "commit_prompt";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -30,12 +30,24 @@ pub struct PreflightResult {
 }
 
 pub fn check_environment() -> PreflightResult {
-    let checks = vec![
-        check_pi_print(),
-        check_git(),
-        check_commit_prompt(),
-    ];
-    build_result(checks)
+    debug_assert!(
+        !PI_COMMIT_PROMPT.trim().is_empty(),
+        "PI_COMMIT_PROMPT must be non-empty"
+    );
+
+    let pi_path = check_pi_in_path();
+    let pi_print = if pi_path.ok {
+        check_pi_print_probe()
+    } else {
+        PreflightItem {
+            id: CHECK_PI_PRINT.to_string(),
+            ok: false,
+            message: "未检测：请先将 pi 安装并加入 PATH".to_string(),
+        }
+    };
+    let git = check_git();
+
+    build_result(vec![pi_path, pi_print, git])
 }
 
 pub fn build_result(checks: Vec<PreflightItem>) -> PreflightResult {
@@ -66,14 +78,14 @@ pub fn build_failure_summary(checks: &[PreflightItem]) -> String {
 
 fn check_label(id: &str) -> &'static str {
     match id {
+        CHECK_PI_PATH => "pi 未找到",
         CHECK_PI_PRINT => "pi --print 不可用",
         CHECK_GIT => "git 不可用",
-        CHECK_COMMIT_PROMPT => "提交提示词不可用",
         _ => "环境检查失败",
     }
 }
 
-fn pi_in_path() -> Result<(), String> {
+fn check_pi_in_path() -> PreflightItem {
     let lookup = if cfg!(target_os = "windows") {
         Command::new("where").arg("pi").output()
     } else {
@@ -83,28 +95,32 @@ fn pi_in_path() -> Result<(), String> {
     };
 
     match lookup {
-        Ok(output) if output.status.success() && !output.stdout.is_empty() => Ok(()),
+        Ok(output) if output.status.success() && !output.stdout.is_empty() => PreflightItem {
+            id: CHECK_PI_PATH.to_string(),
+            ok: true,
+            message: "pi 已在 PATH 中".to_string(),
+        },
         Ok(output) => {
             let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
-            Err(if detail.is_empty() {
-                "请安装 pi 并确保在终端可执行（PATH）".to_string()
-            } else {
-                format!("请安装 pi 并加入 PATH（{detail}）")
-            })
+            PreflightItem {
+                id: CHECK_PI_PATH.to_string(),
+                ok: false,
+                message: if detail.is_empty() {
+                    "请安装 pi 并确保在终端可执行（PATH）".to_string()
+                } else {
+                    format!("请安装 pi 并加入 PATH（{detail}）")
+                },
+            }
         }
-        Err(e) => Err(format!("无法检测 pi 是否在 PATH：{e}")),
+        Err(e) => PreflightItem {
+            id: CHECK_PI_PATH.to_string(),
+            ok: false,
+            message: format!("无法检测 pi 是否在 PATH：{e}"),
+        },
     }
 }
 
-fn check_pi_print() -> PreflightItem {
-    if let Err(reason) = pi_in_path() {
-        return PreflightItem {
-            id: CHECK_PI_PRINT.to_string(),
-            ok: false,
-            message: reason,
-        };
-    }
-
+fn check_pi_print_probe() -> PreflightItem {
     let mut cmd = Command::new("pi");
     cmd.args(["--print", PI_PROBE_PROMPT])
         .stdin(Stdio::null())
@@ -123,7 +139,7 @@ fn check_pi_print() -> PreflightItem {
                 PreflightItem {
                     id: CHECK_PI_PRINT.to_string(),
                     ok: true,
-                    message: "pi 在 PATH 中，pi --print 可非交互启动".to_string(),
+                    message: "pi --print 可非交互启动".to_string(),
                 }
             } else {
                 let detail = if stderr.trim().is_empty() {
@@ -197,26 +213,6 @@ fn check_git() -> PreflightItem {
     }
 }
 
-pub fn check_commit_prompt() -> PreflightItem {
-    let trimmed = PI_COMMIT_PROMPT.trim();
-    if trimmed.is_empty() {
-        return PreflightItem {
-            id: CHECK_COMMIT_PROMPT.to_string(),
-            ok: false,
-            message: "内置提交提示词为空，请检查应用配置".to_string(),
-        };
-    }
-
-    PreflightItem {
-        id: CHECK_COMMIT_PROMPT.to_string(),
-        ok: true,
-        message: format!(
-            "固化提交提示词已加载（{} 字）",
-            trimmed.chars().count()
-        ),
-    }
-}
-
 enum RunOutcome {
     Completed(Output),
     TimedOut,
@@ -250,7 +246,7 @@ mod tests {
                 message: "ok".into(),
             },
             PreflightItem {
-                id: CHECK_PI_PRINT.to_string(),
+                id: CHECK_PI_PATH.to_string(),
                 ok: false,
                 message: "missing".into(),
             },
@@ -267,7 +263,7 @@ mod tests {
     fn failure_summary_uses_first_failed_check() {
         let checks = vec![
             PreflightItem {
-                id: CHECK_PI_PRINT.to_string(),
+                id: CHECK_PI_PATH.to_string(),
                 ok: false,
                 message: "请安装 pi".into(),
             },
@@ -278,7 +274,7 @@ mod tests {
             },
         ];
         let summary = build_failure_summary(&checks);
-        assert!(summary.contains("pi --print 不可用"));
+        assert!(summary.contains("pi 未找到"));
         assert!(summary.contains("请安装 pi"));
     }
 
@@ -301,20 +297,27 @@ mod tests {
     }
 
     #[test]
-    fn check_commit_prompt_is_non_empty() {
-        let item = check_commit_prompt();
-        assert_eq!(item.id, CHECK_COMMIT_PROMPT);
-        assert!(item.ok);
-        assert!(item.message.contains("固化提交提示词"));
+    fn builtin_commit_prompt_non_empty() {
+        assert!(
+            !PI_COMMIT_PROMPT.trim().is_empty(),
+            "PI_COMMIT_PROMPT must ship non-empty"
+        );
     }
 
     #[test]
     fn check_environment_returns_three_checks_in_order() {
         let result = check_environment();
         assert_eq!(result.checks.len(), 3);
-        assert_eq!(result.checks[0].id, CHECK_PI_PRINT);
-        assert_eq!(result.checks[1].id, CHECK_GIT);
-        assert_eq!(result.checks[2].id, CHECK_COMMIT_PROMPT);
+        assert_eq!(result.checks[0].id, CHECK_PI_PATH);
+        assert_eq!(result.checks[1].id, CHECK_PI_PRINT);
+        assert_eq!(result.checks[2].id, CHECK_GIT);
         assert_eq!(result.ready, result.checks.iter().all(|c| c.ok));
+        assert!(
+            !result
+                .checks
+                .iter()
+                .any(|c| c.id == "commit_prompt"),
+            "commit_prompt must not appear in preflight UI list"
+        );
     }
 }

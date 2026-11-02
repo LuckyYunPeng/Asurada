@@ -18,9 +18,11 @@ macOS 边缘吸附小标签 + 浮层面板：管理本地 git 仓库路径，一
 
 | 检查项 | 含义 |
 |---|---|
-| `pi_print` | `pi` 在 PATH 中，且 `pi --print` 能以非交互方式启动（短探测提示，12 秒超时） |
+| `pi_path` | `pi` 在 PATH 中（`command -v pi` / `where pi`） |
+| `pi_print` | `pi --print` 能以非交互方式启动（短探测提示，12 秒超时） |
 | `git` | 本机可执行 `git` |
-| `commit_prompt` | 应用内置固化提交提示词（`PI_COMMIT_PROMPT`）非空可读，无需额外安装 |
+
+固化提交提示词（`PI_COMMIT_PROMPT`）为应用内置常量，**不参与**预检列表；仅在开发构建中以 `debug_assert`/单测保证非空。
 
 `run_commit_push` 在服务端会再次预检；未就绪直接返回错误，**不会**调用 `pi`。工作区干净时仍禁用主按钮且不调用 `pi`（与预检无关）。
 
