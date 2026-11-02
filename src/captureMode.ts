@@ -11,6 +11,7 @@ export type CaptureScene =
   | "precheck"
   | "precheck-fail"
   | "list"
+  | "settings"
   | "empty"
   | "running"
   | "result";
@@ -70,6 +71,7 @@ export interface CaptureBootstrap {
   rows: ProjectRowState[];
   toast: { message: string; kind: "ok" | "err" } | null;
   skipInvoke: boolean;
+  inSettings?: boolean;
 }
 
 export function bootstrapCapture(scene: CaptureScene): CaptureBootstrap {
@@ -135,6 +137,15 @@ export function bootstrapCapture(scene: CaptureScene): CaptureBootstrap {
           { project: mockProjectA, uiState: "idle" },
           { project: mockProjectB, uiState: "idle" },
         ],
+      };
+    case "settings":
+      return {
+        ...base,
+        rows: [
+          { project: mockProjectA, uiState: "idle" },
+          { project: mockProjectB, uiState: "idle" },
+        ],
+        inSettings: true,
       };
     case "running":
       return {

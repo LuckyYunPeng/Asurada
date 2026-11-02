@@ -89,7 +89,9 @@ function App() {
     if (captureBoot) return captureBoot.introStep;
     return readIntroComplete() ? -1 : 0;
   });
-  const [inSettings, setInSettings] = useState(false);
+  const [inSettings, setInSettings] = useState(
+    () => captureBoot?.inSettings ?? false,
+  );
   const [themePreference, setThemePreference] = useState<ThemePreference>(
     () => readThemePreference(),
   );
