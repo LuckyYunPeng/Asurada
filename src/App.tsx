@@ -19,6 +19,12 @@ import type {
   ProjectRowState,
   ProjectView,
 } from "./types";
+import {
+  persistThemePreference,
+  readThemePreference,
+  syncThemeFromPreference,
+  type ThemePreference,
+} from "./theme";
 import "./App.css";
 
 function summarizeCommitMessage(msg: string): string {
@@ -84,6 +90,9 @@ function App() {
     return readIntroComplete() ? -1 : 0;
   });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [themePreference, setThemePreference] = useState<ThemePreference>(
+    () => readThemePreference(),
+  );
   const [rows, setRows] = useState<ProjectRowState[]>(
     () => captureBoot?.rows ?? [],
   );
@@ -206,6 +215,26 @@ function App() {
     if (captureBoot || !isTauri) return;
     void invoke("sync_dock_geometry", { expanded: panelOpen }).catch(() => {});
   }, [panelOpen]);
+
+  useEffect(() => {
+    syncThemeFromPreference(themePreference);
+  }, [themePreference]);
+
+  useEffect(() => {
+    if (themePreference !== "system") return;
+
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => {
+      syncThemeFromPreference("system");
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [themePreference]);
+
+  function setTheme(next: ThemePreference) {
+    setThemePreference(next);
+    persistThemePreference(next);
+  }
 
   useEffect(() => {
     if (captureBoot) return;
@@ -402,7 +431,37 @@ function App() {
                     <Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
                   </button>
                   {settingsOpen ? (
-                    <div className="settings-pop">
+                    <div className="settings-pop" aria-label="设置">
+                      <div className="settings-pop-head">设置</div>
+                      <div className="settings-section">
+                        <span className="settings-label">主题</span>
+                        <div
+                          className="theme-segment"
+                          role="radiogroup"
+                          aria-label="主题"
+                        >
+                          {(
+                            [
+                              ["light", "浅色"],
+                              ["dark", "深色"],
+                              ["system", "系统"],
+                            ] as const
+                          ).map(([value, label]) => (
+                            <button
+                              key={value}
+                              type="button"
+                              role="radio"
+                              aria-checked={themePreference === value}
+                              className={
+                                themePreference === value ? "on" : undefined
+                              }
+                              onClick={() => setTheme(value)}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       <button type="button" onClick={replayIntro}>
                         重看引导
                       </button>
