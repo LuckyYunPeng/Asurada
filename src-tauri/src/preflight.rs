@@ -5,7 +5,8 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-/// Short probe for `pi --print` (not the commit prompt).
+/// Non-interactive probe. Skips session, extensions, tools, and thinking so a
+/// provider round-trip fits in PI_PROBE_TIMEOUT. Commit still uses full `pi --print`.
 pub const PI_PROBE_PROMPT: &str = "只回复 OK，不要解释。";
 pub const PI_PROBE_TIMEOUT: Duration = Duration::from_secs(12);
 
@@ -122,10 +123,20 @@ fn check_pi_in_path() -> PreflightItem {
 
 fn check_pi_print_probe() -> PreflightItem {
     let mut cmd = Command::new("pi");
-    cmd.args(["--print", PI_PROBE_PROMPT])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+    cmd.args([
+        "--no-session",
+        "--no-extensions",
+        "--no-mcp",
+        "--no-skills",
+        "--no-tools",
+        "--thinking",
+        "off",
+        "--print",
+        PI_PROBE_PROMPT,
+    ])
+    .stdin(Stdio::null())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped());
 
     if let Ok(temp) = std::env::temp_dir().canonicalize() {
         cmd.current_dir(temp);
@@ -219,17 +230,45 @@ enum RunOutcome {
 }
 
 fn run_with_timeout(mut cmd: Command, timeout: Duration) -> Result<RunOutcome, String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
+
+    let child = cmd.spawn().map_err(|e| format!("spawn 失败: {e}"))?;
+    let pid = child.id();
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
-        let result = cmd.output();
+        let result = child.wait_with_output();
         let _ = tx.send(result);
     });
 
     match rx.recv_timeout(timeout) {
         Ok(Ok(output)) => Ok(RunOutcome::Completed(output)),
-        Ok(Err(e)) => Err(format!("spawn 失败: {e}")),
-        Err(mpsc::RecvTimeoutError::Timeout) => Ok(RunOutcome::TimedOut),
+        Ok(Err(e)) => Err(format!("等待 pi 失败: {e}")),
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            kill_probe(pid);
+            let _ = rx.recv_timeout(Duration::from_secs(2));
+            Ok(RunOutcome::TimedOut)
+        }
         Err(mpsc::RecvTimeoutError::Disconnected) => Err("pi 探测线程异常退出".to_string()),
+    }
+}
+
+fn kill_probe(pid: u32) {
+    #[cfg(unix)]
+    {
+        let _ = Command::new("kill")
+            .args(["-9", &format!("-{pid}")])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = pid;
     }
 }
 
