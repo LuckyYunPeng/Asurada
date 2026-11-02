@@ -1,8 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import logoUrl from "./assets/asurada-logo.png";
+import {
+  INTRO_STEPS,
+  INTRO_STORAGE_KEY,
+  PREFLIGHT_CHECK_META,
+} from "./introContent";
+import { getRowPresentation } from "./rowPresentation";
+import { Toast, type ToastKind } from "./Toast";
 import type {
   CommitPushResult,
+  PreflightItem,
   PreflightResult,
   ProjectRowState,
   ProjectView,
@@ -14,15 +23,43 @@ function summarizeCommitMessage(msg: string): string {
   return line.length > 80 ? `${line.slice(0, 77)}…` : line;
 }
 
+function readIntroComplete(): boolean {
+  try {
+    return localStorage.getItem(INTRO_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function Mascot() {
+  return (
+    <div className="mascot" aria-hidden>
+      <span className="blush-l" />
+      <span className="blush-r" />
+      <span className="mouth" />
+    </div>
+  );
+}
+
 function App() {
   const [panelOpen, setPanelOpen] = useState(true);
+  const [introComplete, setIntroComplete] = useState(readIntroComplete);
+  const [introStep, setIntroStep] = useState(() =>
+    readIntroComplete() ? -1 : 0,
+  );
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [rows, setRows] = useState<ProjectRowState[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [preflight, setPreflight] = useState<PreflightResult | null>(null);
   const [preflightLoading, setPreflightLoading] = useState(false);
+  const [toast, setToast] = useState<{ message: string; kind: ToastKind } | null>(
+    null,
+  );
 
   const envReady = preflight?.ready === true;
+  const inIntro = introStep >= 0;
+  const inMain = introComplete && !inIntro && envReady && !preflightLoading;
 
   const hasUnreadFailure = useMemo(
     () => rows.some((r) => r.uiState === "failure"),
@@ -54,8 +91,10 @@ function App() {
   }, []);
 
   useEffect(() => {
-    void refreshList();
-  }, [refreshList]);
+    if (introComplete) {
+      void refreshList();
+    }
+  }, [introComplete, refreshList]);
 
   const runPreflight = useCallback(async () => {
     setPreflightLoading(true);
@@ -74,13 +113,30 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (panelOpen) {
+    if (panelOpen && introComplete && !inIntro) {
       void runPreflight();
     }
-  }, [panelOpen, runPreflight]);
+  }, [panelOpen, introComplete, inIntro, runPreflight]);
+
+  function finishIntro() {
+    try {
+      localStorage.setItem(INTRO_STORAGE_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    setIntroComplete(true);
+    setIntroStep(-1);
+    void runPreflight();
+    void refreshList();
+  }
+
+  function replayIntro() {
+    setSettingsOpen(false);
+    setIntroStep(0);
+  }
 
   async function handleAddProject() {
-    if (!envReady || preflightLoading) return;
+    if (!inMain) return;
     const selected = await open({
       directory: true,
       multiple: false,
@@ -105,7 +161,7 @@ function App() {
   }
 
   async function handleCommitPush(row: ProjectRowState) {
-    if (!envReady || preflightLoading || row.project.gitClean || row.uiState === "running") {
+    if (!inMain || row.project.gitClean || row.uiState === "running") {
       return;
     }
 
@@ -125,6 +181,7 @@ function App() {
 
       if (result.success && result.commitMessage) {
         const summary = `已推送 · ${summarizeCommitMessage(result.commitMessage)}`;
+        setToast({ message: summary, kind: "ok" });
         setRows((prev) =>
           prev.map((r) =>
             r.project.id === row.project.id
@@ -132,40 +189,35 @@ function App() {
                   project: refreshed,
                   uiState: "success",
                   resultSummary: summary,
-                  resultDetail: [result.commitMessage, result.pushOutput]
-                    .filter(Boolean)
-                    .join("\n\n"),
-                  resultExpanded: false,
                 }
               : r,
           ),
         );
       } else {
+        const errMsg = result.error ?? "提交失败";
+        setToast({ message: errMsg, kind: "err" });
         setRows((prev) =>
           prev.map((r) =>
             r.project.id === row.project.id
               ? {
                   project: refreshed,
                   uiState: "failure",
-                  resultSummary: result.error ?? "提交失败",
-                  resultDetail: result.pushOutput || result.error || "",
-                  // TODO(design): failure expand default — collapsed for now
-                  resultExpanded: false,
+                  resultSummary: errMsg,
                 }
               : r,
           ),
         );
       }
     } catch (e) {
+      const errMsg = String(e);
+      setToast({ message: errMsg, kind: "err" });
       setRows((prev) =>
         prev.map((r) =>
           r.project.id === row.project.id
             ? {
                 ...r,
                 uiState: "failure",
-                resultSummary: String(e),
-                resultDetail: String(e),
-                resultExpanded: false,
+                resultSummary: errMsg,
               }
             : r,
         ),
@@ -173,46 +225,74 @@ function App() {
     }
   }
 
-  function toggleResult(id: string) {
-    setRows((prev) =>
-      prev.map((r) =>
-        r.project.id === id
-          ? { ...r, resultExpanded: !r.resultExpanded }
-          : r,
-      ),
-    );
-  }
-
   const projectCount = rows.length;
+  const showHeaderAdd = inMain;
 
   return (
-    <div className="shell">
+    <div className="desktop">
+      <span className="deco deco-a" aria-hidden>
+        ✿
+      </span>
+      <span className="deco deco-b" aria-hidden>
+        ✧
+      </span>
+      <span className="deco deco-c" aria-hidden>
+        ♡
+      </span>
+
       <button
         type="button"
-        className="edge-tag"
+        className="tag"
         aria-expanded={panelOpen}
-        aria-label="CommitDock"
+        aria-label="Asurada"
+        title="Asurada"
         onClick={() => setPanelOpen((o) => !o)}
       >
-        <span className="edge-tag-label">CD</span>
         {hasUnreadFailure && !panelOpen ? (
-          <span className="edge-tag-dot" aria-hidden />
+          <span className="tag-dot" aria-hidden />
         ) : null}
+        <img className="tag-logo" src={logoUrl} alt="" />
+        <span className="tag-mark">AS</span>
       </button>
 
       {panelOpen ? (
-        <div className="panel" role="dialog" aria-label="CommitDock 面板">
-          <header className="panel-header">
-            <h1 className="panel-title">CommitDock</h1>
-            <div className="panel-header-actions">
-              <button
-                type="button"
-                className="btn-text"
-                disabled={!envReady || preflightLoading}
-                onClick={() => void handleAddProject()}
-              >
-                添加项目
-              </button>
+        <aside className="panel" role="dialog" aria-label="Asurada 面板">
+          <header className="chrome">
+            <div className="title-wrap">
+              <div className="badge">
+                <img src={logoUrl} alt="" />
+              </div>
+              <h1 className="title">Asurada</h1>
+            </div>
+            <div className="chrome-actions">
+              {showHeaderAdd ? (
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => void handleAddProject()}
+                >
+                  添加项目
+                </button>
+              ) : null}
+              {inMain ? (
+                <div className="settings-menu">
+                  <button
+                    type="button"
+                    className="btn-text"
+                    aria-expanded={settingsOpen}
+                    onClick={() => setSettingsOpen((o) => !o)}
+                  >
+                    设置
+                  </button>
+                  {settingsOpen ? (
+                    <div className="settings-pop">
+                      <button type="button" onClick={replayIntro}>
+                        重看引导
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <button
                 type="button"
                 className="btn-text"
@@ -225,165 +305,258 @@ function App() {
 
           {loadError ? <p className="banner-error">{loadError}</p> : null}
 
-          {preflightLoading || (preflight && !preflight.ready) ? (
-            <div className="preflight-banner" role="status">
-              <span className="preflight-banner-text">
-                {preflightLoading ? "环境检测中…" : preflight?.summary}
-              </span>
-              <button
-                type="button"
-                className="btn-text preflight-retry"
-                disabled={preflightLoading}
-                onClick={() => void runPreflight()}
-              >
-                重新检查
-              </button>
+          {inMain && projectCount > 0 ? (
+            <div className="env-pill">
+              <span className="dot" aria-hidden />
+              本机环境就绪
             </div>
           ) : null}
 
-          {projectCount > 0 ? (
-            <div className="risk-banner" role="status">
-              一键将暂存、提交并推送到远端，不再确认
+          {inMain && projectCount > 0 ? (
+            <div className="risk" role="status">
+              <span className="ico">!</span>
+              <span>一键会暂存、提交并推送到远端哦，不会再确认～</span>
             </div>
           ) : null}
 
           <div className="panel-body">
-            {loading ? (
+            {inIntro ? (
+              <IntroView
+                step={introStep}
+                onSkip={finishIntro}
+                onNext={() =>
+                  setIntroStep((s) =>
+                    s >= INTRO_STEPS.length - 1 ? s : s + 1,
+                  )
+                }
+                onStart={finishIntro}
+              />
+            ) : preflightLoading ? (
+              <PreflightGateView loading checks={preflight?.checks} />
+            ) : preflight && !preflight.ready ? (
+              <PreflightFailView
+                result={preflight}
+                onRecheck={() => void runPreflight()}
+              />
+            ) : loading ? (
               <p className="muted">加载中…</p>
             ) : projectCount === 0 ? (
-              <div className="empty-state">
-                <p className="empty-title">还没有项目</p>
-                <p className="empty-desc">
-                  添加本地 git 仓库后，可一键生成中文提交并推送
-                </p>
-                {!envReady && preflight && !preflightLoading ? (
-                  <p className="empty-preflight">{preflight.summary}</p>
-                ) : null}
+              <div className="empty">
+                <Mascot />
+                <h2>还没有项目呢</h2>
+                <p>添加本地 git 仓库后，就能一键生成提交并推送啦</p>
                 <button
                   type="button"
                   className="btn-primary"
-                  disabled={!envReady || preflightLoading}
+                  disabled={!inMain}
                   onClick={() => void handleAddProject()}
                 >
                   添加项目
                 </button>
               </div>
             ) : (
-              <ul className="project-list">
+              <ul className="list">
                 {rows.map((row) => (
                   <ProjectRow
                     key={row.project.id}
                     row={row}
-                    envReady={envReady}
-                    preflightLoading={preflightLoading}
+                    canCommit={inMain}
                     onCommit={() => void handleCommitPush(row)}
                     onRemove={() => void handleRemove(row.project.id)}
-                    onToggleResult={() => toggleResult(row.project.id)}
                   />
                 ))}
               </ul>
             )}
           </div>
-
-          {/* TODO(design): clean-workspace bulk action — disabled stub */}
-          {projectCount > 0 ? (
-            <footer className="panel-footer">
-              <button type="button" className="btn-text btn-disabled" disabled title="待产品设计">
-                清理干净工作区（占位）
-              </button>
-            </footer>
-          ) : null}
-        </div>
+        </aside>
       ) : null}
+
+      {toast ? (
+        <Toast
+          message={toast.message}
+          kind={toast.kind}
+          onDismiss={() => setToast(null)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function IntroView({
+  step,
+  onSkip,
+  onNext,
+  onStart,
+}: {
+  step: number;
+  onSkip: () => void;
+  onNext: () => void;
+  onStart: () => void;
+}) {
+  const content = INTRO_STEPS[step];
+  const isLast = step === INTRO_STEPS.length - 1;
+
+  return (
+    <div className="intro step">
+      <Mascot />
+      <h2>{content.title}</h2>
+      {"sub" in content && content.sub ? (
+        <p className="sub">{content.sub}</p>
+      ) : null}
+      <p className="lead">{content.lead}</p>
+      <div className="dots" aria-hidden>
+        {INTRO_STEPS.map((_, i) => (
+          <span key={i} className={i === step ? "on" : undefined} />
+        ))}
+      </div>
+      <div className="intro-actions">
+        <button type="button" className="linkish" onClick={onSkip}>
+          跳过
+        </button>
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={isLast ? onStart : onNext}
+        >
+          {isLast ? "开始使用" : "下一步"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PreflightGateView({
+  loading,
+  checks,
+}: {
+  loading: boolean;
+  checks?: PreflightItem[];
+}) {
+  const items = checks?.length
+    ? checks
+    : [
+        { id: "pi_path", ok: false, message: "" },
+        { id: "pi_print", ok: false, message: "" },
+        { id: "git", ok: false, message: "" },
+      ];
+
+  return (
+    <div className="gate">
+      {loading ? <div className="spin" aria-hidden /> : null}
+      <h2>{loading ? "正在检查本机环境" : "环境检查"}</h2>
+      <p>依赖本机 pi agent，先确认能不能跑～</p>
+      <div className="checks">
+        {items.map((c) => (
+          <PreflightCheckRow key={c.id} item={c} loading={loading} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PreflightFailView({
+  result,
+  onRecheck,
+}: {
+  result: PreflightResult;
+  onRecheck: () => void;
+}) {
+  return (
+    <div className="gate">
+      <Mascot />
+      <h2>本机还差一点</h2>
+      <p>环境没齐的话没法提交并推送，先修好再来呀</p>
+      <div className="checks">
+        {result.checks.map((c) => (
+          <PreflightCheckRow key={c.id} item={c} loading={false} />
+        ))}
+      </div>
+      <div className="gate-actions">
+        <button type="button" className="btn-primary" onClick={onRecheck}>
+          重新检查
+        </button>
+      </div>
+      <p className="muted" style={{ marginTop: 12, fontSize: 11 }}>
+        {result.summary}
+      </p>
+    </div>
+  );
+}
+
+function PreflightCheckRow({
+  item,
+  loading,
+}: {
+  item: PreflightItem;
+  loading: boolean;
+}) {
+  const meta = PREFLIGHT_CHECK_META[item.id] ?? {
+    label: item.id,
+    detail: item.message,
+  };
+  const state = loading ? "wait" : item.ok ? "ok" : "bad";
+  const mark = loading ? "…" : item.ok ? "✓" : "!";
+
+  return (
+    <div className={`check ${state}`}>
+      <span className="mark">{mark}</span>
+      <div>
+        <div className="label">{meta.label}</div>
+        <div className="detail">
+          {!item.ok && item.message ? item.message : meta.detail}
+        </div>
+      </div>
     </div>
   );
 }
 
 function ProjectRow({
   row,
-  envReady,
-  preflightLoading,
+  canCommit,
   onCommit,
   onRemove,
-  onToggleResult,
 }: {
   row: ProjectRowState;
-  envReady: boolean;
-  preflightLoading: boolean;
+  canCommit: boolean;
   onCommit: () => void;
   onRemove: () => void;
-  onToggleResult: () => void;
 }) {
-  const { project, uiState } = row;
-  const isRunning = uiState === "running";
-  const isClean = project.gitClean;
-  const primaryDisabled = isClean || isRunning || !envReady || preflightLoading;
-
-  const statusClass = isClean ? "status-clean" : "status-dirty";
+  const pres = getRowPresentation(row);
+  const primaryDisabled =
+    pres.btnDisabled || !canCommit || row.uiState === "running";
 
   return (
-    <li className="project-row">
-      <div className="row-main">
-        <div className="row-info">
-          <div className="row-name">{project.displayName}</div>
-          <div className="row-path" title={project.path}>
-            {project.shortPath}
-          </div>
-          <div className={`row-status ${statusClass}`}>
-            {project.gitStatusLabel}
-            {isClean ? (
-              <span className="no-change-hint" title="无变更">
-                无变更
-              </span>
-            ) : null}
-          </div>
+    <li className="row">
+      <div className="meta">
+        <div className="name">{row.project.displayName}</div>
+        <div className="path" title={row.project.path}>
+          {row.project.shortPath}
         </div>
-        <div className="row-actions">
-          <button
-            type="button"
-            className="btn-primary btn-commit"
-            disabled={primaryDisabled}
-            title={isClean ? "无变更" : undefined}
-            aria-disabled={primaryDisabled}
-            onClick={onCommit}
-          >
-            {isRunning ? (
-              <>
-                <span className="spinner" aria-hidden />
-                提交中…
-              </>
-            ) : (
-              "提交并推送"
-            )}
-          </button>
-          <button
-            type="button"
-            className="btn-icon"
-            aria-label="移除项目"
-            onClick={onRemove}
-            disabled={isRunning}
-          >
-            ⋯
-          </button>
+        <div className={`status ${pres.kind}`}>
+          <span className="pip" aria-hidden />
+          <span>{pres.statusText}</span>
         </div>
       </div>
-
-      {row.resultSummary ? (
-        <div
-          className={`row-result row-result--${uiState === "success" ? "success" : "failure"}`}
+      <div className="actions">
+        <button
+          type="button"
+          className="menu"
+          aria-label="移除项目"
+          disabled={row.uiState === "running"}
+          onClick={onRemove}
         >
-          <button type="button" className="row-result-toggle" onClick={onToggleResult}>
-            {uiState === "success" ? (
-              <span className="result-dot success" aria-hidden />
-            ) : null}
-            <span>{row.resultSummary}</span>
-            <span className="chevron">{row.resultExpanded ? "▾" : "▸"}</span>
-          </button>
-          {row.resultExpanded && row.resultDetail ? (
-            <pre className="row-result-detail">{row.resultDetail}</pre>
-          ) : null}
-        </div>
-      ) : null}
+          ⋯
+        </button>
+        <button
+          type="button"
+          className={`btn-primary${pres.btnBusy ? " busy" : ""}`}
+          disabled={primaryDisabled}
+          title={pres.btnTitle}
+          onClick={onCommit}
+        >
+          {pres.btnBusy ? "提交中…" : "提交并推送"}
+        </button>
+      </div>
     </li>
   );
 }

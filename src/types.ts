@@ -1,3 +1,15 @@
+export interface PreflightItem {
+  id: string;
+  ok: boolean;
+  message: string;
+}
+
+export interface PreflightResult {
+  ready: boolean;
+  checks: PreflightItem[];
+  summary: string;
+}
+
 export type RowUiState = "idle" | "running" | "success" | "failure";
 
 export interface ProjectView {

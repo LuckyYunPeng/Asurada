@@ -1,5 +1,6 @@
 mod commands;
 mod git;
+mod preflight;
 mod store;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -12,6 +13,8 @@ pub fn run() {
             commands::add_project,
             commands::remove_project,
             commands::refresh_project_status,
+            commands::check_environment,
+            commands::preflight,
             commands::run_commit_push,
         ])
         .run(tauri::generate_context!())
