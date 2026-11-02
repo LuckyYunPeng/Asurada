@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { bootstrapCapture, getCaptureScene } from "./captureMode";
 import logoUrl from "./assets/asurada-logo.png";
 import {
   INTRO_STEPS,
@@ -41,20 +42,32 @@ function Mascot() {
   );
 }
 
+const captureScene = getCaptureScene();
+const captureBoot = captureScene ? bootstrapCapture(captureScene) : null;
+
 function App() {
   const [panelOpen, setPanelOpen] = useState(true);
-  const [introComplete, setIntroComplete] = useState(readIntroComplete);
-  const [introStep, setIntroStep] = useState(() =>
-    readIntroComplete() ? -1 : 0,
+  const [introComplete, setIntroComplete] = useState(
+    () => captureBoot?.introComplete ?? readIntroComplete(),
   );
+  const [introStep, setIntroStep] = useState(() => {
+    if (captureBoot) return captureBoot.introStep;
+    return readIntroComplete() ? -1 : 0;
+  });
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [rows, setRows] = useState<ProjectRowState[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [rows, setRows] = useState<ProjectRowState[]>(
+    () => captureBoot?.rows ?? [],
+  );
+  const [loading, setLoading] = useState(() => captureBoot?.loading ?? true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [preflight, setPreflight] = useState<PreflightResult | null>(null);
-  const [preflightLoading, setPreflightLoading] = useState(false);
+  const [preflight, setPreflight] = useState<PreflightResult | null>(
+    () => captureBoot?.preflight ?? null,
+  );
+  const [preflightLoading, setPreflightLoading] = useState(
+    () => captureBoot?.preflightLoading ?? false,
+  );
   const [toast, setToast] = useState<{ message: string; kind: ToastKind } | null>(
-    null,
+    () => captureBoot?.toast ?? null,
   );
 
   const envReady = preflight?.ready === true;
@@ -67,6 +80,10 @@ function App() {
   );
 
   const refreshList = useCallback(async () => {
+    if (captureBoot?.skipInvoke) {
+      setLoading(false);
+      return;
+    }
     setLoadError(null);
     try {
       const projects = await invoke<ProjectView[]>("list_projects");
@@ -91,12 +108,14 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (captureBoot) return;
     if (introComplete) {
       void refreshList();
     }
   }, [introComplete, refreshList]);
 
   const runPreflight = useCallback(async () => {
+    if (captureBoot?.skipInvoke) return;
     setPreflightLoading(true);
     try {
       const result = await invoke<PreflightResult>("preflight");
@@ -113,6 +132,7 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (captureBoot) return;
     if (panelOpen && introComplete && !inIntro) {
       void runPreflight();
     }

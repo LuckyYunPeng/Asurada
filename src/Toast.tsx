@@ -2,6 +2,8 @@ import { useEffect } from "react";
 
 export type ToastKind = "ok" | "err";
 
+import { getCaptureScene } from "./captureMode";
+
 export function Toast({
   message,
   kind,
@@ -12,6 +14,7 @@ export function Toast({
   onDismiss: () => void;
 }) {
   useEffect(() => {
+    if (getCaptureScene()) return;
     const t = window.setTimeout(onDismiss, 4200);
     return () => window.clearTimeout(t);
   }, [message, onDismiss]);
