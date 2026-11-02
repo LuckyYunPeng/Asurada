@@ -948,6 +948,18 @@ body {
   cursor: pointer;
 }
 
+/* 重复添加时闪两下，告诉用户已有的项目在哪 */
+.row.is-flashing {
+  animation: row-flash 0.7s ease-in-out 2;
+}
+
+@keyframes row-flash {
+  50% {
+    border-color: var(--mint);
+    box-shadow: 0 0 0 3px rgba(94, 200, 212, 0.35);
+  }
+}
+
 .row {
   position: relative;
   width: 100%;
@@ -1257,6 +1269,12 @@ body {
   background: #eaf9f1;
   color: #2f9a64;
   border: 1px solid #c7efda;
+}
+
+.toast--info {
+  background: var(--mint-soft);
+  color: #1f7f8c;
+  border: 1px solid #b8e6ec;
 }
 
 .toast--err {

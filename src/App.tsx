@@ -111,6 +111,8 @@ function App() {
   } | null>(() => captureBoot?.toast ?? null);
   const cloudRef = useRef<HTMLDivElement>(null);
   const [rowOrder, setRowOrder] = useState<string[]>([]);
+  // 重复添加时闪烁高亮的已有项目
+  const [flashId, setFlashId] = useState<string | null>(null);
   // 启动后首次拿到列表也排一次
   const [isOrderPending, setIsOrderPending] = useState(true);
   const [cloudBand, setCloudBand] = useState(0);
@@ -410,7 +412,15 @@ function App() {
       const added = await invoke<ProjectView>("add_project", { path: selected });
       setRows((prev) => [...prev, { project: added, uiState: "idle" }]);
     } catch (e) {
-      setLoadError(String(e));
+      const message = String(e);
+      // 与 commands.rs 的 DUPLICATE_PROJECT_PREFIX 一致
+      if (message.startsWith("DUPLICATE_PROJECT:")) {
+        setToast({ title: "已在列表中", message: "这个项目之前加过啦", kind: "info" });
+        setFlashId(message.slice("DUPLICATE_PROJECT:".length));
+        return;
+      }
+      console.error("添加项目失败", e);
+      setLoadError(message);
     }
   }
 
@@ -507,7 +517,15 @@ function App() {
           {toast ? (
             <div ref={cloudRef} className={`cloud cloud--${toast.kind}`} role="status">
               <span className="cloud-icon" aria-hidden>
-                <Icon d={toast.kind === "ok" ? "M20 6 9 17l-5-5" : "M18 6 6 18M6 6l12 12"} />
+                <Icon
+                  d={
+                    toast.kind === "ok"
+                      ? "M20 6 9 17l-5-5"
+                      : toast.kind === "info"
+                        ? "M12 7v6M12 17h.01"
+                        : "M18 6 6 18M6 6l12 12"
+                  }
+                />
               </span>
               <span className="cloud-body">
                 <strong>{toast.title}</strong>
@@ -679,6 +697,8 @@ function App() {
                     canCommit={inMain}
                     onCommit={() => void handleCommitPush(row)}
                     onRemove={() => void handleRemove(row.project.id)}
+                    isFlashing={flashId === row.project.id}
+                    onFlashEnd={() => setFlashId(null)}
                   />
                 ))}
               </ul>
@@ -911,13 +931,24 @@ function ProjectRow({
   canCommit,
   onCommit,
   onRemove,
+  isFlashing,
+  onFlashEnd,
 }: {
   row: ProjectRowState;
   canCommit: boolean;
   onCommit: () => void;
   onRemove: () => void;
+  isFlashing: boolean;
+  onFlashEnd: () => void;
 }) {
   const [isConfirming, setIsConfirming] = useState(false);
+  const rowRef = useRef<HTMLLIElement>(null);
+
+  useEffect(() => {
+    if (isFlashing) {
+      rowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [isFlashing]);
   const pres = getRowPresentation(row);
   const isRunning = row.uiState === "running";
   const primaryDisabled = pres.btnDisabled || !canCommit || isRunning;
@@ -931,7 +962,15 @@ function ProjectRow({
   }
 
   return (
-    <li className="row">
+    <li
+      ref={rowRef}
+      className={`row${isFlashing ? " is-flashing" : ""}`}
+      onAnimationEnd={(e) => {
+        if (e.animationName === "row-flash") {
+          onFlashEnd();
+        }
+      }}
+    >
       <div className="meta">
         <div className="name" title={row.project.path}>
           {row.project.displayName}

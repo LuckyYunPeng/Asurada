@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-export type ToastKind = "ok" | "err";
+export type ToastKind = "ok" | "err" | "info";
 
 import { getCaptureScene } from "./captureMode";
 

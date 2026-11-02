@@ -65,6 +65,17 @@ fn to_view(p: &StoredProject) -> ProjectView {
     }
 }
 
+/// 重复添加时的错误前缀，后面跟已存在项目的 id；前端 App.tsx 按此识别并高亮那一行。
+const DUPLICATE_PROJECT_PREFIX: &str = "DUPLICATE_PROJECT:";
+
+/// 解析软链接、去掉末尾 `/`，让同一个目录的不同写法得到同一个路径。
+/// 目录已不存在时无法解析，只去末尾 `/`。
+fn normalize_path(path: &str) -> String {
+    std::fs::canonicalize(path)
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| path.trim_end_matches('/').to_string())
+}
+
 #[tauri::command]
 pub async fn list_projects(app: tauri::AppHandle) -> Result<Vec<ProjectView>, String> {
     let dir = app_data_dir(&app)?;
@@ -82,10 +93,12 @@ pub async fn add_project(app: tauri::AppHandle, path: String) -> Result<ProjectV
         return Err("路径不存在或不是文件夹".to_string());
     }
 
+    let path = normalize_path(&path);
     let dir = app_data_dir(&app)?;
     let mut projects = load_projects(&dir)?;
-    if projects.iter().any(|p| p.path == path) {
-        return Err("该项目已在列表中".to_string());
+    // 旧数据里的路径可能没规范化过，比较时两边都规范化
+    if let Some(existing) = projects.iter().find(|p| normalize_path(&p.path) == path) {
+        return Err(format!("{DUPLICATE_PROJECT_PREFIX}{}", existing.id));
     }
 
     let stored = StoredProject {
