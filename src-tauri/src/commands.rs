@@ -159,3 +159,8 @@ pub fn run_commit_push(app: tauri::AppHandle, id: String) -> Result<CommitPushRe
         error: None,
     })
 }
+
+#[tauri::command]
+pub fn sync_shell_layout(app: tauri::AppHandle, expanded: bool) -> Result<(), String> {
+    crate::shell::sync_layout(&app, expanded)
+}

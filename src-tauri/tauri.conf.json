@@ -10,14 +10,21 @@
     "frontendDist": "../dist"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "main",
         "title": "Asurada",
-        "width": 360,
-        "height": 520,
-        "resizable": true,
-        "decorations": true
+        "width": 48,
+        "height": 200,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": true,
+        "center": false,
+        "focus": false
       }
     ],
     "security": {

@@ -52,6 +52,14 @@ body {
   overflow: hidden;
 }
 
+.desktop--tag-only {
+  background: transparent;
+}
+
+.desktop--tag-only .deco {
+  display: none;
+}
+
 .deco {
   position: absolute;
   opacity: 0.45;
@@ -70,6 +78,17 @@ body {
 .deco-c {
   left: 48%;
   top: 18%;
+}
+
+.shell-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: default;
 }
 
 .tag {

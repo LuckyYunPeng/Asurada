@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { bootstrapCapture, getCaptureScene } from "./captureMode";
 import logoUrl from "./assets/asurada-logo.png";
@@ -46,7 +47,7 @@ const captureScene = getCaptureScene();
 const captureBoot = captureScene ? bootstrapCapture(captureScene) : null;
 
 function App() {
-  const [panelOpen, setPanelOpen] = useState(true);
+  const [panelOpen, setPanelOpen] = useState(() => (captureBoot ? true : false));
   const [introComplete, setIntroComplete] = useState(
     () => captureBoot?.introComplete ?? readIntroComplete(),
   );
@@ -78,6 +79,37 @@ function App() {
     () => rows.some((r) => r.uiState === "failure"),
     [rows],
   );
+
+  useEffect(() => {
+    if (captureBoot) return;
+    void invoke("sync_shell_layout", { expanded: panelOpen }).catch(() => {
+      /* 浏览器 dev 或无 Tauri 壳时忽略 */
+    });
+  }, [panelOpen]);
+
+  useEffect(() => {
+    if (captureBoot) return;
+    let unlisten: (() => void) | undefined;
+    void listen("asurada-shell-collapse", () => {
+      setPanelOpen(false);
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => {
+      unlisten?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (captureBoot || !panelOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setPanelOpen(false);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [panelOpen]);
 
   const refreshList = useCallback(async () => {
     if (captureBoot?.skipInvoke) {
@@ -249,7 +281,7 @@ function App() {
   const showHeaderAdd = inMain;
 
   return (
-    <div className="desktop">
+    <div className={`desktop${panelOpen ? "" : " desktop--tag-only"}`}>
       <span className="deco deco-a" aria-hidden>
         ✿
       </span>
@@ -276,7 +308,14 @@ function App() {
       </button>
 
       {panelOpen ? (
-        <aside className="panel" role="dialog" aria-label="Asurada 面板">
+        <>
+          <button
+            type="button"
+            className="shell-backdrop"
+            aria-label="收起面板"
+            onClick={() => setPanelOpen(false)}
+          />
+          <aside className="panel" role="dialog" aria-label="Asurada 面板">
           <header className="chrome">
             <div className="title-wrap">
               <div className="badge">
@@ -389,6 +428,7 @@ function App() {
             )}
           </div>
         </aside>
+        </>
       ) : null}
 
       {toast ? (
