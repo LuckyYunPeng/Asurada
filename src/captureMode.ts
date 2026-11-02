@@ -29,6 +29,7 @@ const mockProjectA: ProjectView = {
   shortPath: "…/fe-ceranva-landing",
   gitClean: false,
   gitStatusLabel: "有未提交变更",
+  lastCommitMessage: "feat: 调整落地页导航间距",
 };
 
 const mockProjectB: ProjectView = {
@@ -38,6 +39,7 @@ const mockProjectB: ProjectView = {
   shortPath: "…/asurada",
   gitClean: true,
   gitStatusLabel: "工作区干净",
+  lastCommitMessage: null,
 };
 
 export const mockPreflightOk: PreflightResult = {
@@ -68,7 +70,7 @@ export interface CaptureBootstrap {
   preflight: PreflightResult | null;
   preflightLoading: boolean;
   rows: ProjectRowState[];
-  toast: { message: string; kind: "ok" | "err" } | null;
+  toast: { title: string; message: string; kind: "ok" | "err" } | null;
   skipInvoke: boolean;
 }
 
@@ -148,7 +150,8 @@ export function bootstrapCapture(scene: CaptureScene): CaptureBootstrap {
       return {
         ...base,
         toast: {
-          message: "已推送 · feat: 调整落地页导航间距",
+          title: "已推送",
+          message: "feat: 调整落地页导航间距",
           kind: "ok",
         },
         rows: [

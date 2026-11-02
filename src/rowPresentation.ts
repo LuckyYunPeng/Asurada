@@ -20,44 +20,20 @@ export function getRowPresentation(row: ProjectRowState): {
     };
   }
 
-  if (uiState === "success") {
+  if (!project.gitClean) {
     return {
-      kind: "ok",
-      statusText: row.resultSummary ?? "已推送",
-      btnDisabled: project.gitClean,
+      kind: "dirty",
+      statusText: "有未提交变更",
+      btnDisabled: false,
       btnBusy: false,
-      btnTitle: project.gitClean ? "无变更" : undefined,
-    };
-  }
-
-  if (uiState === "failure") {
-    const summary = row.resultSummary ?? "提交失败";
-    const statusText = summary.startsWith("失败")
-      ? summary
-      : `失败 · ${summary}`;
-    return {
-      kind: "err",
-      statusText,
-      btnDisabled: project.gitClean,
-      btnBusy: false,
-      btnTitle: project.gitClean ? "无变更" : undefined,
-    };
-  }
-
-  if (project.gitClean) {
-    return {
-      kind: "clean",
-      statusText: "无变更",
-      btnDisabled: true,
-      btnBusy: false,
-      btnTitle: "无变更",
     };
   }
 
   return {
-    kind: "dirty",
-    statusText: "有未提交变更",
-    btnDisabled: false,
+    kind: "clean",
+    statusText: project.lastCommitMessage ?? "暂无变更",
+    btnDisabled: true,
     btnBusy: false,
+    btnTitle: project.lastCommitMessage ? "无变更" : "暂无变更",
   };
 }

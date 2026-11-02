@@ -4,7 +4,7 @@ use std::sync::Mutex;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    App, AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Size, WebviewWindow,
+    App, AppHandle, Emitter, LogicalSize, Manager, WebviewWindow,
 };
 use tauri_nspanel::{
     tauri_panel, CollectionBehavior, PanelLevel, StyleMask, WebviewWindowExt,
@@ -16,16 +16,31 @@ static IS_FILE_DIALOG_OPEN: AtomicBool = AtomicBool::new(false);
 static IS_PANEL_EXPANDED: AtomicBool = AtomicBool::new(true);
 static IS_TAG_HOT: AtomicBool = AtomicBool::new(false);
 static IS_DRAGGING: AtomicBool = AtomicBool::new(false);
+/// 收起且有提交结果时，窗口上方多出一朵云。
+static SHOW_RESULT_CLOUD: AtomicBool = AtomicBool::new(false);
 /// 标签顶边距工作区顶边的逻辑距离。空表示还没拖过，用默认位置。
 static DOCK_TAG_OFFSET: Mutex<Option<f64>> = Mutex::new(None);
+/// 在别的屏幕上真实点下后，下一次摆放贴到这块屏。空表示留在当前屏。
+static CLICKED_SCREEN: Mutex<Option<(f64, f64, f64, f64)>> = Mutex::new(None);
 
 /// 收起态窗口比标签高出这一截，用来放拖拽手柄。和 CSS `.tag` 的 top 一致。
 const HANDLE_BAND: f64 = 22.0;
+/// 和 CSS `.desktop--cloud` 的 `--cloud-band`、云朵高度一致。
+const CLOUD_BAND: f64 = 72.0;
+const CLOUD_WIDTH: f64 = 220.0;
 /// 和 CSS `.tag` 的 height、`.panel` 的 top/bottom 留白一致。
 const TAG_HEIGHT: f64 = 88.0;
 const PANEL_INSET: f64 = 10.0;
 const DOCK_COLLAPSED: LogicalSize<f64> = LogicalSize::new(48.0, 122.0);
 const DOCK_EXPANDED: LogicalSize<f64> = LogicalSize::new(384.0, 600.0);
+
+fn result_cloud_band() -> f64 {
+    if SHOW_RESULT_CLOUD.load(Ordering::SeqCst) {
+        CLOUD_BAND
+    } else {
+        0.0
+    }
+}
 
 const TRAY_SHOW_ID: &str = "tray-show-panel";
 const TRAY_COLLAPSE_ID: &str = "tray-collapse";
@@ -47,52 +62,186 @@ tauri_panel! {
 
 
 pub fn place_dock_window(window: &WebviewWindow, expanded: bool) -> Result<(), String> {
-    let logical = if expanded {
-        DOCK_EXPANDED
+    let cloud = result_cloud_band();
+    let (width, height) = if expanded {
+        (DOCK_EXPANDED.width, DOCK_EXPANDED.height)
+    } else if cloud > 0.0 {
+        (CLOUD_WIDTH, DOCK_COLLAPSED.height + CLOUD_BAND)
     } else {
-        DOCK_COLLAPSED
+        (DOCK_COLLAPSED.width, DOCK_COLLAPSED.height)
     };
-    window
-        .set_size(Size::Logical(logical))
-        .map_err(|e| format!("无法调整窗口大小: {e}"))?;
-    position_dock(window, expanded)
-}
-
-fn position_dock(window: &WebviewWindow, expanded: bool) -> Result<(), String> {
-    let monitor = active_monitor(window)?;
-    let scale = monitor.scale_factor();
-    let area = monitor.work_area();
-    let origin = area.position.to_logical::<f64>(scale);
-    let mon = area.size.to_logical::<f64>(scale);
-    let width = if expanded {
-        DOCK_EXPANDED.width
+    let saved_offset = *lock_dock(&DOCK_TAG_OFFSET);
+    let ns_window = window
+        .ns_window()
+        .map_err(|e| format!("无法读取窗口: {e}"))? as usize;
+    let is_from_bottom = AtomicBool::new(false);
+    if tauri_nspanel::objc2::MainThreadMarker::new().is_some() {
+        is_from_bottom.store(
+            place_frame(ns_window, expanded, width, height, cloud, saved_offset),
+            Ordering::SeqCst,
+        );
     } else {
-        DOCK_COLLAPSED.width
-    };
-    let x = origin.x + mon.width - width;
-    let collapsed_max = (mon.height - DOCK_COLLAPSED.height + HANDLE_BAND).max(HANDLE_BAND);
-    let raw = lock_dock(&DOCK_TAG_OFFSET).unwrap_or_else(|| {
-        (mon.height * 0.36 - DOCK_EXPANDED.height / 2.0)
-            .clamp(HANDLE_BAND, collapsed_max)
-    });
-    let tag_top = origin.y + raw.clamp(HANDLE_BAND, collapsed_max);
-    let work_bottom = origin.y + mon.height;
-    // 下面放得下整块面板时，面板顶边贴着标签顶边。放不下就改成底边贴着标签底边，往上长。
-    let is_from_bottom = expanded && tag_top + DOCK_EXPANDED.height > work_bottom;
-    let y = if !expanded {
-        tag_top - HANDLE_BAND
-    } else if is_from_bottom {
-        ((tag_top + TAG_HEIGHT + PANEL_INSET).min(work_bottom) - DOCK_EXPANDED.height).max(origin.y)
-    } else {
-        tag_top
-    };
-    window
-        .set_position(LogicalPosition::new(x, y))
-        .map_err(|e| format!("无法移动窗口: {e}"))?;
+        let is_from_bottom = &is_from_bottom;
+        dispatch2::DispatchQueue::main().exec_sync(move || {
+            is_from_bottom.store(
+                place_frame(ns_window, expanded, width, height, cloud, saved_offset),
+                Ordering::SeqCst,
+            );
+        });
+    }
     if expanded {
-        let _ = window.emit("panel-from-bottom", is_from_bottom);
+        let _ = window.emit("panel-from-bottom", is_from_bottom.load(Ordering::SeqCst));
     }
     Ok(())
+}
+
+fn same_screen(left: &objc2_app_kit::NSScreen, right: &objc2_app_kit::NSScreen) -> bool {
+    let left = left.frame();
+    let right = right.frame();
+    (left.origin.x - right.origin.x).abs() < 1.0
+        && (left.origin.y - right.origin.y).abs() < 1.0
+        && (left.size.width - right.size.width).abs() < 1.0
+        && (left.size.height - right.size.height).abs() < 1.0
+}
+
+fn screen_under_mouse(
+    mtm: tauri_nspanel::objc2::MainThreadMarker,
+) -> Option<tauri_nspanel::objc2::rc::Retained<objc2_app_kit::NSScreen>> {
+    use objc2_app_kit::{NSEvent, NSScreen};
+
+    let mouse = NSEvent::mouseLocation();
+    let screens = NSScreen::screens(mtm);
+    for index in 0..screens.count() {
+        let candidate = screens.objectAtIndex(index);
+        let bounds = candidate.frame();
+        if mouse.x >= bounds.origin.x
+            && mouse.x < bounds.origin.x + bounds.size.width
+            && mouse.y >= bounds.origin.y
+            && mouse.y < bounds.origin.y + bounds.size.height
+        {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+/// 平时留在窗口现在这块屏。只有点在别的屏上时，才改贴那块屏。
+fn screen_in_use(
+    window: &objc2_app_kit::NSWindow,
+    mtm: tauri_nspanel::objc2::MainThreadMarker,
+) -> Option<tauri_nspanel::objc2::rc::Retained<objc2_app_kit::NSScreen>> {
+    if let Some((x, y, width, height)) = *lock_dock(&CLICKED_SCREEN) {
+        let screens = objc2_app_kit::NSScreen::screens(mtm);
+        for index in 0..screens.count() {
+            let candidate = screens.objectAtIndex(index);
+            let bounds = candidate.frame();
+            if (bounds.origin.x - x).abs() < 1.0
+                && (bounds.origin.y - y).abs() < 1.0
+                && (bounds.size.width - width).abs() < 1.0
+                && (bounds.size.height - height).abs() < 1.0
+            {
+                return Some(candidate);
+            }
+        }
+    }
+    if let Some(current) = window.screen() {
+        return Some(current);
+    }
+    screen_under_mouse(mtm).or_else(|| {
+        let screens = objc2_app_kit::NSScreen::screens(mtm);
+        if screens.count() == 0 {
+            None
+        } else {
+            Some(screens.objectAtIndex(0))
+        }
+    })
+}
+
+/// 在本窗口以外点下时，若落点在另一块屏，记下那块屏。收起态马上贴过去。
+fn note_display_click(app: &AppHandle) {
+    if IS_DRAGGING.load(Ordering::SeqCst) || IS_FILE_DIALOG_OPEN.load(Ordering::SeqCst) {
+        return;
+    }
+    if tauri_nspanel::objc2::MainThreadMarker::new().is_none() {
+        let app = app.clone();
+        dispatch2::DispatchQueue::main().exec_async(move || note_display_click(&app));
+        return;
+    }
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let Ok(ns_window) = window.ns_window() else {
+        return;
+    };
+    let ns_window = unsafe { &*ns_window.cast::<objc2_app_kit::NSWindow>() };
+    let mtm = tauri_nspanel::objc2::MainThreadMarker::from(ns_window);
+    let Some(target) = screen_under_mouse(mtm) else {
+        return;
+    };
+    if ns_window
+        .screen()
+        .is_some_and(|dock| same_screen(&dock, &target))
+    {
+        return;
+    }
+    let bounds = target.frame();
+    *lock_dock(&CLICKED_SCREEN) = Some((
+        bounds.origin.x,
+        bounds.origin.y,
+        bounds.size.width,
+        bounds.size.height,
+    ));
+    if !IS_PANEL_EXPANDED.load(Ordering::SeqCst) {
+        let _ = place_dock_window(&window, false);
+    }
+}
+
+/// 用正在使用的屏幕的 AppKit 坐标贴右边。不走 tao 的 set_position，避免主屏像素高度把窗口丢到另一块屏。
+fn place_frame(
+    ns_window: usize,
+    expanded: bool,
+    width: f64,
+    height: f64,
+    cloud: f64,
+    saved_offset: Option<f64>,
+) -> bool {
+    use objc2_app_kit::NSWindow;
+    use tauri_nspanel::objc2::MainThreadMarker;
+    use tauri_nspanel::objc2_foundation::{NSPoint, NSRect, NSSize};
+
+    let window = unsafe { &*(ns_window as *const NSWindow) };
+    let Some(screen) = screen_in_use(window, MainThreadMarker::from(window)) else {
+        return false;
+    };
+    let visible = screen.visibleFrame();
+    let work_top = visible.origin.y + visible.size.height;
+    let collapsed_max = (visible.size.height - DOCK_COLLAPSED.height + HANDLE_BAND).max(HANDLE_BAND);
+    let raw = saved_offset
+        .unwrap_or_else(|| {
+            (visible.size.height * 0.36 - DOCK_EXPANDED.height / 2.0).clamp(HANDLE_BAND, collapsed_max)
+        })
+        .clamp(HANDLE_BAND, collapsed_max);
+    // 下面放得下整块面板时，面板顶边贴着标签顶边。放不下就改成底边贴着标签底边，往上长。
+    let is_from_bottom = expanded && raw + DOCK_EXPANDED.height > visible.size.height;
+    let top_from_work = if !expanded {
+        (raw - HANDLE_BAND - cloud).max(0.0)
+    } else if is_from_bottom {
+        ((raw + TAG_HEIGHT + PANEL_INSET).min(visible.size.height) - DOCK_EXPANDED.height).max(0.0)
+    } else {
+        raw
+    };
+    window.setFrame_display(
+        NSRect::new(
+            NSPoint::new(
+                visible.origin.x + visible.size.width - width,
+                work_top - top_from_work - height,
+            ),
+            NSSize::new(width, height),
+        ),
+        false,
+    );
+    *lock_dock(&CLICKED_SCREEN) = None;
+    is_from_bottom
 }
 
 fn lock_dock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
@@ -135,21 +284,6 @@ fn save_dock_offset(app: &AppHandle) {
 pub(super) fn commit_dock_offset(app: &AppHandle, tag_offset: f64) {
     *lock_dock(&DOCK_TAG_OFFSET) = Some(tag_offset);
     save_dock_offset(app);
-}
-
-/// 鼠标所在的显示器，取不到时回退主显示器。
-fn active_monitor(window: &WebviewWindow) -> Result<tauri::Monitor, String> {
-    let by_cursor = window.cursor_position().ok().and_then(|p| {
-        // tao 的 cursor_position 按主屏缩放比转成物理像素，monitor_from_point 要的是全局 point
-        let scale = window.primary_monitor().ok().flatten()?.scale_factor();
-        window
-            .monitor_from_point(p.x / scale, p.y / scale)
-            .ok()
-            .flatten()
-    });
-    by_cursor
-        .or_else(|| window.primary_monitor().ok().flatten())
-        .ok_or_else(|| "无法读取显示器".to_string())
 }
 
 fn show_window_expanded(window: &WebviewWindow) -> Result<(), String> {
@@ -426,11 +560,12 @@ mod outside_click {
                     return;
                 }
                 let bounds = self.bounds();
+                let cloud = super::result_cloud_band();
                 self.addCursorRect_cursor(
                     NSRect {
                         origin: NSPoint {
                             x: bounds.origin.x,
-                            y: bounds.origin.y + bounds.size.height - HANDLE_BAND,
+                            y: bounds.origin.y + bounds.size.height - cloud - HANDLE_BAND,
                         },
                         size: NSSize {
                             width: bounds.size.width,
@@ -444,7 +579,7 @@ mod outside_click {
                         origin: bounds.origin,
                         size: NSSize {
                             width: bounds.size.width,
-                            height: bounds.size.height - HANDLE_BAND,
+                            height: bounds.size.height - cloud - HANDLE_BAND,
                         },
                     },
                     &NSCursor::pointingHandCursor(),
@@ -481,7 +616,13 @@ mod outside_click {
 
             #[unsafe(method_id(hitTest:))]
             fn hit_test(&self, point: NSPoint) -> Option<Retained<NSView>> {
-                if IS_PANEL_EXPANDED.load(Ordering::SeqCst) {
+                let bounds = self.bounds();
+                let cloud = super::result_cloud_band();
+                let local_y = point.y - bounds.origin.y;
+                let local_x = point.x - bounds.origin.x;
+                let in_cloud = cloud > 0.0 && local_y >= bounds.size.height - cloud;
+                let in_tag = local_x >= bounds.size.width - super::DOCK_COLLAPSED.width;
+                if IS_PANEL_EXPANDED.load(Ordering::SeqCst) || !(in_cloud || in_tag) {
                     None
                 } else {
                     unsafe { msg_send![super(self), hitTest: point] }
@@ -493,6 +634,17 @@ mod outside_click {
     fn show_hand() {
         if IS_PANEL_EXPANDED.load(Ordering::SeqCst) || IS_FILE_DIALOG_OPEN.load(Ordering::SeqCst) {
             release_hand();
+            return;
+        }
+        if cursor_over_cloud() {
+            if IS_HAND_SHOWN.swap(false, Ordering::SeqCst) {
+                NSCursor::arrowCursor().set();
+            }
+            if let Some(app) = APP.get() {
+                if IS_TAG_HOT.swap(false, Ordering::SeqCst) {
+                    let _ = app.emit("tag-hot", false);
+                }
+            }
             return;
         }
         IS_HAND_SHOWN.store(true, Ordering::SeqCst);
@@ -627,6 +779,7 @@ mod outside_click {
             if IS_FILE_DIALOG_OPEN.load(Ordering::SeqCst) {
                 return;
             }
+            super::note_display_click(&blur_handle);
             let _ = blur_handle.emit("dock-blur", ());
         });
         if let Some(monitor) =
@@ -783,9 +936,11 @@ mod outside_click {
             MainThreadMarker::from(window),
         )
         .visibleFrame();
-        let tag_top = origin_y + drag.height - HANDLE_BAND;
+        let tag_top = origin_y + drag.height - HANDLE_BAND - super::result_cloud_band();
         let work_top = visible.origin.y + visible.size.height;
-        let max_offset = (visible.size.height - drag.height + HANDLE_BAND).max(HANDLE_BAND);
+        let max_offset = (visible.size.height - (drag.height - super::result_cloud_band())
+            + HANDLE_BAND)
+            .max(HANDLE_BAND);
         commit_dock_offset(app, (work_top - tag_top).clamp(HANDLE_BAND, max_offset));
         // 贴边引导在鼠标松开后才改窗口，下一轮和稍后再摆回去。
         hold_frame_later(window, drag.origin_x, origin_y, drag.width, drag.height, 0);
@@ -821,12 +976,15 @@ mod outside_click {
                 && mouse_down.windowNumber() == window_number
             {
                 let frame = unsafe { &*window }.frame();
-                let in_handle = mouse_down.locationInWindow().y >= frame.size.height - HANDLE_BAND;
-                if in_handle {
-                    begin_live_drag(&app_handle, unsafe { &*window });
-                    show_hand();
-                } else {
-                    let _ = apply_panel_open(&app_handle, true);
+                let y = mouse_down.locationInWindow().y;
+                let cloud = super::result_cloud_band();
+                if y < frame.size.height - cloud {
+                    if y >= frame.size.height - cloud - HANDLE_BAND {
+                        begin_live_drag(&app_handle, unsafe { &*window });
+                        show_hand();
+                    } else {
+                        let _ = apply_panel_open(&app_handle, true);
+                    }
                 }
             }
             event.as_ptr()
@@ -926,19 +1084,46 @@ mod outside_click {
         };
         let frame = unsafe { &*ns_window.cast::<NSWindow>() }.frame();
         let mouse = NSEvent::mouseLocation();
+        let cloud = super::result_cloud_band();
         mouse.x >= frame.origin.x
             && mouse.x < frame.origin.x + frame.size.width
-            && mouse.y >= frame.origin.y + frame.size.height - HANDLE_BAND
+            && mouse.y >= frame.origin.y + frame.size.height - cloud - HANDLE_BAND
+            && mouse.y < frame.origin.y + frame.size.height - cloud
+    }
+
+    fn cursor_over_cloud() -> bool {
+        let cloud = super::result_cloud_band();
+        if cloud <= 0.0 {
+            return false;
+        }
+        let Some(app) = APP.get() else {
+            return false;
+        };
+        let Some(window) = app.get_webview_window("main") else {
+            return false;
+        };
+        let Ok(ns_window) = window.ns_window() else {
+            return false;
+        };
+        let frame = unsafe { &*ns_window.cast::<NSWindow>() }.frame();
+        let mouse = NSEvent::mouseLocation();
+        mouse.x >= frame.origin.x
+            && mouse.x < frame.origin.x + frame.size.width
+            && mouse.y >= frame.origin.y + frame.size.height - cloud
             && mouse.y < frame.origin.y + frame.size.height
     }
 
     fn cursor_inside(window: *const NSWindow) -> bool {
         let mouse = NSEvent::mouseLocation();
         let frame = unsafe { &*window }.frame();
-        mouse.x >= frame.origin.x
+        let cloud = super::result_cloud_band();
+        let in_frame = mouse.x >= frame.origin.x
             && mouse.x < frame.origin.x + frame.size.width
             && mouse.y >= frame.origin.y
-            && mouse.y < frame.origin.y + frame.size.height
+            && mouse.y < frame.origin.y + frame.size.height;
+        let in_cloud = cloud > 0.0 && mouse.y >= frame.origin.y + frame.size.height - cloud;
+        let in_tag = mouse.x >= frame.origin.x + frame.size.width - super::DOCK_COLLAPSED.width;
+        in_frame && (in_cloud || in_tag)
     }
 }
 
@@ -965,4 +1150,19 @@ pub async fn pick_project_directory(app: tauri::AppHandle) -> Result<Option<Stri
 #[tauri::command]
 pub fn sync_dock_geometry(app: tauri::AppHandle, expanded: bool) -> Result<(), String> {
     apply_panel_open(&app, expanded)
+}
+
+/// 收起态有提交结果时，把窗口向上、向左撑开，给入口上方的云朵留位置。标签屏幕坐标不变。
+#[tauri::command]
+pub fn set_result_cloud(app: tauri::AppHandle, open: bool) -> Result<(), String> {
+    SHOW_RESULT_CLOUD.store(open, Ordering::SeqCst);
+    if IS_PANEL_EXPANDED.load(Ordering::SeqCst) {
+        return Ok(());
+    }
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "未找到主窗口".to_string())?;
+    place_dock_window(&window, false)?;
+    outside_click::refresh_collapsed_cursor(&window);
+    Ok(())
 }

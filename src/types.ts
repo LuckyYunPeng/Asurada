@@ -19,6 +19,7 @@ export interface ProjectView {
   shortPath: string;
   gitClean: boolean;
   gitStatusLabel: string;
+  lastCommitMessage: string | null;
 }
 
 export interface CommitPushResult {

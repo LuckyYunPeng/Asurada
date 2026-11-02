@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { openPath } from "@tauri-apps/plugin-opener";
 import { bootstrapCapture, getCaptureScene } from "./captureMode";
 import logoUrl from "./assets/asurada-logo.png";
 import {
@@ -94,9 +95,11 @@ function App() {
   const [preflightLoading, setPreflightLoading] = useState(
     () => captureBoot?.preflightLoading ?? false,
   );
-  const [toast, setToast] = useState<{ message: string; kind: ToastKind } | null>(
-    () => captureBoot?.toast ?? null,
-  );
+  const [toast, setToast] = useState<{
+    title: string;
+    message: string;
+    kind: ToastKind;
+  } | null>(() => captureBoot?.toast ?? null);
   const [isPanelClosing, setIsPanelClosing] = useState(false);
   const [isTagHot, setIsTagHot] = useState(false);
   const [isTagDragging, setIsTagDragging] = useState(false);
@@ -184,6 +187,13 @@ function App() {
     }
   }, [introComplete, refreshList]);
 
+  useEffect(() => {
+    if (captureBoot || !panelOpen || !inMain) {
+      return;
+    }
+    void refreshList();
+  }, [panelOpen, inMain, refreshList]);
+
   const runPreflight = useCallback(async () => {
     if (captureBoot?.skipInvoke) return;
     setPreflightLoading(true);
@@ -270,6 +280,23 @@ function App() {
     }
     void invoke("sync_dock_geometry", { expanded: false }).catch(() => {});
   }, [panelOpen]);
+
+  useEffect(() => {
+    if (!toast || captureBoot) {
+      return;
+    }
+    const timer = window.setTimeout(() => setToast(null), 4200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    if (captureBoot || !isTauri) {
+      return;
+    }
+    void invoke("set_result_cloud", { open: !panelOpen && toast != null }).catch(
+      () => {},
+    );
+  }, [panelOpen, toast]);
 
   useEffect(() => {
     if (captureBoot) return;
@@ -365,7 +392,11 @@ function App() {
 
       if (result.success && result.commitMessage) {
         const summary = `已推送 · ${summarizeCommitMessage(result.commitMessage)}`;
-        setToast({ message: summary, kind: "ok" });
+        setToast({
+          title: "已推送",
+          message: summarizeCommitMessage(result.commitMessage),
+          kind: "ok",
+        });
         setRows((prev) =>
           prev.map((r) =>
             r.project.id === row.project.id
@@ -379,7 +410,7 @@ function App() {
         );
       } else {
         const errMsg = result.error ?? "提交失败";
-        setToast({ message: errMsg, kind: "err" });
+        setToast({ title: "失败", message: errMsg, kind: "err" });
         setRows((prev) =>
           prev.map((r) =>
             r.project.id === row.project.id
@@ -394,7 +425,7 @@ function App() {
       }
     } catch (e) {
       const errMsg = String(e);
-      setToast({ message: errMsg, kind: "err" });
+      setToast({ title: "失败", message: errMsg, kind: "err" });
       setRows((prev) =>
         prev.map((r) =>
           r.project.id === row.project.id
@@ -415,11 +446,17 @@ function App() {
   return (
     <div
       className={`desktop${panelOpen ? " desktop--expanded" : " desktop--tag"}${
-        isTagHot ? " is-hot" : ""
-      }${isTagDragging ? " is-dragging" : ""}`}
+        !panelOpen && toast ? " desktop--cloud" : ""
+      }${isTagHot ? " is-hot" : ""}${isTagDragging ? " is-dragging" : ""}`}
     >
       {panelOpen ? null : (
         <>
+          {toast ? (
+            <div className={`cloud cloud--${toast.kind}`} role="status">
+              <strong>{toast.title}</strong>
+              <span>{toast.message}</span>
+            </div>
+          ) : null}
           <div className="tag-handle" aria-hidden>
             <span />
             <span />
@@ -513,14 +550,14 @@ function App() {
 
           {loadError ? <p className="banner-error">{loadError}</p> : null}
 
-          {inMain && projectCount > 0 ? (
-            <div className="risk" role="status">
-              <span className="ico">!</span>
-              <span>一键会暂存、提交并推送到远端哦，不会再确认～</span>
-            </div>
-          ) : null}
-
           <div className="panel-body">
+            {inMain && projectCount > 0 ? (
+              <div className="risk" role="status">
+                <span className="ico">!</span>
+                <span>一键会暂存、提交并推送到远端哦</span>
+              </div>
+            ) : null}
+
             {inIntro ? (
               <IntroView
                 step={introStep}
@@ -573,9 +610,9 @@ function App() {
         </aside>
       ) : null}
 
-      {toast ? (
+      {toast && panelOpen ? (
         <Toast
-          message={toast.message}
+          message={`${toast.title} · ${toast.message}`}
           kind={toast.kind}
           onDismiss={() => setToast(null)}
         />
@@ -741,7 +778,14 @@ function ProjectRow({
   const pres = getRowPresentation(row);
   const primaryDisabled =
     pres.btnDisabled || !canCommit || row.uiState === "running";
-  const isRunning = row.uiState === "running";
+
+  async function onOpenFolder() {
+    try {
+      await openPath(row.project.path);
+    } catch (error) {
+      console.error("打开文件夹失败", error);
+    }
+  }
 
   return (
     <li className="row">
@@ -765,7 +809,16 @@ function ProjectRow({
         >
           {pres.btnBusy ? "提交中…" : "提交并推送"}
         </button>
-        {isRunning ? null : (
+        <div className="row-tools">
+          <button
+            type="button"
+            className="row-open"
+            aria-label="打开文件夹"
+            title="打开文件夹"
+            onClick={onOpenFolder}
+          >
+            <Icon d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+          </button>
           <button
             type="button"
             className={`row-remove${isConfirming ? " is-open" : ""}`}
@@ -774,7 +827,7 @@ function ProjectRow({
           >
             <Icon d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
           </button>
-        )}
+        </div>
       </div>
       {isConfirming ? (
         <div className="row-confirm" role="alertdialog" aria-label="确认移除">

@@ -18,6 +18,28 @@ pub fn git_is_clean(project_path: &Path) -> Result<bool, String> {
     Ok(output.stdout.is_empty())
 }
 
+pub fn git_last_commit_subject(project_path: &Path) -> Option<String> {
+    let output = Command::new("git")
+        .args([
+            "-C",
+            project_path.to_string_lossy().as_ref(),
+            "log",
+            "-1",
+            "--format=%s",
+        ])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let subject = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if subject.is_empty() {
+        None
+    } else {
+        Some(subject)
+    }
+}
+
 pub fn run_pi_print(project_path: &Path) -> Result<String, String> {
     let output = Command::new("pi")
         .args(["--no-session", "--print", PI_COMMIT_PROMPT])

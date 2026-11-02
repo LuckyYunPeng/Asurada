@@ -56,10 +56,14 @@ body {
   cursor: pointer;
 }
 
+.desktop--cloud {
+  --cloud-band: 72px;
+}
+
 /* 收起态：窗口上方留出手柄，悬停时整块 tag 从右上角轻微放大 */
 .tag-handle {
   position: absolute;
-  top: 3px;
+  top: calc(3px + var(--cloud-band, 0px));
   right: 6px;
   z-index: 2;
   width: 28px;
@@ -101,7 +105,7 @@ body {
 
 .tag {
   position: absolute;
-  top: 22px;
+  top: calc(22px + var(--cloud-band, 0px));
   right: 0;
   width: 40px;
   height: 88px;
@@ -149,6 +153,95 @@ body {
   border-radius: 50%;
   background: var(--err);
   box-shadow: 0 0 0 2px #1d1734;
+}
+
+.cloud {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  right: 8px;
+  width: 200px;
+  padding: 8px 12px 9px;
+  border-radius: 18px;
+  background: #f4fffb;
+  border: 1.5px solid rgba(94, 200, 196, 0.7);
+  box-shadow: 0 8px 18px rgba(23, 18, 42, 0.14);
+  pointer-events: none;
+  animation: cloud-in 0.22s ease-out;
+}
+
+.cloud::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 28px;
+  width: 22px;
+  height: 22px;
+  background: inherit;
+  border: 1.5px solid rgba(94, 200, 196, 0.7);
+  border-radius: 50%;
+}
+
+.cloud::after {
+  content: "";
+  position: absolute;
+  right: 18px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  background: #f4fffb;
+  border-right: 1.5px solid rgba(94, 200, 196, 0.7);
+  border-bottom: 1.5px solid rgba(94, 200, 196, 0.7);
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.cloud strong {
+  display: block;
+  font-size: 12px;
+  line-height: 1.3;
+  color: #1c9a78;
+}
+
+.cloud span {
+  display: -webkit-box;
+  margin-top: 2px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #4a4458;
+}
+
+.cloud--err {
+  background: #fff6f8;
+  border-color: rgba(255, 140, 164, 0.75);
+}
+
+.cloud--err::before {
+  border-color: rgba(255, 140, 164, 0.75);
+}
+
+.cloud--err::after {
+  background: #fff6f8;
+  border-right-color: rgba(255, 140, 164, 0.75);
+  border-bottom-color: rgba(255, 140, 164, 0.75);
+}
+
+.cloud--err strong {
+  color: #d45370;
+}
+
+@keyframes cloud-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* 展开态：面板铺满透明窗，四周留白给阴影 */
@@ -339,9 +432,9 @@ body {
 
 .risk {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
-  margin: 0 16px 12px;
+  margin: 0 0 12px;
   padding: 9px 11px;
   border-radius: 14px;
   background: linear-gradient(135deg, #fff5eb, #ffe8d9);
@@ -804,7 +897,19 @@ body {
   background: #ef8a3a;
   box-shadow: 0 0 0 2px rgba(239, 138, 58, 0.35);
 }
+.status.clean {
+  align-items: flex-start;
+}
+
+.status.clean span:last-child {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .status.clean .pip {
+  margin-top: 4px;
   background: #cfc8d8;
 }
 .status.ok {
@@ -845,20 +950,48 @@ body {
   align-self: stretch;
 }
 
+.row-tools {
+  display: flex;
+  gap: 2px;
+}
+
+.row-open,
 .row-remove {
   width: 24px;
   height: 24px;
-  border-radius: 999px;
+  border-radius: 6px;
   border: none;
-  background: #fff0f3;
-  color: #e0567a;
+  background: transparent;
+  color: var(--ink-3);
   cursor: pointer;
   display: grid;
   place-items: center;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
+.row-open svg,
+.row-remove svg {
+  width: 14px;
+  height: 14px;
+}
+
+.row-open:hover {
+  background: var(--mint-soft);
+  color: #2a8a96;
+}
+
+.row-remove:hover,
+.row-remove.is-open {
+  background: #fff0f3;
+  color: #e0567a;
+}
+
+.row:hover .row-open,
+.row:focus-within .row-open,
 .row:hover .row-remove,
 .row:focus-within .row-remove,
 .row-remove.is-open {
@@ -948,6 +1081,9 @@ body {
   max-width: min(320px, calc(100vw - 32px));
   padding: 10px 16px;
   border-radius: 999px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 12px;
   font-weight: 600;
   z-index: 100;

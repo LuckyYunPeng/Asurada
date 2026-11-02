@@ -1,4 +1,4 @@
-use crate::git::{git_add_commit_push, git_is_clean, run_pi_print};
+use crate::git::{git_add_commit_push, git_is_clean, git_last_commit_subject, run_pi_print};
 use crate::preflight::{self, PreflightResult};
 use crate::store::{default_display_name, load_projects, save_projects, StoredProject};
 use serde::{Deserialize, Serialize};
@@ -15,6 +15,7 @@ pub struct ProjectView {
     pub short_path: String,
     pub git_clean: bool,
     pub git_status_label: String,
+    pub last_commit_message: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,10 +44,14 @@ fn shorten_path(path: &str) -> String {
 
 fn to_view(p: &StoredProject) -> ProjectView {
     let path = PathBuf::from(&p.path);
-    let (git_clean, git_status_label) = match git_is_clean(&path) {
-        Ok(true) => (true, "工作区干净".to_string()),
-        Ok(false) => (false, "有未提交变更".to_string()),
-        Err(e) => (true, format!("状态未知: {e}")),
+    let (git_clean, git_status_label, last_commit_message) = match git_is_clean(&path) {
+        Ok(true) => (
+            true,
+            "工作区干净".to_string(),
+            git_last_commit_subject(&path),
+        ),
+        Ok(false) => (false, "有未提交变更".to_string(), None),
+        Err(e) => (true, format!("状态未知: {e}"), None),
     };
 
     ProjectView {
@@ -56,6 +61,7 @@ fn to_view(p: &StoredProject) -> ProjectView {
         short_path: shorten_path(&p.path),
         git_clean,
         git_status_label,
+        last_commit_message,
     }
 }
 

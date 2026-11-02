@@ -28,6 +28,7 @@ pub fn run() {
             commands::run_commit_push,
             #[cfg(target_os = "macos")]
             macos_panel::sync_dock_geometry,
+            macos_panel::set_result_cloud,
             #[cfg(target_os = "macos")]
             macos_panel::pick_project_directory,
         ])
