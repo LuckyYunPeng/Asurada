@@ -571,7 +571,7 @@ pub fn apply_toggle_shortcut(app: &AppHandle, shortcut: &str) -> Result<(), Stri
     let gs = app.global_shortcut();
 
     if !previous.is_empty() && previous != shortcut {
-        let _ = gs.unregister(&previous);
+        let _ = gs.unregister(previous.as_str());
     }
 
     match register_toggle_shortcut_handler(app, shortcut) {
