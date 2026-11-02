@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -487,7 +495,7 @@ function App() {
           role="dialog" aria-label="Asurada 面板">
           <header className="chrome">
             <div className="title-wrap">
-              <div className="badge">
+              <div className="brand">
                 <img src={logoUrl} alt="" />
               </div>
               <h1 className="title">Asurada</h1>
@@ -763,6 +771,72 @@ function PreflightCheckRow({
   );
 }
 
+function CommitTip({ text }: { text: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [tip, setTip] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  useLayoutEffect(() => {
+    setTip(null);
+  }, [text]);
+
+  useEffect(() => {
+    if (!tip) {
+      return;
+    }
+    const onScroll = () => setTip(null);
+    window.addEventListener("scroll", onScroll, true);
+    return () => window.removeEventListener("scroll", onScroll, true);
+  }, [tip]);
+
+  return (
+    <>
+      <span
+        ref={ref}
+        className="status-text"
+        onMouseEnter={() => {
+          const el = ref.current;
+          if (!el || el.scrollHeight <= el.clientHeight + 1) {
+            return;
+          }
+          const rect = el.getBoundingClientRect();
+          setTip({
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+          });
+        }}
+        onMouseLeave={() => setTip(null)}
+      >
+        {text}
+      </span>
+      {tip
+        ? createPortal(
+            <div
+              className="commit-tip tooltip tooltip-open tooltip-top tooltip-start"
+              data-tip={text}
+              style={{
+                position: "fixed",
+                top: tip.top,
+                left: tip.left,
+                width: tip.width,
+                height: tip.height,
+                zIndex: 40,
+                pointerEvents: "none",
+              }}
+            />,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
 function ProjectRow({
   row,
   canCommit,
@@ -776,8 +850,8 @@ function ProjectRow({
 }) {
   const [isConfirming, setIsConfirming] = useState(false);
   const pres = getRowPresentation(row);
-  const primaryDisabled =
-    pres.btnDisabled || !canCommit || row.uiState === "running";
+  const isRunning = row.uiState === "running";
+  const primaryDisabled = pres.btnDisabled || !canCommit || isRunning;
 
   async function onOpenFolder() {
     try {
@@ -794,40 +868,40 @@ function ProjectRow({
         <div className="path" title={row.project.path}>
           {row.project.shortPath}
         </div>
-        <div className={`status ${pres.kind}`}>
-          <span className="pip" aria-hidden />
-          <span>{pres.statusText}</span>
-        </div>
       </div>
-      <div className="actions">
+      <button
+        type="button"
+        className={`btn-primary${pres.btnBusy ? " busy" : ""}`}
+        disabled={primaryDisabled}
+        title={pres.btnTitle}
+        onClick={onCommit}
+      >
+        {pres.btnBusy ? "提交中…" : "提交并推送"}
+      </button>
+      <div className={`git-status ${pres.kind}`}>
+        <span className="pip" aria-hidden />
+        <CommitTip text={pres.statusText} />
+      </div>
+      <div className="row-tools">
         <button
           type="button"
-          className={`btn-primary${pres.btnBusy ? " busy" : ""}`}
-          disabled={primaryDisabled}
-          title={pres.btnTitle}
-          onClick={onCommit}
+          className="row-open"
+          aria-label="打开文件夹"
+          title="打开文件夹"
+          disabled={isRunning}
+          onClick={onOpenFolder}
         >
-          {pres.btnBusy ? "提交中…" : "提交并推送"}
+          <Icon d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
         </button>
-        <div className="row-tools">
-          <button
-            type="button"
-            className="row-open"
-            aria-label="打开文件夹"
-            title="打开文件夹"
-            onClick={onOpenFolder}
-          >
-            <Icon d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
-          </button>
-          <button
-            type="button"
-            className={`row-remove${isConfirming ? " is-open" : ""}`}
-            aria-label="移除项目"
-            onClick={() => setIsConfirming(true)}
-          >
-            <Icon d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
-          </button>
-        </div>
+        <button
+          type="button"
+          className={`row-remove${isConfirming ? " is-open" : ""}`}
+          aria-label="移除项目"
+          disabled={isRunning}
+          onClick={() => setIsConfirming(true)}
+        >
+          <Icon d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
+        </button>
       </div>
       {isConfirming ? (
         <div className="row-confirm" role="alertdialog" aria-label="确认移除">
