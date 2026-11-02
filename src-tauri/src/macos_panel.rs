@@ -51,9 +51,10 @@ pub fn place_dock_window(window: &WebviewWindow, expanded: bool) -> Result<(), S
     let origin = area.position.to_logical::<f64>(scale);
     let mon = area.size.to_logical::<f64>(scale);
     let x = origin.x + mon.width - logical.width;
+    // 展开、收起共用面板顶边。按各自中心对齐时，88 高的 tag 会落到 600 高面板的中部。
     let y = origin.y
-        + (mon.height * 0.36 - logical.height / 2.0)
-            .min(mon.height - logical.height)
+        + (mon.height * 0.36 - DOCK_EXPANDED.height / 2.0)
+            .min(mon.height - DOCK_EXPANDED.height)
             .max(8.0);
 
     window
