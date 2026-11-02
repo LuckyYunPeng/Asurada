@@ -7,9 +7,9 @@
   --app-bg-a: transparent;
   --app-bg-b: transparent;
   --panel: rgba(255, 255, 255, 0.9);
-  --panel-solid: #fff;
+  --panel-solid: rgba(240, 252, 250, 0.88);
   --panel-border: rgba(94, 200, 212, 0.38);
-  --panel-outline: rgba(61, 58, 74, 0.08);
+  --panel-outline: rgba(94, 200, 212, 0.38);
   --panel-shadow: 0 12px 32px rgba(23, 18, 42, 0.18),
     0 2px 6px rgba(23, 18, 42, 0.08);
   --chrome-divider: rgba(61, 58, 74, 0.06);
@@ -237,11 +237,26 @@ body {
   background: var(--panel-solid);
   border: 1px solid var(--panel-outline);
   box-shadow: var(--panel-shadow);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   transform-origin: right center;
   animation: panel-in 0.42s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+:root .panel::before,
+[data-theme="light"] .panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  border-radius: 18px 18px 0 0;
+  background: linear-gradient(90deg, var(--peach), var(--mint));
+  opacity: 0.92;
+  pointer-events: none;
+  z-index: 1;
 }
 
 [data-theme="dark"] .panel::before {
@@ -358,7 +373,21 @@ body {
 .chrome-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.btn-chrome {
+  color: var(--mint-hover-ink);
+  font-weight: 600;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.btn-chrome-muted {
+  color: var(--ink-2);
+  font-weight: 600;
+  font-size: 12px;
 }
 
 .btn-ghost,
@@ -949,40 +978,42 @@ body {
 }
 
 .settings-page {
-  padding: 4px 4px 8px;
+  padding: 2px 2px 8px;
 }
 
-.settings-page-title {
-  margin: 0 0 12px;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--heading);
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 2px 12px;
 }
 
-.settings-card {
-  padding: 12px 12px 10px;
-  border-radius: 16px;
-  background: var(--surface-card);
-  border: 1.5px solid var(--border-soft);
-  margin-bottom: 14px;
-}
-
-.settings-card-head {
-  margin-bottom: 10px;
-}
-
-.settings-label {
-  display: block;
+.settings-row .settings-label {
+  flex: none;
   font-size: 12px;
   font-weight: 700;
   color: var(--heading);
+  cursor: default;
 }
 
-.settings-hint {
-  margin: 4px 0 0;
-  font-size: 11px;
-  line-height: 1.4;
-  color: var(--ink-3);
+.settings-row .theme-segment {
+  flex: 1;
+  max-width: 220px;
+}
+
+.settings-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 2px;
+}
+
+.settings-foot .btn-text {
+  color: var(--mint-hover-ink);
+  font-weight: 600;
+  font-size: 12px;
+  padding: 4px 0;
 }
 
 .theme-segment {
@@ -1016,17 +1047,6 @@ body {
   background: var(--segment-on-bg);
   color: var(--heading);
   box-shadow: var(--segment-on-shadow);
-}
-
-.settings-page-actions {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.settings-back {
-  min-width: 72px;
 }
 
 .settings-extra {

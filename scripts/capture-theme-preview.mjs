@@ -51,7 +51,7 @@ for (const { capture, file, theme } of shots) {
   await page.waitForTimeout(500);
 
   if (capture === "settings") {
-    await page.waitForSelector(".settings-page", { timeout: 5000 });
+    await page.waitForSelector(".settings-row", { timeout: 5000 });
   }
   if (capture === "list") {
     await page.waitForSelector(".risk", { timeout: 5000 });

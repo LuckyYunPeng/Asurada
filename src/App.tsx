@@ -433,12 +433,10 @@ function App() {
               {showHeaderAdd ? (
                 <button
                   type="button"
-                  className="btn-icon"
-                  aria-label="添加项目"
-                  title="添加项目"
+                  className="btn-text btn-chrome"
                   onClick={() => void handleAddProject()}
                 >
-                  <Icon d="M12 5v14M5 12h14" />
+                  添加项目
                 </button>
               ) : null}
               {showMainChrome ? (
@@ -454,12 +452,10 @@ function App() {
               ) : null}
               <button
                 type="button"
-                className="btn-icon"
-                aria-label="收起"
-                title="收起"
+                className="btn-text btn-chrome-muted"
                 onClick={onCollapsePanel}
               >
-                <Icon d="m9 18 6-6-6-6" />
+                收起
               </button>
             </div>
           </header>
@@ -569,14 +565,13 @@ function SettingsView({
 }) {
   return (
     <div className="settings-page">
-      <h2 className="settings-page-title">设置</h2>
-      <div className="settings-card">
-        <div className="settings-card-head">
-          <span className="settings-label">主题</span>
-          <p className="settings-hint">
-            跟随系统时按 macOS 浅色/深色自动切换
-          </p>
-        </div>
+      <div className="settings-row">
+        <span
+          className="settings-label"
+          title="跟随系统时按 macOS 浅色/深色自动切换"
+        >
+          主题
+        </span>
         <div className="theme-segment" role="radiogroup" aria-label="主题">
           {THEME_OPTIONS.map(([value, label]) => (
             <button
@@ -592,8 +587,8 @@ function SettingsView({
           ))}
         </div>
       </div>
-      <div className="settings-page-actions">
-        <button type="button" className="btn-secondary settings-back" onClick={onBack}>
+      <div className="settings-foot">
+        <button type="button" className="btn-text" onClick={onBack}>
           返回
         </button>
         <button type="button" className="settings-extra" onClick={onReplayIntro}>
