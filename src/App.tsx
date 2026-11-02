@@ -9,7 +9,7 @@ import {
   INTRO_STEPS,
   INTRO_STORAGE_KEY,
   PREFLIGHT_CHECK_META,
-  REPLAY_INTRO_LABEL,
+  VIEW_INTRO_LABEL,
 } from "./introContent";
 import { getRowPresentation } from "./rowPresentation";
 import { Toast, type ToastKind } from "./Toast";
@@ -423,6 +423,15 @@ function App() {
         >
           <header className="chrome">
             <div className="title-wrap">
+              {inSettings ? (
+                <button
+                  type="button"
+                  className="btn-text btn-chrome-back"
+                  onClick={closeSettings}
+                >
+                  返回
+                </button>
+              ) : null}
               <div className="badge">
                 <img src={logoUrl} alt="" />
               </div>
@@ -482,8 +491,7 @@ function App() {
               <SettingsView
                 themePreference={themePreference}
                 onThemeChange={setTheme}
-                onBack={closeSettings}
-                onReplayIntro={replayIntro}
+                onViewIntro={replayIntro}
               />
             ) : inIntro ? (
               <IntroView
@@ -556,13 +564,11 @@ const THEME_OPTIONS = [
 function SettingsView({
   themePreference,
   onThemeChange,
-  onBack,
-  onReplayIntro,
+  onViewIntro,
 }: {
   themePreference: ThemePreference;
   onThemeChange: (next: ThemePreference) => void;
-  onBack: () => void;
-  onReplayIntro: () => void;
+  onViewIntro: () => void;
 }) {
   return (
     <div className="settings-page">
@@ -586,23 +592,16 @@ function SettingsView({
         </div>
         <p className="settings-hint">跟随系统时按 macOS 外观自动切换</p>
       </div>
-      <div className="settings-foot">
-        <button
-          type="button"
-          className="btn-secondary settings-back"
-          onClick={onBack}
-        >
-          返回
-        </button>
-        <button
-          type="button"
-          className="settings-extra"
-          aria-label={REPLAY_INTRO_LABEL}
-          onClick={onReplayIntro}
-        >
-          {REPLAY_INTRO_LABEL}
-        </button>
-      </div>
+      <button
+        type="button"
+        className="settings-row settings-row-action"
+        onClick={onViewIntro}
+      >
+        <span className="settings-label">{VIEW_INTRO_LABEL}</span>
+        <span className="settings-chevron" aria-hidden>
+          ›
+        </span>
+      </button>
     </div>
   );
 }

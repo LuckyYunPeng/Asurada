@@ -1,7 +1,7 @@
 export const INTRO_STORAGE_KEY = "asurada_intro_complete";
 
-/** 设置页脚链：重看引导（深浅色统一文案） */
-export const REPLAY_INTRO_LABEL = "重看引导";
+/** 设置页「查看引导」行标签 */
+export const VIEW_INTRO_LABEL = "查看引导";
 
 export const INTRO_STEPS = [
   {
