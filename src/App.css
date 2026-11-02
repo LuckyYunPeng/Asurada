@@ -7,9 +7,9 @@
   --app-bg-a: transparent;
   --app-bg-b: transparent;
   --panel: rgba(255, 255, 255, 0.9);
-  --panel-solid: rgba(240, 252, 250, 0.88);
-  --panel-border: rgba(94, 200, 212, 0.38);
-  --panel-outline: rgba(94, 200, 212, 0.38);
+  --panel-solid: rgba(255, 252, 247, 0.82);
+  --panel-border: rgba(94, 200, 212, 0.42);
+  --panel-outline: rgba(94, 200, 212, 0.36);
   --panel-shadow: 0 12px 32px rgba(23, 18, 42, 0.18),
     0 2px 6px rgba(23, 18, 42, 0.08);
   --chrome-divider: rgba(61, 58, 74, 0.06);
@@ -157,6 +157,15 @@ body {
   min-height: 100vh;
 }
 
+[data-theme="light"] .desktop--expanded {
+  background: linear-gradient(
+    165deg,
+    var(--bg1) 0%,
+    var(--bg2) 48%,
+    var(--bg3) 100%
+  );
+}
+
 [data-theme="dark"] .desktop--expanded {
   background: linear-gradient(
     165deg,
@@ -234,11 +243,16 @@ body {
   left: 14px;
   max-height: calc(100vh - 24px);
   border-radius: 18px;
-  background: var(--panel-solid);
+  background: linear-gradient(
+    165deg,
+    rgba(255, 253, 250, 0.9) 0%,
+    rgba(232, 250, 246, 0.78) 55%,
+    rgba(255, 248, 242, 0.8) 100%
+  );
   border: 1px solid var(--panel-outline);
   box-shadow: var(--panel-shadow);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -246,17 +260,25 @@ body {
   animation: panel-in 0.42s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
-:root .panel::before,
 [data-theme="light"] .panel::before {
   content: "";
   position: absolute;
   inset: 0 0 auto;
   height: 3px;
   border-radius: 18px 18px 0 0;
-  background: linear-gradient(90deg, var(--peach), var(--mint));
-  opacity: 0.92;
+  background: linear-gradient(
+    90deg,
+    rgba(240, 184, 154, 0.95) 0%,
+    rgba(248, 200, 170, 0.85) 22%,
+    rgba(126, 217, 200, 0.9) 78%,
+    rgba(94, 200, 212, 0.95) 100%
+  );
   pointer-events: none;
   z-index: 1;
+}
+
+[data-theme="dark"] .panel {
+  background: var(--panel-solid);
 }
 
 [data-theme="dark"] .panel::before {
@@ -981,12 +1003,24 @@ body {
   padding: 2px 2px 8px;
 }
 
+.settings-theme {
+  padding: 6px 2px 16px;
+}
+
 .settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 8px 2px 12px;
+  padding: 0;
+}
+
+.settings-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-3);
+  max-width: 18em;
 }
 
 .settings-row .settings-label {
@@ -1006,14 +1040,11 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 2px;
+  padding: 4px 2px 0;
 }
 
-.settings-foot .btn-text {
-  color: var(--mint-hover-ink);
-  font-weight: 600;
-  font-size: 12px;
-  padding: 4px 0;
+.settings-foot .settings-back {
+  min-width: 64px;
 }
 
 .theme-segment {

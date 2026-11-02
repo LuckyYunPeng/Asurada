@@ -565,30 +565,32 @@ function SettingsView({
 }) {
   return (
     <div className="settings-page">
-      <div className="settings-row">
-        <span
-          className="settings-label"
-          title="跟随系统时按 macOS 浅色/深色自动切换"
-        >
-          主题
-        </span>
-        <div className="theme-segment" role="radiogroup" aria-label="主题">
-          {THEME_OPTIONS.map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              role="radio"
-              aria-checked={themePreference === value}
-              className={themePreference === value ? "on" : undefined}
-              onClick={() => onThemeChange(value)}
-            >
-              {label}
-            </button>
-          ))}
+      <div className="settings-theme">
+        <div className="settings-row">
+          <span className="settings-label">主题</span>
+          <div className="theme-segment" role="radiogroup" aria-label="主题">
+            {THEME_OPTIONS.map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={themePreference === value}
+                className={themePreference === value ? "on" : undefined}
+                onClick={() => onThemeChange(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
+        <p className="settings-hint">跟随系统时按 macOS 外观自动切换</p>
       </div>
       <div className="settings-foot">
-        <button type="button" className="btn-text" onClick={onBack}>
+        <button
+          type="button"
+          className="btn-secondary settings-back"
+          onClick={onBack}
+        >
           返回
         </button>
         <button type="button" className="settings-extra" onClick={onReplayIntro}>
