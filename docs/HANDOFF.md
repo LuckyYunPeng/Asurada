@@ -44,20 +44,25 @@ cd src-tauri && cargo test preflight::
 |----|------|
 | 壳 | **Tauri 2** |
 | 前端 | **React 19 + Vite 8 + TypeScript**（`src/`） |
-| 后端命令 | Rust（`src-tauri/src/`：`commands`、`git`、`preflight`、`store`） |
-| 插件 | `@tauri-apps/plugin-dialog`（选目录）、`tauri-plugin-opener`（已接入 capability，UI 尚未用 Finder） |
+| 后端命令 | Rust（`src-tauri/src/`：`commands`、`git`、`preflight`、`store`、**`macos_panel`**） |
+| macOS 壳 | **`tauri-nspanel`**（git `ahkohd/tauri-nspanel` branch `v2.1`）+ `macos_panel.rs` |
+| 插件 | `@tauri-apps/plugin-dialog`（选目录）、`tauri-plugin-opener`（capability 已开，UI 尚未用 Finder） |
 
-### macOS 壳层（NSPanel / 托盘 / Accessory）— **现状**
+### macOS 壳层（NSPanel / 托盘 / 启动策略）— **现状**
 
-产品目标为 **无传统主窗口、边缘 tag + 浮层**（见设计摘录 `uploads/design-v0.1-brief_55e5.md`）。**当前 main 尚未接入** 下列 native 能力，UI 在 **单窗口 Tauri 窗口**（`tauri.conf.json` 360×520、带 decorations）内用 CSS 模拟 tag + panel：
+主窗口 `main` 为 **无装饰、透明、置顶** 的贴边壳（见 `tauri.conf.json`：`macOSPrivateApi`、初始逻辑尺寸约 **52×148** 收起态）。Rust 模块 **`macos_panel`**（`src-tauri/src/lib.rs` 注册）负责 native 行为；前端 React 仍渲染 **tag + 浮层面板**，通过 **`sync_dock_geometry`** 与 Rust 同步展开/收起。
 
-| 能力 | 现状 | 预期方向 |
-|------|------|----------|
-| **NSPanel**（如 `tauri-nspanel`） | 未集成；无 `macos_panel` 模块 | tag / 面板拆为 native 贴边浮层 |
-| **菜单栏托盘** | 未实现 | 可选：显式退出、重开面板 |
-| **Accessory vs Regular** | 未设置 `LSUIElement`；常规 App 行为 | 定稿后：偏 Accessory（少 Dock 干扰）或 Regular（便于调试）需产品拍板 |
+| 能力 | 实现要点（代码为准） |
+|------|----------------------|
+| **`tauri-nspanel`** | `lib.rs` → `tauri_nspanel::init()`；`init_panel` 将 `main` 转为 `AsuradaPanel`（Floating level、nonactivating、全 Space / 全屏辅助 collection behavior） |
+| **贴边几何** | `place_dock_window`：收起 **52×148** / 展开 **452×620**（Logical），锚定 **当前显示器右缘**、纵向约 **36%** 屏高；`sync_dock_geometry(expanded)` → `apply_panel_open` |
+| **启动** | `setup`：`ActivationPolicy::Regular`（**Dock 可见**，见 commit `845b3a3`）；NSPanel 成功则 **默认展开** 并 `show_and_make_key`；失败 → `fallback_regular_window`（Regular + 置顶普通窗） |
+| **setup 失败** | `setup` 整体 Err 时 `last_resort_show`：尽量 Regular + 置顶 + 展开尺寸 + `show`/`focus`，避免无 UI 退出 |
+| **菜单栏托盘** | `setup_tray`：`显示面板` / `收起` / `退出`（左键出菜单）；调用 `apply_panel_open` 并 `emit("set-panel-open")` |
+| **前后端同步** | `App.tsx`：`panelOpen` 变化时 `invoke("sync_dock_geometry")`；监听 `set-panel-open`；失焦 `tauri://blur` 与 **`dock-blur`**（NSPanel resign key）时 **自动收起** |
+| **Accessory vs Regular** | **当前 Regular**（非 `LSUIElement` / Accessory）；若以后要「仅菜单栏、无 Dock」，需单独产品决策后再改 activation policy |
 
-接手后优先读：`src/App.tsx`（tag/panel 状态）、`src/App.css`（布局），再规划 `src-tauri` macOS 专用代码路径。
+接手优先读：`src-tauri/src/macos_panel.rs` ↔ `src/App.tsx`（几何 + 收起逻辑）↔ `src/App.css`（tag/面板视觉）。
 
 ## 关键代码路径
 
@@ -66,32 +71,36 @@ asurada/
 ├── docs/REQUIREMENTS.md      # 产品范围
 ├── docs/HANDOFF.md           # 本文件
 ├── src/                      # React UI：引导、预检、列表、Toast、capture 场景
-│   ├── App.tsx               # 主流程与 invoke
+│   ├── App.tsx               # 主流程；sync_dock_geometry、set-panel-open、dock-blur
 │   ├── introContent.ts       # 引导文案与预检 meta
 │   ├── rowPresentation.ts    # 行状态 / 按钮禁用逻辑
-│   └── captureMode.ts        # ?capture= 设计复拍
+│   └── captureMode.ts        # ?capture= 设计复拍（浏览器无 macos_panel）
 ├── src-tauri/
-│   ├── src/lib.rs            # 插件与 command 注册
+│   ├── src/lib.rs            # nspanel 插件、setup/setup_tray/last_resort_show、command 注册
+│   ├── src/macos_panel.rs    # NSPanel、贴边尺寸、托盘、sync_dock_geometry
 │   ├── src/commands.rs       # list/add/remove/commit/preflight
 │   ├── src/git.rs            # pi --print、PI_COMMIT_PROMPT、add/commit/push
 │   ├── src/preflight.rs      # pi_path / pi_print / git
 │   ├── src/store.rs          # 项目 JSON 持久化
-│   └── tauri.conf.json       # productName、窗口、bundle
+│   └── tauri.conf.json       # 透明贴边主窗、macOSPrivateApi、bundle
 ├── artifacts/                # 设计验收截图
 ├── .github/workflows/
 │   └── build-macos.yml       # macOS CI：未签名 .app/.dmg
 └── README.md                 # 安装、CI、脚本总览
 ```
 
-**Tauri invoke 命令**：`list_projects`、`add_project`、`remove_project`、`refresh_project_status`、`check_environment`、`preflight`、`run_commit_push`。
+**Tauri invoke 命令**：`list_projects`、`add_project`、`remove_project`、`refresh_project_status`、`check_environment`、`preflight`、`run_commit_push`；macOS 另增 **`sync_dock_geometry`**（`expanded: bool`）。
+
+**Tauri 事件（macOS 壳 ↔ UI）**：`set-panel-open`（托盘驱动 UI 状态）、`dock-blur`（Panel 失焦收起）。
 
 ## 已知问题与验收注意
 
 | 问题 | 说明 |
 |------|------|
 | **未签名 / 未公证** | CI 故意跳过 Apple secrets；首次打开需系统「仍要打开」或右键打开（见 README） |
-| **贴边 / 多屏** | 当前为普通窗口 + CSS tag，**非**系统级边缘吸附；多屏与 Spaces 行为未专门测试 |
-| **打开文件夹可能收起面板** | 系统文件对话框可能导致窗口失焦；收起行为以实机为准，回归时必测 |
+| **贴边 / 多屏** | `place_dock_window` 按 **`current_monitor()`** 右缘定位；外接屏、排列变更、Spaces 切换需实机回归；NSPanel 失败时走 **置顶普通窗** 回退，行为与 Panel 路径略有差异 |
+| **失焦自动收起** | 展开态下 `tauri://blur` 与 NSPanel **`dock-blur`** 会收起；系统文件对话框、切 App 等会触发——属当前产品设计，但「添加项目」时易误触，需验收 |
+| **壳层 setup 部分失败** | NSPanel 失败有 `fallback_regular_window`；`setup` 仍 Err 则 `last_resort_show`；托盘创建失败仅 `eprintln`，App 仍可运行 |
 | **crate 仍名 commitdock** | 仅内部标识；对外品牌 Asurada，勿与 npm/Cargo 名混淆 |
 | **pi 提示词仍含 CommitDock 字样** | `git.rs` 内 `PI_COMMIT_PROMPT` 字符串待品牌统一（低优先级） |
 | **⋯ 菜单** | 当前仅 **移除**；设计稿中的 Finder Reveal **未做** |
@@ -125,9 +134,11 @@ asurada/
 - [x] 风险条常驻（列表非空）
 - [x] Toast + 行内成功 / 失败 / 进行中
 - [x] tag 收起时失败未读小红点（`hasUnreadFailure`）
-- [ ] **Native 边缘 tag / NSPanel 贴边浮层**（当前为单窗口内 CSS 模拟）
-- [ ] 菜单栏托盘
+- [x] **NSPanel 贴边壳**（`tauri-nspanel` + `macos_panel`：`place_dock_window` / `sync_dock_geometry`）
+- [x] **菜单栏托盘**（显示面板 / 收起 / 退出）
+- [x] 启动 **Dock 可见（Regular）**、默认 **展开面板**；壳层失败 **last_resort_show**（`845b3a3` 一带行为）
 - [ ] 行内 Finder / opener 入口
+- [ ] Accessory（隐藏 Dock）策略 — 当前 intentionally **Regular**
 
 ### 非目标（保持不做）
 
