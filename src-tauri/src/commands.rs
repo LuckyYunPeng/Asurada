@@ -1,4 +1,6 @@
-use crate::git::{git_add_commit_push, git_is_clean, git_last_commit_subject, run_pi_print};
+use crate::git::{
+    git_add_commit_push, git_is_clean, git_last_commit_subject, git_working_diff, run_pi_print,
+};
 use crate::preflight::{self, PreflightResult};
 use crate::store::{default_display_name, load_projects, save_projects, StoredProject};
 use serde::{Deserialize, Serialize};
@@ -132,6 +134,83 @@ pub async fn refresh_project_status(app: tauri::AppHandle, id: String) -> Result
         .find(|p| p.id == id)
         .ok_or_else(|| "未找到该项目".to_string())?;
     Ok(to_view(project))
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectDiff {
+    pub display_name: String,
+    pub path: String,
+    pub patch: String,
+    pub untracked: Vec<String>,
+}
+
+fn find_project(app: &tauri::AppHandle, id: &str) -> Result<StoredProject, String> {
+    let dir = app_data_dir(app)?;
+    load_projects(&dir)?
+        .into_iter()
+        .find(|p| p.id == id)
+        .ok_or_else(|| "未找到该项目".to_string())
+}
+
+#[tauri::command]
+pub async fn get_project_diff(app: tauri::AppHandle, id: String) -> Result<ProjectDiff, String> {
+    let project = find_project(&app, &id)?;
+    let (patch, untracked) = git_working_diff(&PathBuf::from(&project.path))?;
+    Ok(ProjectDiff {
+        display_name: project.display_name,
+        path: project.path,
+        patch,
+        untracked,
+    })
+}
+
+/// 每个项目只开一个 diff 窗口，已开则带到前台。
+#[tauri::command]
+pub async fn open_diff_window(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    let label = format!("diff-{id}");
+    if let Some(window) = app.get_webview_window(&label) {
+        let _ = window.unminimize();
+        let _ = window.show();
+        return window.set_focus().map_err(|e| format!("无法聚焦窗口: {e}"));
+    }
+
+    let project = find_project(&app, &id)?;
+    let url = tauri::WebviewUrl::App(format!("index.html?view=diff&id={id}").into());
+    let (width, height) = (1440.0, 900.0);
+    let mut builder = tauri::WebviewWindowBuilder::new(&app, &label, url)
+        .title(format!("{} 的变更", project.display_name))
+        .inner_size(width, height)
+        .min_inner_size(720.0, 480.0);
+    // 放到面板所在的显示器（用户刚在那里点过）。.center() 只会放主显示器；
+    // 也不用 cursor_position + monitor_from_point：tao 在 macOS 上按主屏缩放给物理坐标，
+    // 而 monitor_from_point 按逻辑坐标匹配，Retina 主屏下会匹配到别的显示器
+    let panel_monitor = app
+        .get_webview_window("main")
+        .and_then(|w| w.current_monitor().ok().flatten());
+    if let Some(monitor) = panel_monitor {
+        let scale = monitor.scale_factor();
+        let area = monitor.work_area();
+        let (x, y) = (area.position.x as f64 / scale, area.position.y as f64 / scale);
+        let (w, h) = (area.size.width as f64 / scale, area.size.height as f64 / scale);
+        builder = builder
+            .inner_size(width.min(w - 40.0), height.min(h - 40.0))
+            .position(x + ((w - width) / 2.0).max(20.0), y + ((h - height) / 2.0).max(20.0));
+    } else {
+        builder = builder.center();
+    }
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .title_bar_style(tauri::TitleBarStyle::Overlay)
+        .hidden_title(true)
+        // 红绿灯对齐 DiffWindow.css 里 52px 高顶栏的中线（26px）。
+        // y 不是按钮顶边：tao 把标题栏容器高度设为 16 + y，按钮离容器底部约 6px，
+        // 实测 y=19 时按钮顶边在 13px，所以按钮顶边 18px（中心 26px）要用 y=24
+        .traffic_light_position(tauri::LogicalPosition::new(18.0, 24.0));
+    builder
+        .build()
+        .map(|_| ())
+        .map_err(|e| format!("无法打开 diff 窗口: {e}"))
 }
 
 #[tauri::command]

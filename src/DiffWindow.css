@@ -1,0 +1,430 @@
+/* diff 独立窗口，复用 App.css 的变量与 .btn-primary。
+   不要写 html/body 等全局样式，以免将来被主窗口引入时盖掉它的透明背景；全局设置在 DiffWindow.tsx 里用 JS 加 */
+.dw {
+  /* 固定铺满，文档本身不产生滚动 */
+  position: fixed;
+  inset: 0;
+  background: #fbfdfd;
+  display: flex;
+  flex-direction: column;
+  color: var(--ink);
+}
+
+.dw-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 52px;
+  /* 左侧给 macOS 红绿灯留位 */
+  padding: 0 14px 0 92px;
+  border-bottom: 1px solid rgba(61, 58, 74, 0.08);
+  background: #fff;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.dw-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.dw-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.dw-brand .title {
+  font-size: 15px;
+}
+
+.dw-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(61, 58, 74, 0.14);
+}
+
+.dw-title strong {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dw-sub {
+  color: var(--ink-3);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.dw-count {
+  display: inline-flex;
+  gap: 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.dw-count .is-add {
+  color: #2f9e6a;
+}
+
+.dw-count .is-del {
+  color: #d9536f;
+}
+
+.dw-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dw-seg {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 999px;
+  background: #eef8f7;
+}
+
+.dw-seg button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ink-2);
+  padding: 4px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.dw-seg button.is-on {
+  background: #fff;
+  color: #1f7f8c;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(23, 18, 42, 0.1);
+}
+
+.dw-icon-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.dw-icon-btn:hover:not(:disabled) {
+  background: rgba(94, 200, 212, 0.12);
+  color: #2a8a96;
+}
+
+.dw-icon-btn:disabled {
+  opacity: 0.45;
+}
+
+.dw-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.dw-notice.is-ok {
+  background: #e7f8ef;
+  color: #2f9e6a;
+}
+
+.dw-notice.is-err {
+  background: #ffe8ef;
+  color: #c43d5a;
+}
+
+.dw-notice span {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.dw-notice button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.dw-main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.dw-side {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  border-right: 1px solid rgba(61, 58, 74, 0.08);
+  background: #fff;
+}
+
+.dw-filter {
+  margin: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(180, 220, 220, 0.8);
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.dw-filter:focus {
+  border-color: var(--mint);
+  box-shadow: 0 0 0 3px rgba(94, 200, 212, 0.18);
+}
+
+.dw-files {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: auto;
+  overscroll-behavior: none;
+  margin: 0;
+  padding: 0 6px 10px;
+  list-style: none;
+}
+
+.dw-files button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.dw-files button {
+  transition: background-color 0.12s ease;
+}
+
+.dw-files button:hover {
+  background: #eaf6f5;
+}
+
+.dw-files button:hover .dw-file-base {
+  color: #1f7f8c;
+}
+
+.dw-files button.is-active {
+  background: #e0f3f2;
+}
+
+.dw-files button.is-active .dw-file-base {
+  font-weight: 600;
+}
+
+.dw-status {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.dw-status.is-M {
+  background: #fff1e3;
+  color: #c45e22;
+}
+
+.dw-status.is-A,
+.dw-status.is-U {
+  background: #e7f8ef;
+  color: #2f9e6a;
+}
+
+.dw-status.is-D {
+  background: #ffe8ef;
+  color: #d9536f;
+}
+
+.dw-status.is-R {
+  background: #e6f0ff;
+  color: #3b6fd1;
+}
+
+.dw-file-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.dw-file-base,
+.dw-file-dir {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dw-file-base {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.dw-file-dir {
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.dw-resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 1;
+}
+
+.dw-resizer:hover {
+  background: rgba(94, 200, 212, 0.35);
+}
+
+.dw-diff {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+.dw-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  background: #fbfdfd;
+}
+
+.dw-loading .logo-idle,
+.dw-state .logo-idle {
+  margin: 0;
+}
+
+.dw-scroll {
+  flex: 1;
+  overflow: auto;
+  overscroll-behavior: none;
+}
+
+.dw-content {
+  padding: 14px 16px;
+}
+
+.dw-file {
+  margin-bottom: 14px;
+  border: 1px solid rgba(61, 58, 74, 0.1);
+  border-radius: 10px;
+  overflow: clip;
+  background: #fff;
+}
+
+.dw-open {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: #1f7f8c;
+  padding: 2px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.dw-open:hover {
+  background: rgba(94, 200, 212, 0.14);
+}
+
+.dw-binary {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.dw-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--ink-2);
+}
+
+.dw-state > img {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  box-shadow: 0 8px 22px rgba(94, 200, 212, 0.4);
+}
+
+.dw-state p {
+  margin: 0;
+}
+
+.dw-state pre {
+  max-width: 80%;
+  white-space: pre-wrap;
+  font-size: 12px;
+  color: #c43d5a;
+}
+
+/* 滚动条：和主面板同款细长青绿色（WKWebView 走 webkit 伪元素） */
+.dw-scroll::-webkit-scrollbar,
+.dw-files::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.dw-scroll::-webkit-scrollbar-track,
+.dw-files::-webkit-scrollbar-track,
+.dw-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.dw-scroll::-webkit-scrollbar-thumb,
+.dw-files::-webkit-scrollbar-thumb {
+  /* 透明边框 + padding-box 让滑块看起来是 4px 细条，且留出可点区域 */
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: rgba(94, 200, 212, 0.35) padding-box;
+}
+
+.dw-scroll::-webkit-scrollbar-thumb:hover,
+.dw-files::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(94, 200, 212, 0.65);
+}

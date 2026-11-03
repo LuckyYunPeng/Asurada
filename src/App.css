@@ -953,6 +953,16 @@ body {
 }
 
 /* 重复添加时闪两下，告诉用户已有的项目在哪 */
+.row.is-diffable {
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.row.is-diffable:hover {
+  border-color: rgba(94, 200, 212, 0.75);
+  box-shadow: 0 4px 14px rgba(94, 200, 212, 0.18);
+}
+
 .row.is-flashing {
   animation: row-flash 0.7s ease-in-out 2;
 }

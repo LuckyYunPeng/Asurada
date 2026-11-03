@@ -29,6 +29,8 @@ pub fn run() {
             commands::check_environment,
             commands::preflight,
             commands::run_commit_push,
+            commands::get_project_diff,
+            commands::open_diff_window,
             #[cfg(target_os = "macos")]
             macos_panel::sync_dock_geometry,
             #[cfg(target_os = "macos")]

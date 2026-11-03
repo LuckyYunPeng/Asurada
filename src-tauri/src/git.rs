@@ -65,6 +65,52 @@ pub fn run_pi_print(project_path: &Path) -> Result<String, String> {
     Ok(stdout.lines().next().unwrap_or(&stdout).trim().to_string())
 }
 
+fn git_output(project_path: &Path, args: &[&str]) -> Result<std::process::Output, String> {
+    Command::new("git")
+        .args(["-c", "core.quotepath=off"])
+        .args(args)
+        .current_dir(project_path)
+        .output()
+        .map_err(|e| format!("无法执行 git: {e}"))
+}
+
+/// 工作区相对 HEAD 的完整 patch（即一键提交会带上的内容），含未跟踪文件；同时返回未跟踪文件列表。
+pub fn git_working_diff(project_path: &Path) -> Result<(String, Vec<String>), String> {
+    // 空仓库没有 HEAD，和空树比
+    let has_head = git_output(project_path, &["rev-parse", "-q", "--verify", "HEAD"])?
+        .status
+        .success();
+    let base = if has_head { "HEAD" } else { "4b825dc642cb6eb9a060e54bf8d69288fbee4904" };
+
+    let tracked = git_output(project_path, &["diff", "--no-color", "--no-ext-diff", base])?;
+    if !tracked.status.success() {
+        return Err(format!(
+            "git diff 失败: {}",
+            String::from_utf8_lossy(&tracked.stderr).trim()
+        ));
+    }
+    let mut patch = String::from_utf8_lossy(&tracked.stdout).into_owned();
+
+    let untracked = git_output(
+        project_path,
+        &["ls-files", "--others", "--exclude-standard", "-z"],
+    )?;
+    let untracked: Vec<String> = String::from_utf8_lossy(&untracked.stdout)
+        .split('\0')
+        .filter(|f| !f.is_empty())
+        .map(str::to_string)
+        .collect();
+    for file in &untracked {
+        // --no-index 有差异时退出码为 1，属正常
+        let out = git_output(
+            project_path,
+            &["diff", "--no-color", "--no-ext-diff", "--no-index", "--", "/dev/null", file],
+        )?;
+        patch.push_str(&String::from_utf8_lossy(&out.stdout));
+    }
+    Ok((patch, untracked))
+}
+
 pub fn git_add_commit_push(project_path: &Path, message: &str) -> Result<String, String> {
     // push 被拒（远端有更新）时先 rebase 再推一次；rebase 冲突则撤回，保持本地提交不变
     let script = format!(
@@ -141,6 +187,21 @@ mod tests {
         git(&b, &["commit", "-qm", "b"]);
         git(&b, &["push", "-q"]);
         (root, a)
+    }
+
+    #[test]
+    fn working_diff_includes_modified_and_untracked() {
+        let (root, a) = setup("diff", "b.txt");
+        fs::write(a.join("base.txt"), "changed").unwrap();
+        fs::create_dir_all(a.join("新目录")).unwrap();
+        fs::write(a.join("新目录/笔记.md"), "hi\n").unwrap();
+        let (patch, untracked) = git_working_diff(&a).unwrap();
+        assert_eq!(untracked, vec!["新目录/笔记.md".to_string()]);
+        assert!(patch.contains("diff --git a/base.txt b/base.txt"), "{patch}");
+        assert!(patch.contains("+changed"), "{patch}");
+        assert!(patch.contains("b/新目录/笔记.md"), "{patch}");
+        assert!(patch.contains("+hi"), "{patch}");
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

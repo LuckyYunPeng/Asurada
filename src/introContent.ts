@@ -12,7 +12,7 @@ export const INTRO_STEPS = [
   {
     title: "贴在屏幕边，点一下就交",
     sub: "验收完就交，别为了 commit 再开一场聊",
-    lead: "Asurada 用独立短会话生成中文 Conventional Commit 并 push；交完就散，不留尾巴。",
+    lead: "ASURADA 用独立短会话生成中文 Conventional Commit 并 push；交完就散，不留尾巴。",
   },
 ] as const;
 

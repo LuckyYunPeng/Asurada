@@ -9,6 +9,11 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(() => ({
   plugins: [tailwindcss(), react()],
 
+  // diff 窗口是懒加载的，启动时扫不到这个依赖；运行中再预构建会出现两份 React，页面白屏
+  optimizeDeps: {
+    include: ["@pierre/diffs", "@pierre/diffs/react"],
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

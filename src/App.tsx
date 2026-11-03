@@ -716,8 +716,8 @@ function App() {
             type="button"
             className={`tag${isTagHot ? " tag--hot" : ""}`}
             aria-expanded={false}
-            aria-label="Asurada"
-            title="Asurada"
+            aria-label="ASURADA"
+            title="ASURADA"
             onClick={onExpandPanel}
           >
           <span className={`tag-logo-wrap${isAnyRunning ? " is-running" : ""}`}>
@@ -737,13 +737,13 @@ function App() {
           className={`panel${isPanelFromBottom ? " panel--up" : ""}${
             isPanelClosing ? " panel--closing" : ""
           }`}
-          role="dialog" aria-label="Asurada 面板">
+          role="dialog" aria-label="ASURADA 面板">
           <header className="chrome">
             <div className="title-wrap">
               <div className="brand">
                 <img src={logoUrl} alt="" />
               </div>
-              <h1 className="title">Asurada</h1>
+              <h1 className="title">ASURADA</h1>
               {isEnvFailed ? (
                 <button
                   type="button"
@@ -1150,10 +1150,26 @@ function ProjectRow({
     }
   }
 
+  // 只有有变更的条目可点；点在行内按钮上时交给按钮自己处理
+  const isDiffable = !row.project.gitClean && !isRunning;
+
+  async function onOpenDiff(event: React.MouseEvent) {
+    if (!isDiffable || isConfirming || (event.target as HTMLElement).closest("button")) {
+      return;
+    }
+    try {
+      await invoke("open_diff_window", { id: row.project.id });
+    } catch (error) {
+      console.error("打开 diff 窗口失败", error);
+    }
+  }
+
   return (
     <li
       ref={rowRef}
-      className={`row${isFlashing ? " is-flashing" : ""}`}
+      className={`row${isFlashing ? " is-flashing" : ""}${isDiffable ? " is-diffable" : ""}`}
+      title={isDiffable ? "查看变更" : undefined}
+      onClick={(event) => void onOpenDiff(event)}
       onAnimationEnd={(e) => {
         if (e.animationName === "row-flash") {
           onFlashEnd();
