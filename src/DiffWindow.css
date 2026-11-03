@@ -4,10 +4,29 @@
   /* 固定铺满，文档本身不产生滚动 */
   position: fixed;
   inset: 0;
-  background: #fbfdfd;
+  background: var(--surface-2);
   display: flex;
   flex-direction: column;
   color: var(--ink);
+  /* diff 增删底色：库默认只混入 12%，加深到一眼能看出改动；注入 shadow DOM 的样式引用这些变量 */
+  --dw-code-bg: #ffffff;
+  --dw-add-bg: #dbf6e3;
+  --dw-del-bg: #fde2e4;
+  --dw-add-emphasis: rgba(13, 190, 78, 0.32);
+  --dw-del-emphasis: rgba(255, 46, 63, 0.28);
+  --dw-add-number: #c4efd2;
+  --dw-del-number: #fbcdd2;
+}
+
+.dark .dw {
+  --dw-code-bg: #1f1c29;
+  /* 用实色：库会把这些底色再和代码底色混一次，半透明会被冲淡到几乎看不见 */
+  --dw-add-bg: #233d30;
+  --dw-del-bg: #4a2630;
+  --dw-add-emphasis: rgba(63, 185, 80, 0.4);
+  --dw-del-emphasis: rgba(248, 81, 73, 0.4);
+  --dw-add-number: #29513a;
+  --dw-del-number: #62303a;
 }
 
 .dw-top {
@@ -18,8 +37,8 @@
   height: 52px;
   /* 左侧给 macOS 红绿灯留位 */
   padding: 0 14px 0 92px;
-  border-bottom: 1px solid rgba(61, 58, 74, 0.08);
-  background: #fff;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface);
   flex-shrink: 0;
   user-select: none;
 }
@@ -45,7 +64,7 @@
 .dw-divider {
   width: 1px;
   height: 16px;
-  background: rgba(61, 58, 74, 0.14);
+  background: var(--hairline);
 }
 
 .dw-title strong {
@@ -71,11 +90,11 @@
 }
 
 .dw-count .is-add {
-  color: #2f9e6a;
+  color: var(--ok-fg);
 }
 
 .dw-count .is-del {
-  color: #d9536f;
+  color: var(--err-fg);
 }
 
 .dw-actions {
@@ -95,13 +114,13 @@
 }
 
 .dw-notice.is-ok {
-  background: #e7f8ef;
-  color: #2f9e6a;
+  background: var(--ok-bg);
+  color: var(--ok-fg);
 }
 
 .dw-notice.is-err {
-  background: #ffe8ef;
-  color: #c43d5a;
+  background: var(--err-bg);
+  color: var(--err-fg);
 }
 
 .dw-notice span {
@@ -129,15 +148,17 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  border-right: 1px solid rgba(61, 58, 74, 0.08);
-  background: #fff;
+  border-right: 1px solid var(--hairline);
+  background: var(--surface);
 }
 
 .dw-filter {
   margin: 10px;
   padding: 6px 10px;
   border-radius: 8px;
-  border: 1px solid rgba(180, 220, 220, 0.8);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: inherit;
   font: inherit;
   font-size: 12px;
   outline: none;
@@ -180,15 +201,15 @@
 }
 
 .dw-files button:hover {
-  background: #eaf6f5;
+  background: var(--accent);
 }
 
 .dw-files button:hover .dw-file-base {
-  color: #1f7f8c;
+  color: var(--accent-foreground);
 }
 
 .dw-files button.is-active {
-  background: #e0f3f2;
+  background: var(--accent-strong);
 }
 
 .dw-files button.is-active .dw-file-base {
@@ -207,24 +228,24 @@
 }
 
 .dw-status.is-M {
-  background: #fff1e3;
-  color: #c45e22;
+  background: var(--warn-bg);
+  color: var(--warn-fg);
 }
 
 .dw-status.is-A,
 .dw-status.is-U {
-  background: #e7f8ef;
-  color: #2f9e6a;
+  background: var(--ok-bg);
+  color: var(--ok-fg);
 }
 
 .dw-status.is-D {
-  background: #ffe8ef;
-  color: #d9536f;
+  background: var(--err-bg);
+  color: var(--err-fg);
 }
 
 .dw-status.is-R {
-  background: #e6f0ff;
-  color: #3b6fd1;
+  background: var(--rename-bg);
+  color: var(--rename-fg);
 }
 
 .dw-file-text {
@@ -278,7 +299,7 @@
   z-index: 5;
   display: grid;
   place-items: center;
-  background: #fbfdfd;
+  background: var(--surface-2);
 }
 
 .dw-loading .logo-idle,
@@ -298,10 +319,10 @@
 
 .dw-file {
   margin-bottom: 14px;
-  border: 1px solid rgba(61, 58, 74, 0.1);
+  border: 1px solid var(--hairline);
   border-radius: 10px;
   overflow: clip;
-  background: #fff;
+  background: var(--surface);
 }
 
 .dw-open {
@@ -310,7 +331,7 @@
   background: transparent;
   font: inherit;
   font-size: 12px;
-  color: #1f7f8c;
+  color: var(--accent-foreground);
   padding: 2px 8px;
   border-radius: 6px;
   cursor: pointer;
@@ -352,7 +373,7 @@
   max-width: 80%;
   white-space: pre-wrap;
   font-size: 12px;
-  color: #c43d5a;
+  color: var(--err-fg);
 }
 
 /* 滚动条：和主面板同款细长青绿色（WKWebView 走 webkit 伪元素） */

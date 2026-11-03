@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useThemeMode } from "./theme";
 import "./App.css";
 import "./DiffWindow.css";
 
@@ -35,26 +36,32 @@ interface IDiffEntry {
 // 注入 diff 库 shadow DOM 的样式（外部 CSS 进不去）。库默认的增删底色只混入 12%、
 // 行内改动词只有 15% 高亮，再加上鲜艳的语法色，改动很难一眼看出
 const DIFF_UNSAFE_CSS = `
+/* 颜色变量定义在 DiffWindow.css 的 .dw 上（随亮/暗切换），自定义属性会继承进 shadow DOM */
 :host {
-  /* 整行底色：88% -> 80% 背景，红绿更明显 */
-  --diffs-bg-addition-override: #dbf6e3;
-  --diffs-bg-deletion-override: #fde2e4;
-  /* 行内改动词：加深到能一眼看出改了哪几个字 */
-  --diffs-bg-addition-emphasis-override: rgba(13, 190, 78, 0.32);
-  --diffs-bg-deletion-emphasis-override: rgba(255, 46, 63, 0.28);
+  --diffs-bg-addition-override: var(--dw-add-bg);
+  --diffs-bg-deletion-override: var(--dw-del-bg);
+  --diffs-bg-addition-emphasis-override: var(--dw-add-emphasis);
+  --diffs-bg-deletion-emphasis-override: var(--dw-del-emphasis);
+}
+/* 深色时代码底色跟面板同色系，不用主题自带的纯黑；增删、行号等底色都由它混色得出 */
+/* 主题把底色写在 pre 的内联样式里，只能 !important 盖；底色值在 DiffWindow.css 的 .dw 上 */
+:host {
+  --diffs-bg: var(--dw-code-bg) !important;
 }
 [data-line], [data-no-newline] {
   --mix-light: 0%;
+  --mix-dark: 0%;
 }
 /* 改动行行号栏比代码区稍深，滚动时余光能扫到 */
 [data-column-number] {
   --mix-light: 0%;
+  --mix-dark: 0%;
 }
 [data-line-type="change-addition"][data-column-number] {
-  --diffs-bg-addition-number-override: #c4efd2;
+  --diffs-bg-addition-number-override: var(--dw-add-number);
 }
 [data-line-type="change-deletion"][data-column-number] {
-  --diffs-bg-deletion-number-override: #fbcdd2;
+  --diffs-bg-deletion-number-override: var(--dw-del-number);
 }
 /* 语法色降饱和，让红绿成为最显眼的颜色 */
 [data-code] [data-line] span:not([data-diff-span]) {
@@ -73,7 +80,7 @@ const DIFF_UNSAFE_CSS = `
 
 // 语法高亮放到 worker 里跑：大文件在主线程高亮一次要几百毫秒，切换文件会卡住界面。
 // 这里的 theme / lineDiffType 必须和下面 FileDiff 的 options 一致
-const DIFF_THEME = "pierre-light";
+const DIFF_THEME = { light: "pierre-light", dark: "pierre-dark" } as const;
 const LINE_DIFF_TYPE = "word";
 const WORKER_POOL_OPTIONS = {
   workerFactory: () => new DiffsWorker(),
@@ -172,6 +179,7 @@ const FileItem = memo(function FileItem({
 });
 
 export default function DiffWindow({ projectId }: { projectId: string }) {
+  const { isDark } = useThemeMode();
   const [diff, setDiff] = useState<IProjectDiff | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -520,7 +528,7 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
                   fileDiff={selected.file}
                   options={{
                     theme: DIFF_THEME,
-                    themeType: "light",
+                    themeType: isDark ? "dark" : "light",
                     diffStyle,
                     overflow: "scroll",
                     // 行首用 +/- 号，不靠颜色也能分清增删

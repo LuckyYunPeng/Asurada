@@ -21,6 +21,32 @@
   --pink: #e8a8bc;
   --ok: #4ecb8b;
   --err: #ff6b8a;
+  /* 主题语义色：深色值在下方 .dark 里，浅色值保持原设计 */
+  --surface: #ffffff;
+  --surface-2: #fbfdfd;
+  --hairline: rgba(61, 58, 74, 0.08);
+  --ink-strong: #4a4458;
+  --row-from: rgba(255, 255, 255, 0.8);
+  --row-to: rgba(255, 247, 251, 0.8);
+  --accent-strong: #e0f3f2;
+  --ok-fg: #2f9e6a;
+  --ok-bg: #e7f8ef;
+  --ok-border: #c7efda;
+  --err-fg: #c43d5a;
+  --err-bg: #ffe8ef;
+  --err-border: #ffc9d8;
+  --warn: #ef8a3a;
+  --warn-fg: #c45e22;
+  --warn-bg: #ffe8d9;
+  --risk-from: #fff5eb;
+  --risk-to: #ffe8d9;
+  --risk-border: #f0b89a;
+  --risk-fg: #b07848;
+  --risk-ico: #ffe0c8;
+  --rename-fg: #3b6fd1;
+  --rename-bg: #e6f0ff;
+  --dot-off: #d4ebe8;
+  --pip-off: #cfc8d8;
   --font:
     "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", -apple-system,
     BlinkMacSystemFont, sans-serif;
@@ -229,8 +255,8 @@ body {
   gap: 10px;
   padding: 9px 12px 11px 10px;
   border-radius: 16px;
-  background: linear-gradient(135deg, #fff 40%, var(--cloud-tint));
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: linear-gradient(135deg, var(--surface) 40%, var(--cloud-tint));
+  border: 1px solid var(--hairline);
   box-shadow:
     0 10px 24px rgba(23, 18, 42, 0.16),
     0 2px 6px rgba(23, 18, 42, 0.08),
@@ -378,8 +404,8 @@ body {
   left: 14px;
   max-height: calc(100vh - 24px);
   border-radius: 18px;
-  background: #fff;
-  border: 1px solid rgba(61, 58, 74, 0.08);
+  background: var(--surface);
+  border: 1px solid var(--hairline);
   box-shadow: 0 12px 32px rgba(23, 18, 42, 0.18),
     0 2px 6px rgba(23, 18, 42, 0.08);
   display: flex;
@@ -434,7 +460,7 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 16px 16px 12px 18px;
-  border-bottom: 1px solid rgba(61, 58, 74, 0.06);
+  border-bottom: 1px solid var(--hairline);
   margin-bottom: 14px;
   flex-shrink: 0;
 }
@@ -479,6 +505,12 @@ body {
     1.5px 1.5px 0 #fff,
     3px 3px 0 var(--peach),
     4px 5px 8px rgba(240, 160, 126, 0.3);
+}
+
+/* 深色底上白边、蜜桃投影和柔光会糊成一团：只留一层同色系深青投影，保持立体感 */
+.dark .title {
+  color: #5ed3e0;
+  text-shadow: 2px 2px 0 #1f6f7a;
 }
 
 .panel-body {
@@ -621,13 +653,13 @@ body {
   font-size: 15px;
   font-weight: 800;
   line-height: 1;
-  box-shadow: 0 0 0 3px #fff, 0 4px 10px rgba(240, 184, 154, 0.5);
+  box-shadow: 0 0 0 3px var(--surface), 0 4px 10px rgba(240, 184, 154, 0.5);
   animation: logo-float 3s ease-in-out infinite;
 }
 
 .logo-idle-badge.is-warn {
   background: linear-gradient(135deg, #ff8fa6, var(--err));
-  box-shadow: 0 0 0 3px #fff, 0 4px 10px rgba(255, 107, 138, 0.45);
+  box-shadow: 0 0 0 3px var(--surface), 0 4px 10px rgba(255, 107, 138, 0.45);
 }
 
 @keyframes logo-float {
@@ -701,38 +733,68 @@ body {
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* 深色：夜空紫底，与收起态 Tag 同色系；品牌青/桃色保留 */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  color-scheme: dark;
+  --ink: #e8e5f0;
+  --ink-2: #b4aec2;
+  --ink-3: #8a849a;
+  --mint-soft: rgba(94, 200, 212, 0.16);
+  --peach-soft: rgba(240, 184, 154, 0.16);
+  --surface: #1f1c29;
+  --surface-2: #17151f;
+  --hairline: rgba(255, 255, 255, 0.08);
+  --ink-strong: #f2effa;
+  --row-from: rgba(44, 40, 56, 0.8);
+  --row-to: rgba(48, 38, 54, 0.8);
+  --accent-strong: rgba(94, 200, 212, 0.24);
+  --ok-fg: #6fdca3;
+  --ok-bg: rgba(78, 203, 139, 0.14);
+  --ok-border: rgba(78, 203, 139, 0.3);
+  --err-fg: #ff8fa6;
+  --err-bg: rgba(255, 107, 138, 0.14);
+  --err-border: rgba(255, 107, 138, 0.3);
+  --warn-fg: #f5a46a;
+  --warn-bg: rgba(239, 138, 58, 0.16);
+  --risk-from: rgba(240, 184, 154, 0.1);
+  --risk-to: rgba(240, 184, 154, 0.16);
+  --risk-border: rgba(240, 184, 154, 0.5);
+  --risk-fg: #f0b89a;
+  --risk-ico: rgba(240, 184, 154, 0.22);
+  --rename-fg: #8fb3ff;
+  --rename-bg: rgba(91, 141, 239, 0.18);
+  --dot-off: rgba(255, 255, 255, 0.14);
+  --pip-off: #5a5468;
+
+  --background: #17151f;
+  --foreground: #e8e5f0;
+  --card: #24212e;
+  --card-foreground: #e8e5f0;
+  --popover: #2a2735;
+  --popover-foreground: #e8e5f0;
+  /* 比浅色主色略深，白字对比度更高；配合按钮在深色下去掉青色光晕 */
+  --primary: #2a9fae;
+  --primary-foreground: #ffffff;
+  --secondary: rgba(94, 200, 212, 0.14);
+  --secondary-foreground: #7fd8e2;
+  --muted: #2c2937;
+  --muted-foreground: #8a849a;
+  --accent: rgba(94, 200, 212, 0.14);
+  --accent-foreground: #7fd8e2;
+  --destructive: #ff6b8a;
+  --border: #34313f;
+  --input: #3d3a4a;
+  --ring: #5ec8d4;
+}
+
+.dark .cloud {
+  --cloud-ink: #6fdca3;
+  --cloud-tint: #1f2c2a;
+}
+
+.dark .cloud--err {
+  --cloud-ink: #ff8fa6;
+  --cloud-tint: #2e1f27;
 }
 
 @layer base {

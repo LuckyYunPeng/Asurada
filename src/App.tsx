@@ -30,8 +30,11 @@ import {
   FolderOpen,
   Info,
   Loader2,
+  Monitor,
+  Moon,
   Plus,
   Settings,
+  Sun,
   Trash2,
   TriangleAlert,
   X,
@@ -40,6 +43,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
 import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ThemeModeEnum, useThemeMode } from "./theme";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Select,
@@ -88,12 +93,12 @@ function LogoHero({ badge }: { badge?: "+" | "!" }) {
 }
 
 /** 引导 / 环境检查 / 空态共用的标题与正文样式 */
-const HEADING_CLASS = "mb-1.5 text-[15px] font-semibold text-[#4a4458]";
-const LEAD_CLASS = "mb-3.5 text-left leading-normal text-[#6d687a]";
+const HEADING_CLASS = "mb-1.5 text-[15px] font-semibold text-(--ink-strong)";
+const LEAD_CLASS = "mb-3.5 text-left leading-normal text-(--ink-2)";
 
 /** 设置列表的一行 */
 const SETTINGS_ROW_CLASS =
-  "flex w-full items-center justify-between gap-2.5 rounded-lg px-2.5 py-2 text-left text-[#6d687a] hover:bg-accent disabled:hover:bg-transparent";
+  "flex w-full items-center justify-between gap-2.5 rounded-lg px-2.5 py-2 text-left text-(--ink-2) hover:bg-accent disabled:hover:bg-transparent";
 
 function SettingsShortcutRow({
   active,
@@ -285,11 +290,54 @@ function SettingsAutostartRow({ skipInvoke }: { skipInvoke?: boolean }) {
   );
 }
 
+const THEME_OPTIONS = [
+  { value: ThemeModeEnum.Light, label: "亮色", icon: Sun },
+  { value: ThemeModeEnum.Dark, label: "深色", icon: Moon },
+  { value: ThemeModeEnum.System, label: "跟随系统", icon: Monitor },
+];
+
+function SettingsThemeRow() {
+  const { mode, onChangeThemeMode } = useThemeMode();
+
+  return (
+    <div className={SETTINGS_ROW_CLASS}>
+      <span>外观</span>
+      <ToggleGroup
+        type="single"
+        size="sm"
+        variant="outline"
+        spacing={0}
+        value={mode}
+        aria-label="外观"
+        onValueChange={(v) => {
+          if (v) {
+            onChangeThemeMode(v as ThemeModeEnum);
+          }
+        }}
+      >
+        {THEME_OPTIONS.map((o) => (
+          <ToggleGroupItem
+            key={o.value}
+            value={o.value}
+            className="px-2.5"
+            aria-label={o.label}
+            title={o.label}
+          >
+            <o.icon />
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </div>
+  );
+}
+
 const captureScene = getCaptureScene();
 const captureBoot = captureScene ? bootstrapCapture(captureScene) : null;
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 function App() {
+  // 常驻：跟随系统切换、接收 diff 窗口里改的主题
+  useThemeMode();
   const [panelOpen, setPanelOpen] = useState(
     () => captureBoot?.panelOpen ?? true,
   );
@@ -811,7 +859,7 @@ function App() {
               {isEnvFailed ? (
                 <Button
                   size="icon-xs"
-                  className="rounded-full bg-[#fff0e4] text-[#d4783a] hover:bg-[#ffe0c8]"
+                  className="rounded-full bg-(--warn-bg) text-(--warn-fg) hover:bg-(--risk-ico)"
                   aria-label="环境异常，查看检查"
                   title="环境异常，查看检查"
                   onClick={() => setIsCheckOpen((open) => !open)}
@@ -871,9 +919,9 @@ function App() {
             {inMain && projectCount > 0 && !settingsOpen ? (
               <div
                 role="status"
-                className="mb-3 flex items-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-[#f0b89a] bg-linear-135 from-[#fff5eb] to-[#ffe8d9] px-[11px] py-[9px] leading-snug text-[#b07848]"
+                className="mb-3 flex items-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-(--risk-border) bg-linear-135 from-(--risk-from) to-(--risk-to) px-[11px] py-[9px] leading-snug text-(--risk-fg)"
               >
-                <span className="grid size-[18px] flex-none place-items-center rounded-full bg-[#ffe0c8] text-[11px] font-extrabold">
+                <span className="grid size-[18px] flex-none place-items-center rounded-full bg-(--risk-ico) text-[11px] font-extrabold">
                   !
                 </span>
                 一键会暂存、提交并推送到远端哦
@@ -901,6 +949,7 @@ function App() {
                     onToast={setToast}
                     onRecordingChange={handleShortcutRecordingChange}
                   />
+                  <SettingsThemeRow />
                   <SettingsDiffSizeRow
                     active={settingsOpen}
                     skipInvoke={captureBoot?.skipInvoke}
@@ -1002,7 +1051,7 @@ function IntroView({
         {INTRO_STEPS.map((_, i) => (
           <span
             key={i}
-            className={`h-[7px] rounded-full ${i === step ? "w-4 bg-ring" : "w-[7px] bg-[#d4ebe8]"}`}
+            className={`h-[7px] rounded-full ${i === step ? "w-4 bg-ring" : "w-[7px] bg-(--dot-off)"}`}
           />
         ))}
       </div>
@@ -1098,20 +1147,20 @@ function PreflightCheckRow({
     detail: item.message,
   };
   return (
-    <div className="flex items-start gap-2 py-1.5 text-[#6d687a] not-first:border-t not-first:border-dashed">
+    <div className="flex items-start gap-2 py-1.5 text-(--ink-2) not-first:border-t not-first:border-dashed">
       <span
         className={`grid size-[18px] flex-none place-items-center rounded-full [&_svg]:size-3 [&_svg]:stroke-3 ${
           loading
-            ? "bg-[#eef9fc] text-[#3a9aaa]"
+            ? "bg-accent text-accent-foreground"
             : item.ok
-              ? "bg-[#e4f9ee] text-[#4ecb8b]"
-              : "bg-[#ffe8ef] text-[#ff6b8a]"
+              ? "bg-(--ok-bg) text-(--ok)"
+              : "bg-(--err-bg) text-(--err)"
         }`}
       >
         {loading ? <Loader2 className="animate-spin" /> : item.ok ? <Check /> : <X />}
       </span>
       <div>
-        <div className="font-semibold text-[#4a4458]">{meta.label}</div>
+        <div className="font-semibold text-(--ink-strong)">{meta.label}</div>
         <div className="mt-0.5 text-xs leading-snug text-muted-foreground">
           {!item.ok && item.message ? item.message : meta.detail}
         </div>
@@ -1125,14 +1174,14 @@ const CHECKS_CLASS = "mb-3.5 self-stretch rounded-xl border bg-card px-3 py-2.5 
 
 /** 项目行状态文字与圆点的颜色 */
 const STATUS_CLASS: Record<RowKind, { text: string; pip: string }> = {
-  clean: { text: "text-[#6d687a]", pip: "mt-[7.5px] bg-[#cfc8d8]" },
+  clean: { text: "text-(--ink-2)", pip: "mt-[7.5px] bg-(--pip-off)" },
   dirty: {
-    text: "w-fit rounded-full bg-[#ffe8d9] py-0.5 pr-2 pl-1.5 text-[#c45e22]",
-    pip: "size-2 bg-[#ef8a3a] shadow-[0_0_0_2px_rgba(239,138,58,0.35)]",
+    text: "w-fit rounded-full bg-(--warn-bg) py-0.5 pr-2 pl-1.5 text-(--warn-fg)",
+    pip: "size-2 bg-(--warn) shadow-[0_0_0_2px_rgba(239,138,58,0.35)]",
   },
-  run: { text: "text-[#2a9aaa]", pip: "bg-ring animate-pulse" },
-  ok: { text: "text-[#4ecb8b]", pip: "mt-[7.5px] bg-[#4ecb8b]" },
-  err: { text: "text-[#ff6b8a]", pip: "mt-[7.5px] bg-[#ff6b8a]" },
+  run: { text: "text-accent-foreground", pip: "bg-ring animate-pulse" },
+  ok: { text: "text-(--ok)", pip: "mt-[7.5px] bg-(--ok)" },
+  err: { text: "text-(--err)", pip: "mt-[7.5px] bg-(--err)" },
 };
 
 /** 提交信息最多两行；被截断时悬停显示完整内容 */
@@ -1212,7 +1261,7 @@ function ProjectRow({
   return (
     <li
       ref={rowRef}
-      className={`group/row relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2.5 gap-y-1.5 rounded-2xl border-[1.5px] bg-linear-to-b from-white/80 to-[#fff7fb]/80 p-[11px] transition-[border-color,box-shadow] ${
+      className={`group/row relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2.5 gap-y-1.5 rounded-2xl border-[1.5px] bg-linear-to-b from-(--row-from) to-(--row-to) p-[11px] transition-[border-color,box-shadow] ${
         isDiffable
           ? "cursor-pointer hover:border-ring/75 hover:shadow-[0_4px_14px_rgba(94,200,212,0.18)]"
           : ""
@@ -1226,7 +1275,7 @@ function ProjectRow({
       }}
     >
       <div
-        className="min-w-0 self-center truncate text-[15px] font-semibold text-[#4a4458]"
+        className="min-w-0 self-center truncate text-[15px] font-semibold text-(--ink-strong)"
         title={row.project.path}
       >
         {row.project.displayName}
@@ -1283,7 +1332,7 @@ function ProjectRow({
       )}
       {isConfirming ? (
         <div
-          className="absolute inset-0 z-2 flex items-center justify-end gap-2 rounded-[inherit] bg-[#fffcfd]/95 px-3 text-xs text-[#4a4458]"
+          className="absolute inset-0 z-2 flex items-center justify-end gap-2 rounded-[inherit] bg-(--surface)/95 px-3 text-xs text-(--ink-strong)"
           role="alertdialog"
           aria-label="确认移除"
         >

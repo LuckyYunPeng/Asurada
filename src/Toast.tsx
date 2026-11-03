@@ -5,9 +5,9 @@ export type ToastKind = "ok" | "err" | "info";
 import { getCaptureScene } from "./captureMode";
 
 const TOAST_CLASS: Record<ToastKind, string> = {
-  ok: "border-[#c7efda] bg-[#eaf9f1] text-[#2f9a64]",
-  info: "border-[#b8e6ec] bg-[#d4f4f7] text-accent-foreground",
-  err: "border-[#ffc9d8] bg-[#ffe8ef] text-[#c43d5a]",
+  ok: "border-(--ok-border) bg-(--ok-bg) text-(--ok-fg)",
+  info: "border-(--accent-strong) bg-(--mint-soft) text-accent-foreground",
+  err: "border-(--err-border) bg-(--err-bg) text-(--err-fg)",
 };
 
 export function Toast({
