@@ -54,13 +54,13 @@ cd src-tauri && cargo test preflight::
 git clone https://github.com/LuckyYunPeng/asurada.git
 cd asurada
 npm install
-npm run tauri dev
+npm run dev
 ```
 
 仅前端壳（端口 **4721**，无 Tauri 命令）：
 
 ```bash
-npm run dev
+npm run dev:web
 ```
 
 本地打 mac 包（与 CI 相同 bundles）：
@@ -83,10 +83,10 @@ npm run tauri build -- --bundles app,dmg
 
 | 命令 | 说明 |
 |---|---|
-| `npm run dev` | Vite（4721） |
-| `npm run tauri dev` | 完整 App |
+| `npm run dev:web` | Vite（4721） |
+| `npm run dev` | 完整 App |
 | `npm run tauri build` | 生产构建 |
-| `npm run capture:artifacts` | 需先 `npm run dev`，生成 `artifacts/*.png` |
+| `npm run capture:artifacts` | 需先 `npm run dev:web`，生成 `artifacts/*.png` |
 
 ## CI/CD
 

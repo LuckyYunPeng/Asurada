@@ -22,15 +22,15 @@
 git clone https://github.com/LuckyYunPeng/asurada.git
 cd asurada
 npm install
-npm run tauri dev
+npm run dev
 ```
 
 | 命令 | 说明 |
 |------|------|
-| `npm run dev` | 仅 Vite 前端，端口 **4721**（无 Tauri 命令） |
-| `npm run tauri dev` | 完整桌面 App |
+| `npm run dev:web` | 仅 Vite 前端，端口 **4721**（无 Tauri 命令） |
+| `npm run dev` | 完整桌面 App |
 | `npm run tauri build -- --bundles app,dmg` | 本地 mac 包，产物在 `src-tauri/target/release/bundle/` |
-| `npm run capture:artifacts` | 需先 `npm run dev`；复拍 `artifacts/*.png`（见 `artifacts/README.md`） |
+| `npm run capture:artifacts` | 需先 `npm run dev:web`；复拍 `artifacts/*.png`（见 `artifacts/README.md`） |
 
 预检单测（Rust）：
 
@@ -104,7 +104,7 @@ asurada/
 | **pi 提示词仍含 CommitDock 字样** | `git.rs` 内 `PI_COMMIT_PROMPT` 字符串待品牌统一（低优先级） |
 | **⋯ 菜单** | 当前仅 **移除**；设计稿中的 Finder Reveal **未做** |
 
-验收时对照 `artifacts/` 与 `npm run dev` + `?capture=` 场景；真机提交需本机 `pi` 与可 push 的远端权限。
+验收时对照 `artifacts/` 与 `npm run dev:web` + `?capture=` 场景；真机提交需本机 `pi` 与可 push 的远端权限。
 
 ## 协作与术语
 

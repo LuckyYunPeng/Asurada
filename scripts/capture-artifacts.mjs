@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Dev-only: capture Asurada UI frames via ?capture= query (see src/captureMode.ts).
- * Usage: npm run dev (port 4721) + node scripts/capture-artifacts.mjs
+ * Usage: npm run dev:web (port 4721) + node scripts/capture-artifacts.mjs
  */
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
