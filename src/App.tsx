@@ -596,6 +596,16 @@ function App() {
               : r,
           ),
         );
+        // 成功绿色只短暂提示，之后回到普通灰色
+        setTimeout(() => {
+          setRows((prev) =>
+            prev.map((r) =>
+              r.project.id === row.project.id && r.uiState === "success"
+                ? { project: r.project, uiState: "idle" }
+                : r,
+            ),
+          );
+        }, 3000);
       } else {
         const errMsg = result.error ?? "提交失败";
         setToast({ title: "失败", message: errMsg, kind: "err" });
