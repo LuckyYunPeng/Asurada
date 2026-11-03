@@ -24,7 +24,34 @@ interface IDiffEntry {
   deletions: number;
 }
 
-const DIFF_SCROLLBAR_CSS = `
+// 注入 diff 库 shadow DOM 的样式（外部 CSS 进不去）。库默认的增删底色只混入 12%、
+// 行内改动词只有 15% 高亮，再加上鲜艳的语法色，改动很难一眼看出
+const DIFF_UNSAFE_CSS = `
+:host {
+  /* 整行底色：88% -> 80% 背景，红绿更明显 */
+  --diffs-bg-addition-override: #dbf6e3;
+  --diffs-bg-deletion-override: #fde2e4;
+  /* 行内改动词：加深到能一眼看出改了哪几个字 */
+  --diffs-bg-addition-emphasis-override: rgba(13, 190, 78, 0.32);
+  --diffs-bg-deletion-emphasis-override: rgba(255, 46, 63, 0.28);
+}
+[data-line], [data-no-newline] {
+  --mix-light: 0%;
+}
+/* 改动行行号栏比代码区稍深，滚动时余光能扫到 */
+[data-column-number] {
+  --mix-light: 0%;
+}
+[data-line-type="change-addition"][data-column-number] {
+  --diffs-bg-addition-number-override: #c4efd2;
+}
+[data-line-type="change-deletion"][data-column-number] {
+  --diffs-bg-deletion-number-override: #fbcdd2;
+}
+/* 语法色降饱和，让红绿成为最显眼的颜色 */
+[data-code] [data-line] span:not([data-diff-span]) {
+  filter: saturate(0.55);
+}
 [data-code]::-webkit-scrollbar-thumb {
   background-color: rgba(94, 200, 212, 0.35);
   border: 2px solid transparent;
@@ -376,8 +403,11 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
                     diffStyle,
                     stickyHeader: true,
                     overflow: "scroll",
-                    // 代码区横向滚动条在 shadow DOM 里，外部 CSS 进不去，只能经库的 unsafeCSS 注入
-                    unsafeCSS: DIFF_SCROLLBAR_CSS,
+                    // 行首用 +/- 号，不靠颜色也能分清增删
+                    diffIndicators: "classic",
+                    // 按整词标出行内改动，比默认 word-alt 更整齐
+                    lineDiffType: "word",
+                    unsafeCSS: DIFF_UNSAFE_CSS,
                   }}
                   renderHeaderMetadata={() => (
                     <button
