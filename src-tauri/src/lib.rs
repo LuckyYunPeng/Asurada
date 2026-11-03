@@ -38,8 +38,6 @@ pub fn run() {
             macos_panel::get_toggle_shortcut,
             #[cfg(target_os = "macos")]
             macos_panel::set_toggle_shortcut,
-            #[cfg(target_os = "macos")]
-            macos_panel::reset_toggle_shortcut,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]

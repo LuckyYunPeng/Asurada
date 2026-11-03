@@ -151,46 +151,18 @@ function SettingsShortcutRow({
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [recording, skipInvoke, onToast]);
 
-  async function handleReset(event: React.MouseEvent) {
-    event.stopPropagation();
-    if (skipInvoke || !isTauri) {
-      setDisplay(DEFAULT_TOGGLE_SHORTCUT_DISPLAY);
-      return;
-    }
-    try {
-      const info = await invoke<ToggleShortcutInfo>("reset_toggle_shortcut");
-      setDisplay(info.display);
-    } catch (e) {
-      onToast({
-        title: "恢复失败",
-        message: String(e),
-        kind: "err",
-      });
-    }
-  }
-
   return (
-    <>
-      <button
-        type="button"
-        className={`settings-row settings-row--shortcut${recording ? " is-recording" : ""}`}
-        onClick={() => setRecording(true)}
-        disabled={recording}
-      >
-        <span className="settings-row-label">自定义快捷键</span>
-        <span className="settings-kbd-pill">
-          {recording ? "按下新组合…" : display}
-        </span>
-      </button>
-      <button
-        type="button"
-        className="settings-reset"
-        disabled={recording}
-        onClick={(event) => void handleReset(event)}
-      >
-        恢复默认
-      </button>
-    </>
+    <button
+      type="button"
+      className={`settings-row settings-row--shortcut${recording ? " is-recording" : ""}`}
+      onClick={() => setRecording(true)}
+      disabled={recording}
+    >
+      <span className="settings-row-label">自定义快捷键</span>
+      <span className="settings-kbd-pill">
+        {recording ? "按下新组合…" : display}
+      </span>
+    </button>
   );
 }
 

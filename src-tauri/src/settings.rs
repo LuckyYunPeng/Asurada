@@ -46,7 +46,3 @@ pub fn save_toggle_panel_shortcut(app_data_dir: &Path, shortcut: &str) -> Result
         serde_json::to_string_pretty(&file).map_err(|e| format!("序列化设置失败: {e}"))?;
     fs::write(&path, raw).map_err(|e| format!("写入设置失败: {e}"))
 }
-
-pub fn reset_toggle_panel_shortcut(app_data_dir: &Path) -> Result<(), String> {
-    save_toggle_panel_shortcut(app_data_dir, DEFAULT_TOGGLE_PANEL_SHORTCUT)
-}

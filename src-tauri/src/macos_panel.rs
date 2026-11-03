@@ -476,7 +476,7 @@ pub fn setup(app: &mut App) -> Result<(), String> {
 }
 
 use crate::settings::{
-    load_toggle_panel_shortcut, reset_toggle_panel_shortcut, save_toggle_panel_shortcut,
+    load_toggle_panel_shortcut, save_toggle_panel_shortcut,
     DEFAULT_TOGGLE_PANEL_SHORTCUT,
 };
 use serde::Serialize;
@@ -606,14 +606,6 @@ pub fn set_toggle_shortcut(app: AppHandle, shortcut: String) -> Result<ToggleSho
     let dir = app_data_dir(&app)?;
     save_toggle_panel_shortcut(&dir, &shortcut)?;
     Ok(toggle_shortcut_info(&shortcut))
-}
-
-#[tauri::command]
-pub fn reset_toggle_shortcut(app: AppHandle) -> Result<ToggleShortcutInfo, String> {
-    apply_toggle_shortcut(&app, DEFAULT_TOGGLE_PANEL_SHORTCUT)?;
-    let dir = app_data_dir(&app)?;
-    reset_toggle_panel_shortcut(&dir)?;
-    Ok(toggle_shortcut_info(DEFAULT_TOGGLE_PANEL_SHORTCUT))
 }
 
 /// 非激活面板点到别的 App 时不会 resign key，用全局鼠标监听补上。
