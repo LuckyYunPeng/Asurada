@@ -66,8 +66,18 @@ pub fn run_pi_print(project_path: &Path) -> Result<String, String> {
 }
 
 pub fn git_add_commit_push(project_path: &Path, message: &str) -> Result<String, String> {
+    // push 被拒（远端有更新）时先 rebase 再推一次；rebase 冲突则撤回，保持本地提交不变
     let script = format!(
-        "git add -A && git commit -m {} && git push",
+        r#"git add -A && git commit -m {} || exit 1
+git push && exit 0
+if ! git pull --rebase; then
+  if git rev-parse -q --verify REBASE_HEAD >/dev/null; then
+    git rebase --abort
+    echo "远端有更新且与本地冲突，已取消 rebase，请手动处理" >&2
+  fi
+  exit 1
+fi
+git push"#,
         shell_escape(message)
     );
 
@@ -86,6 +96,70 @@ pub fn git_add_commit_push(project_path: &Path, message: &str) -> Result<String,
     }
 
     Ok(format!("{}{}", stdout, stderr).trim().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    fn git(dir: &Path, args: &[&str]) {
+        let ok = Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(ok, "git {args:?} failed");
+    }
+
+    /// 建一个裸仓库和两个克隆，让 b 先推一个提交，a 的普通 push 会被拒
+    fn setup(name: &str, b_file: &str) -> (PathBuf, PathBuf) {
+        let root = std::env::temp_dir().join(format!("asurada-git-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        git(&root, &["init", "--bare", "-q", "-b", "main", "remote.git"]);
+        for c in ["a", "b"] {
+            git(&root, &["clone", "-q", "remote.git", c]);
+            let d = root.join(c);
+            git(&d, &["config", "user.email", "t@t"]);
+            git(&d, &["config", "user.name", "t"]);
+            git(&d, &["checkout", "-q", "-b", "main"]);
+        }
+        let a = root.join("a");
+        let b = root.join("b");
+        fs::write(a.join("base.txt"), "base").unwrap();
+        git(&a, &["add", "-A"]);
+        git(&a, &["commit", "-qm", "base"]);
+        git(&a, &["push", "-q", "-u", "origin", "main"]);
+        git(&b, &["pull", "-q", "origin", "main"]);
+        git(&b, &["branch", "-q", "--set-upstream-to=origin/main"]);
+        fs::write(b.join(b_file), "from b").unwrap();
+        git(&b, &["add", "-A"]);
+        git(&b, &["commit", "-qm", "b"]);
+        git(&b, &["push", "-q"]);
+        (root, a)
+    }
+
+    #[test]
+    fn push_rejected_then_rebase_and_retry() {
+        let (root, a) = setup("retry", "b.txt");
+        fs::write(a.join("a.txt"), "from a").unwrap();
+        assert!(git_add_commit_push(&a, "a").is_ok());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rebase_conflict_is_aborted() {
+        let (root, a) = setup("conflict", "base.txt");
+        fs::write(a.join("base.txt"), "from a").unwrap();
+        let err = git_add_commit_push(&a, "a").unwrap_err();
+        assert!(err.contains("已取消 rebase"), "{err}");
+        assert!(!a.join(".git/rebase-merge").exists());
+        fs::remove_dir_all(root).unwrap();
+    }
 }
 
 fn shell_escape(s: &str) -> String {
