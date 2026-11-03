@@ -43,6 +43,8 @@ jobs:
         run: npm run tauri build -- --bundles app,dmg
         env:
           CI: true
+          # Tauri 在 CI=true 时默认对 create-dmg 传 --skip-jenkins，自定义背景/图标摆位不生效
+          TAURI_BUNDLER_DMG_IGNORE_CI: "true"
           # 未配置签名时 Tauri 产出未签名 .app / .dmg（本地 Gatekeeper 需右键打开或 ad-hoc 信任）
           # 正式分发需后续在仓库 Secrets 配置：
           # APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
