@@ -20,6 +20,10 @@ import {
   PREFLIGHT_CHECK_META,
 } from "./introContent";
 import { getRowPresentation } from "./rowPresentation";
+import {
+  DEFAULT_TOGGLE_SHORTCUT_DISPLAY,
+  keyboardEventToShortcut,
+} from "./shortcutSettings";
 import { Toast, type ToastKind } from "./Toast";
 import type {
   CommitPushResult,
@@ -27,6 +31,7 @@ import type {
   PreflightResult,
   ProjectRowState,
   ProjectView,
+  ToggleShortcutInfo,
 } from "./types";
 import "./App.css";
 
@@ -77,6 +82,118 @@ function Icon({ d }: { d: string }) {
   );
 }
 
+function SettingsShortcutRow({
+  active,
+  initialDisplay,
+  skipInvoke,
+  onToast,
+  onRecordingChange,
+}: {
+  active: boolean;
+  initialDisplay?: string;
+  skipInvoke?: boolean;
+  onToast: (toast: { title: string; message: string; kind: ToastKind }) => void;
+  onRecordingChange: (recording: boolean) => void;
+}) {
+  const [display, setDisplay] = useState(
+    initialDisplay ?? DEFAULT_TOGGLE_SHORTCUT_DISPLAY,
+  );
+  const [recording, setRecording] = useState(false);
+
+  useEffect(() => {
+    onRecordingChange(recording);
+  }, [recording, onRecordingChange]);
+
+  useEffect(() => {
+    if (!active || skipInvoke || !isTauri) {
+      return;
+    }
+    void invoke<ToggleShortcutInfo>("get_toggle_shortcut")
+      .then((info) => setDisplay(info.display))
+      .catch(() => {});
+  }, [active, skipInvoke]);
+
+  useEffect(() => {
+    if (!recording) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        setRecording(false);
+        return;
+      }
+      const shortcut = keyboardEventToShortcut(event);
+      if (!shortcut) {
+        return;
+      }
+      if (skipInvoke || !isTauri) {
+        setDisplay("⌥⌘K");
+        setRecording(false);
+        return;
+      }
+      void invoke<ToggleShortcutInfo>("set_toggle_shortcut", { shortcut })
+        .then((info) => {
+          setDisplay(info.display);
+          setRecording(false);
+        })
+        .catch((e) => {
+          onToast({
+            title: "快捷键不可用",
+            message: String(e),
+            kind: "err",
+          });
+          setRecording(false);
+        });
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [recording, skipInvoke, onToast]);
+
+  async function handleReset(event: React.MouseEvent) {
+    event.stopPropagation();
+    if (skipInvoke || !isTauri) {
+      setDisplay(DEFAULT_TOGGLE_SHORTCUT_DISPLAY);
+      return;
+    }
+    try {
+      const info = await invoke<ToggleShortcutInfo>("reset_toggle_shortcut");
+      setDisplay(info.display);
+    } catch (e) {
+      onToast({
+        title: "恢复失败",
+        message: String(e),
+        kind: "err",
+      });
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        className={`settings-row settings-row--shortcut${recording ? " is-recording" : ""}`}
+        onClick={() => setRecording(true)}
+        disabled={recording}
+      >
+        <span className="settings-row-label">自定义快捷键</span>
+        <span className="settings-kbd-pill">
+          {recording ? "按下新组合…" : display}
+        </span>
+      </button>
+      <button
+        type="button"
+        className="settings-reset"
+        disabled={recording}
+        onClick={(event) => void handleReset(event)}
+      >
+        恢复默认
+      </button>
+    </>
+  );
+}
+
 const captureScene = getCaptureScene();
 const captureBoot = captureScene ? bootstrapCapture(captureScene) : null;
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -92,7 +209,13 @@ function App() {
     if (captureBoot) return captureBoot.introStep;
     return readIntroComplete() ? -1 : 0;
   });
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(
+    () => captureBoot?.settingsOpen ?? false,
+  );
+  const shortcutRecordingRef = useRef(false);
+  const handleShortcutRecordingChange = useCallback((recording: boolean) => {
+    shortcutRecordingRef.current = recording;
+  }, []);
   const [rows, setRows] = useState<ProjectRowState[]>(
     () => captureBoot?.rows ?? [],
   );
@@ -357,6 +480,9 @@ function App() {
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (shortcutRecordingRef.current) {
+          return;
+        }
         onCollapsePanel();
       }
     };
@@ -617,8 +743,15 @@ function App() {
                   </button>
                   {settingsOpen ? (
                     <div className="settings-pop">
+                      <SettingsShortcutRow
+                        active={settingsOpen}
+                        initialDisplay={captureBoot?.toggleShortcutDisplay}
+                        skipInvoke={captureBoot?.skipInvoke}
+                        onToast={setToast}
+                        onRecordingChange={handleShortcutRecordingChange}
+                      />
                       <button type="button" onClick={replayIntro}>
-                        重看引导
+                        查看引导
                       </button>
                     </div>
                   ) : null}

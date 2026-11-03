@@ -401,12 +401,18 @@ pub fn last_resort_show(app: &mut App) {
 }
 
 pub fn setup_tray(app: &mut App) -> Result<(), String> {
+    let tray_accel = app
+        .path()
+        .app_data_dir()
+        .ok()
+        .map(|dir| crate::settings::load_toggle_panel_shortcut(&dir))
+        .unwrap_or_else(|| crate::settings::DEFAULT_TOGGLE_PANEL_SHORTCUT.to_string());
     let show_item = MenuItem::with_id(
         app,
         TRAY_SHOW_ID,
         "显示面板",
         true,
-        Some(TOGGLE_SHORTCUT),
+        Some(tray_accel.as_str()),
     )
     .map_err(|e| format!("无法创建菜单项: {e}"))?;
     let collapse_item = MenuItem::with_id(
@@ -463,30 +469,151 @@ pub fn setup(app: &mut App) -> Result<(), String> {
         }
     };
     install_outside_click_monitor(app.handle().clone());
-    if let Err(e) = register_toggle_shortcut(app) {
+    if let Err(e) = init_toggle_shortcut(app.handle()) {
         eprintln!("Asurada: 快捷键注册失败 ({e})，可能已被其他 App 占用");
     }
     ready
 }
 
-/// 全局快捷键：展开 / 收起面板。
-const TOGGLE_SHORTCUT: &str = "Alt+Super+KeyG";
+use crate::settings::{
+    load_toggle_panel_shortcut, reset_toggle_panel_shortcut, save_toggle_panel_shortcut,
+    DEFAULT_TOGGLE_PANEL_SHORTCUT,
+};
+use serde::Serialize;
+use std::str::FromStr;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
-fn register_toggle_shortcut(app: &mut App) -> Result<(), String> {
-    use tauri_plugin_global_shortcut::{Builder, ShortcutState};
-    app.handle()
-        .plugin(
-            Builder::new()
-                .with_shortcut(TOGGLE_SHORTCUT)
-                .map_err(|e| e.to_string())?
-                .with_handler(|app, _shortcut, event| {
-                    if event.state == ShortcutState::Pressed {
-                        let _ = apply_panel_open(app, !IS_PANEL_EXPANDED.load(Ordering::SeqCst));
-                    }
-                })
-                .build(),
-        )
-        .map_err(|e| e.to_string())
+static ACTIVE_TOGGLE_SHORTCUT: Mutex<String> = Mutex::new(String::new());
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToggleShortcutInfo {
+    /// Tauri global-shortcut 字符串，如 Alt+Super+KeyG
+    pub shortcut: String,
+    /// 可读展示，如 ⌥⌘G
+    pub display: String,
+}
+
+pub fn toggle_shortcut_info(storage: &str) -> ToggleShortcutInfo {
+    ToggleShortcutInfo {
+        shortcut: storage.to_string(),
+        display: storage_to_display(storage),
+    }
+}
+
+fn app_data_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map_err(|e| format!("无法解析应用数据目录: {e}"))
+}
+
+fn active_toggle_shortcut() -> String {
+    lock_dock(&ACTIVE_TOGGLE_SHORTCUT).clone()
+}
+
+fn set_active_toggle_shortcut(shortcut: String) {
+    *lock_dock(&ACTIVE_TOGGLE_SHORTCUT) = shortcut;
+}
+
+pub fn storage_to_display(storage: &str) -> String {
+    let mut out = String::new();
+    for part in storage.split('+') {
+        match part {
+            "Alt" => out.push('⌥'),
+            "Super" => out.push('⌘'),
+            "Shift" => out.push('⇧'),
+            "Control" => out.push('⌃'),
+            key if key.starts_with("Key") && key.len() == 4 => {
+                out.push(key.as_bytes()[3] as char);
+            }
+            key if key.starts_with("Digit") && key.len() == 6 => {
+                out.push(key.as_bytes()[5] as char);
+            }
+            other => out.push_str(other),
+        }
+    }
+    if out.is_empty() {
+        storage_to_display(DEFAULT_TOGGLE_PANEL_SHORTCUT)
+    } else {
+        out
+    }
+}
+
+fn validate_toggle_shortcut(shortcut: &str) -> Result<Shortcut, String> {
+    let parsed = Shortcut::from_str(shortcut).map_err(|e| format!("快捷键格式无效：{e}"))?;
+    if parsed.mods == Modifiers::empty() {
+        return Err("请至少包含一个修饰键（⌥、⌘、⇧ 或 ⌃）".to_string());
+    }
+    Ok(parsed)
+}
+
+fn register_toggle_shortcut_handler(app: &AppHandle, shortcut: &str) -> Result<(), String> {
+    validate_toggle_shortcut(shortcut)?;
+    app.global_shortcut()
+        .on_shortcut(shortcut, |app, _shortcut, event| {
+            if event.state == ShortcutState::Pressed {
+                let _ = apply_panel_open(app, !IS_PANEL_EXPANDED.load(Ordering::SeqCst));
+            }
+        })
+        .map_err(|e| format!("快捷键无法注册（可能已被占用）：{e}"))
+}
+
+pub fn apply_toggle_shortcut(app: &AppHandle, shortcut: &str) -> Result<(), String> {
+    let shortcut = shortcut.trim();
+    if shortcut.is_empty() {
+        return Err("快捷键不能为空".to_string());
+    }
+    validate_toggle_shortcut(shortcut)?;
+    let previous = active_toggle_shortcut();
+    if previous == shortcut {
+        return Ok(());
+    }
+    let gs = app.global_shortcut();
+
+    if !previous.is_empty() && previous != shortcut {
+        let _ = gs.unregister(previous.as_str());
+    }
+
+    match register_toggle_shortcut_handler(app, shortcut) {
+        Ok(()) => {
+            set_active_toggle_shortcut(shortcut.to_string());
+            Ok(())
+        }
+        Err(e) => {
+            if !previous.is_empty() {
+                let _ = register_toggle_shortcut_handler(app, &previous);
+            }
+            Err(e)
+        }
+    }
+}
+
+pub fn init_toggle_shortcut(app: &AppHandle) -> Result<(), String> {
+    let dir = app_data_dir(app)?;
+    let shortcut = load_toggle_panel_shortcut(&dir);
+    apply_toggle_shortcut(app, &shortcut)
+}
+
+#[tauri::command]
+pub fn get_toggle_shortcut(app: AppHandle) -> Result<ToggleShortcutInfo, String> {
+    let dir = app_data_dir(&app)?;
+    Ok(toggle_shortcut_info(&load_toggle_panel_shortcut(&dir)))
+}
+
+#[tauri::command]
+pub fn set_toggle_shortcut(app: AppHandle, shortcut: String) -> Result<ToggleShortcutInfo, String> {
+    apply_toggle_shortcut(&app, &shortcut)?;
+    let dir = app_data_dir(&app)?;
+    save_toggle_panel_shortcut(&dir, &shortcut)?;
+    Ok(toggle_shortcut_info(&shortcut))
+}
+
+#[tauri::command]
+pub fn reset_toggle_shortcut(app: AppHandle) -> Result<ToggleShortcutInfo, String> {
+    apply_toggle_shortcut(&app, DEFAULT_TOGGLE_PANEL_SHORTCUT)?;
+    let dir = app_data_dir(&app)?;
+    reset_toggle_panel_shortcut(&dir)?;
+    Ok(toggle_shortcut_info(DEFAULT_TOGGLE_PANEL_SHORTCUT))
 }
 
 /// 非激活面板点到别的 App 时不会 resign key，用全局鼠标监听补上。

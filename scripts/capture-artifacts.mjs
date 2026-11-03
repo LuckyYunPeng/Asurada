@@ -23,6 +23,7 @@ const shots = [
   { capture: "empty", file: "empty.png" },
   { capture: "running", file: "running.png" },
   { capture: "result", file: "result.png" },
+  { capture: "settings", file: "settings-shortcut.png" },
 ];
 
 await mkdir(outDir, { recursive: true });

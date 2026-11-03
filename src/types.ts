@@ -36,3 +36,8 @@ export interface ProjectRowState {
   resultDetail?: string;
   resultExpanded?: boolean;
 }
+
+export interface ToggleShortcutInfo {
+  shortcut: string;
+  display: string;
+}
