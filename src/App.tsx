@@ -18,12 +18,27 @@ import {
   INTRO_STORAGE_KEY,
   PREFLIGHT_CHECK_META,
 } from "./introContent";
-import { getRowPresentation } from "./rowPresentation";
+import { getRowPresentation, type RowKind } from "./rowPresentation";
 import {
   DEFAULT_TOGGLE_SHORTCUT_DISPLAY,
   keyboardEventToShortcut,
 } from "./shortcutSettings";
 import { Toast, type ToastKind } from "./Toast";
+import {
+  Check,
+  ChevronRight,
+  FolderOpen,
+  Info,
+  Loader2,
+  Plus,
+  Settings,
+  Trash2,
+  TriangleAlert,
+  X,
+} from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -72,24 +87,13 @@ function LogoHero({ badge }: { badge?: "+" | "!" }) {
   );
 }
 
-/** Lucide 风格线性图标（24×24 viewBox） */
-function Icon({ d }: { d: string }) {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d={d} />
-    </svg>
-  );
-}
+/** 引导 / 环境检查 / 空态共用的标题与正文样式 */
+const HEADING_CLASS = "mb-1.5 text-[15px] font-semibold text-[#4a4458]";
+const LEAD_CLASS = "mb-3.5 text-left leading-normal text-[#6d687a]";
+
+/** 设置列表的一行 */
+const SETTINGS_ROW_CLASS =
+  "flex w-full items-center justify-between gap-2.5 rounded-lg px-2.5 py-2 text-left text-[#6d687a] hover:bg-accent disabled:hover:bg-transparent";
 
 function SettingsShortcutRow({
   active,
@@ -163,14 +167,20 @@ function SettingsShortcutRow({
   return (
     <button
       type="button"
-      className={`settings-row settings-row--shortcut${recording ? " is-recording" : ""}`}
+      className={SETTINGS_ROW_CLASS}
       onClick={() => setRecording(true)}
       disabled={recording}
     >
-      <span className="settings-row-label">自定义快捷键</span>
-      <span className="settings-kbd-pill">
+      <span>自定义快捷键</span>
+      <Kbd
+        className={
+          recording
+            ? "h-6 border border-dashed border-border bg-transparent px-2 font-normal"
+            : "h-6 bg-accent px-2 font-semibold text-accent-foreground"
+        }
+      >
         {recording ? "按下新组合…" : display}
-      </span>
+      </Kbd>
     </button>
   );
 }
@@ -217,10 +227,10 @@ function SettingsDiffSizeRow({ active, skipInvoke }: { active: boolean; skipInvo
   const isPreset = DIFF_WINDOW_PRESETS.some((p) => `${p.width}x${p.height}` === value);
 
   return (
-    <div className="settings-row">
-      <span className="settings-row-label">变更窗口大小</span>
+    <div className={SETTINGS_ROW_CLASS}>
+      <span>变更窗口大小</span>
       <Select value={value} onValueChange={(v) => void onChangeSize(v)}>
-        <SelectTrigger size="sm" className="settings-select">
+        <SelectTrigger size="sm" className="min-w-32 text-xs">
           <SelectValue />
         </SelectTrigger>
         <SelectContent position="popper" align="end">
@@ -268,8 +278,8 @@ function SettingsAutostartRow({ skipInvoke }: { skipInvoke?: boolean }) {
   }
 
   return (
-    <label className="settings-row">
-      <span className="settings-row-label">开机自动启动</span>
+    <label className={`${SETTINGS_ROW_CLASS} cursor-pointer`}>
+      <span>开机自动启动</span>
       <Switch checked={isEnabled} onCheckedChange={() => void onToggleAutostart()} />
     </label>
   );
@@ -744,15 +754,7 @@ function App() {
           {toast ? (
             <div ref={cloudRef} className={`cloud cloud--${toast.kind}`} role="status">
               <span className="cloud-icon" aria-hidden>
-                <Icon
-                  d={
-                    toast.kind === "ok"
-                      ? "M20 6 9 17l-5-5"
-                      : toast.kind === "info"
-                        ? "M12 7v6M12 17h.01"
-                        : "M18 6 6 18M6 6l12 12"
-                  }
-                />
+                {toast.kind === "ok" ? <Check /> : toast.kind === "info" ? <Info /> : <X />}
               </span>
               <span className="cloud-body">
                 <strong>{toast.title}</strong>
@@ -807,54 +809,59 @@ function App() {
               </div>
               <h1 className="title">ASURADA</h1>
               {isEnvFailed ? (
-                <button
-                  type="button"
-                  className="env-warn"
+                <Button
+                  size="icon-xs"
+                  className="rounded-full bg-[#fff0e4] text-[#d4783a] hover:bg-[#ffe0c8]"
                   aria-label="环境异常，查看检查"
                   title="环境异常，查看检查"
                   onClick={() => setIsCheckOpen((open) => !open)}
                 >
-                  <Icon d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" />
-                </button>
+                  <TriangleAlert />
+                </Button>
               ) : null}
             </div>
-            <div className="chrome-actions">
+            <div className="flex items-center gap-0.5 text-muted-foreground">
               {showHeaderAdd ? (
-                <button
-                  type="button"
-                  className="btn-icon"
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   aria-label="添加项目"
                   title="添加项目"
                   onClick={() => void handleAddProject()}
                 >
-                  <Icon d="M12 5v14M5 12h14" />
-                </button>
+                  <Plus />
+                </Button>
               ) : null}
               {inMain ? (
-                <button
-                  type="button"
-                  className={`btn-icon${settingsOpen ? " is-active" : ""}`}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
                   aria-label="设置"
                   title="设置"
                   aria-pressed={settingsOpen}
                   onClick={() => setSettingsOpen((o) => !o)}
                 >
-                    <Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-                </button>
+                  <Settings />
+                </Button>
               ) : null}
-              <button
-                type="button"
-                className="btn-icon"
+              <Button
+                variant="ghost"
+                size="icon-sm"
                 aria-label="收起"
                 title="收起"
                 onClick={onCollapsePanel}
               >
-                <Icon d="m9 18 6-6-6-6" />
-              </button>
+                <ChevronRight />
+              </Button>
             </div>
           </header>
 
-          {loadError ? <p className="banner-error">{loadError}</p> : null}
+          {loadError ? (
+            <Alert variant="destructive" className="mx-4 mb-2.5 w-auto">
+              <AlertDescription>{loadError}</AlertDescription>
+            </Alert>
+          ) : null}
 
           <div
             className="panel-body"
@@ -862,9 +869,14 @@ function App() {
           >
             <div ref={bodyInnerRef} className="panel-body-inner">
             {inMain && projectCount > 0 && !settingsOpen ? (
-              <div className="risk" role="status">
-                <span className="ico">!</span>
-                <span>一键会暂存、提交并推送到远端哦</span>
+              <div
+                role="status"
+                className="mb-3 flex items-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-[#f0b89a] bg-linear-135 from-[#fff5eb] to-[#ffe8d9] px-[11px] py-[9px] leading-snug text-[#b07848]"
+              >
+                <span className="grid size-[18px] flex-none place-items-center rounded-full bg-[#ffe0c8] text-[11px] font-extrabold">
+                  !
+                </span>
+                一键会暂存、提交并推送到远端哦
               </div>
             ) : null}
 
@@ -880,8 +892,8 @@ function App() {
                 onStart={finishIntro}
               />
             ) : settingsOpen && inMain ? (
-              <div className="settings">
-                <div className="settings-list">
+              <div>
+                <div className="rounded-xl border bg-card p-1.5">
                   <SettingsShortcutRow
                     active={settingsOpen}
                     initialDisplay={captureBoot?.toggleShortcutDisplay}
@@ -894,21 +906,15 @@ function App() {
                     skipInvoke={captureBoot?.skipInvoke}
                   />
                   <SettingsAutostartRow skipInvoke={captureBoot?.skipInvoke} />
-                  <button type="button" className="settings-row" onClick={replayIntro}>
-                    <span className="settings-row-label">查看引导</span>
-                    <span className="settings-chevron" aria-hidden>
-                      ›
-                    </span>
+                  <button type="button" className={SETTINGS_ROW_CLASS} onClick={replayIntro}>
+                    <span>查看引导</span>
+                    <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
                   </button>
                 </div>
-                <div className="settings-foot">
-                  <button
-                    type="button"
-                    className="btn-text"
-                    onClick={() => setSettingsOpen(false)}
-                  >
+                <div className="mt-2.5 flex justify-end">
+                  <Button variant="secondary" onClick={() => setSettingsOpen(false)}>
                     返回
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : preflightLoading ? (
@@ -920,23 +926,20 @@ function App() {
                 onBack={() => setIsCheckOpen(false)}
               />
             ) : loading ? (
-              <p className="muted">加载中…</p>
+              <p className="p-6 text-center text-muted-foreground">加载中…</p>
             ) : projectCount === 0 ? (
-              <div className="empty">
+              <div className="px-1 pt-8 pb-3 text-center">
                 <LogoHero badge="+" />
-                <h2>还没有项目呢</h2>
-                <p>添加本地 git 仓库后，就能一键生成提交并推送啦</p>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  disabled={!inMain}
-                  onClick={() => void handleAddProject()}
-                >
+                <h2 className={HEADING_CLASS}>还没有项目呢</h2>
+                <p className={`${LEAD_CLASS} text-center`}>
+                  添加本地 git 仓库后，就能一键生成提交并推送啦
+                </p>
+                <Button disabled={!inMain} onClick={() => void handleAddProject()}>
                   添加项目
-                </button>
+                </Button>
               </div>
             ) : (
-              <ul className="list">
+              <ul className="flex flex-col gap-2">
                 {/* 按展开时定下的顺序；之后新加的项目排在末尾 */}
                 {[...rows]
                   .sort(
@@ -988,29 +991,28 @@ function IntroView({
   const isLast = step === INTRO_STEPS.length - 1;
 
   return (
-    <div className="intro step">
+    <div className="px-1 pt-2 pb-3 text-center">
       <LogoHero />
-      <h2>{content.title}</h2>
+      <h2 className={HEADING_CLASS}>{content.title}</h2>
       {"sub" in content && content.sub ? (
-        <p className="sub">{content.sub}</p>
+        <p className="mb-2 text-xs font-medium text-muted-foreground">{content.sub}</p>
       ) : null}
-      <p className="lead">{content.lead}</p>
-      <div className="dots" aria-hidden>
+      <p className={LEAD_CLASS}>{content.lead}</p>
+      <div className="mb-3 flex justify-center gap-1.5" aria-hidden>
         {INTRO_STEPS.map((_, i) => (
-          <span key={i} className={i === step ? "on" : undefined} />
+          <span
+            key={i}
+            className={`h-[7px] rounded-full ${i === step ? "w-4 bg-ring" : "w-[7px] bg-[#d4ebe8]"}`}
+          />
         ))}
       </div>
-      <div className="intro-actions">
-        <button type="button" className="linkish" onClick={onSkip}>
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="ghost" className="text-muted-foreground" onClick={onSkip}>
           跳过
-        </button>
-        <button
-          type="button"
-          className="btn-primary"
-          onClick={isLast ? onStart : onNext}
-        >
+        </Button>
+        <Button onClick={isLast ? onStart : onNext}>
           {isLast ? "开始使用" : "下一步"}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -1032,7 +1034,7 @@ function PreflightGateView({
       ];
 
   return (
-    <div className="gate">
+    <div className={GATE_CLASS}>
       {loading ? (
         <div className="logo-loader" aria-hidden>
           <span className="logo-loader-ring" />
@@ -1043,9 +1045,9 @@ function PreflightGateView({
           <img src={logoUrl} alt="" />
         </div>
       ) : null}
-      <h2>{loading ? "正在检查本机环境" : "环境检查"}</h2>
-      <p>依赖本机 pi agent，先确认能不能跑～</p>
-      <div className="checks">
+      <h2 className={HEADING_CLASS}>{loading ? "正在检查本机环境" : "环境检查"}</h2>
+      <p className={`${LEAD_CLASS} text-center`}>依赖本机 pi agent，先确认能不能跑～</p>
+      <div className={CHECKS_CLASS}>
         {items.map((c) => (
           <PreflightCheckRow key={c.id} item={c} loading={loading} />
         ))}
@@ -1064,26 +1066,22 @@ function PreflightFailView({
   onBack: () => void;
 }) {
   return (
-    <div className="gate">
+    <div className={GATE_CLASS}>
       <LogoHero badge="!" />
-      <h2>本机还差一点</h2>
-      <p>环境没齐的话没法提交并推送，先修好再来呀</p>
-      <div className="checks">
+      <h2 className={HEADING_CLASS}>本机还差一点</h2>
+      <p className={`${LEAD_CLASS} text-center`}>环境没齐的话没法提交并推送，先修好再来呀</p>
+      <div className={CHECKS_CLASS}>
         {result.checks.map((c) => (
           <PreflightCheckRow key={c.id} item={c} loading={false} />
         ))}
       </div>
-      <div className="gate-actions">
-        <button type="button" className="btn-text" onClick={onBack}>
+      <div className="flex flex-wrap justify-center gap-2">
+        <Button variant="ghost" className="text-muted-foreground" onClick={onBack}>
           返回
-        </button>
-        <button type="button" className="btn-primary" onClick={onRecheck}>
-          重新检查
-        </button>
+        </Button>
+        <Button onClick={onRecheck}>重新检查</Button>
       </div>
-      <p className="muted" style={{ marginTop: 12, fontSize: 11 }}>
-        {result.summary}
-      </p>
+      <p className="mt-3 text-[11px] text-muted-foreground">{result.summary}</p>
     </div>
   );
 }
@@ -1099,21 +1097,43 @@ function PreflightCheckRow({
     label: item.id,
     detail: item.message,
   };
-  const state = loading ? "wait" : item.ok ? "ok" : "bad";
-  const mark = loading ? "…" : item.ok ? "✓" : "!";
-
   return (
-    <div className={`check ${state}`}>
-      <span className="mark">{mark}</span>
+    <div className="flex items-start gap-2 py-1.5 text-[#6d687a] not-first:border-t not-first:border-dashed">
+      <span
+        className={`grid size-[18px] flex-none place-items-center rounded-full [&_svg]:size-3 [&_svg]:stroke-3 ${
+          loading
+            ? "bg-[#eef9fc] text-[#3a9aaa]"
+            : item.ok
+              ? "bg-[#e4f9ee] text-[#4ecb8b]"
+              : "bg-[#ffe8ef] text-[#ff6b8a]"
+        }`}
+      >
+        {loading ? <Loader2 className="animate-spin" /> : item.ok ? <Check /> : <X />}
+      </span>
       <div>
-        <div className="label">{meta.label}</div>
-        <div className="detail">
+        <div className="font-semibold text-[#4a4458]">{meta.label}</div>
+        <div className="mt-0.5 text-xs leading-snug text-muted-foreground">
           {!item.ok && item.message ? item.message : meta.detail}
         </div>
       </div>
     </div>
   );
 }
+
+const GATE_CLASS = "flex flex-col items-center px-1 pt-2 pb-3 text-center";
+const CHECKS_CLASS = "mb-3.5 self-stretch rounded-xl border bg-card px-3 py-2.5 text-left";
+
+/** 项目行状态文字与圆点的颜色 */
+const STATUS_CLASS: Record<RowKind, { text: string; pip: string }> = {
+  clean: { text: "text-[#6d687a]", pip: "mt-[7.5px] bg-[#cfc8d8]" },
+  dirty: {
+    text: "w-fit rounded-full bg-[#ffe8d9] py-0.5 pr-2 pl-1.5 text-[#c45e22]",
+    pip: "size-2 bg-[#ef8a3a] shadow-[0_0_0_2px_rgba(239,138,58,0.35)]",
+  },
+  run: { text: "text-[#2a9aaa]", pip: "bg-ring animate-pulse" },
+  ok: { text: "text-[#4ecb8b]", pip: "mt-[7.5px] bg-[#4ecb8b]" },
+  err: { text: "text-[#ff6b8a]", pip: "mt-[7.5px] bg-[#ff6b8a]" },
+};
 
 /** 提交信息最多两行；被截断时悬停显示完整内容 */
 function CommitTip({ text }: { text: string }) {
@@ -1129,7 +1149,7 @@ function CommitTip({ text }: { text: string }) {
       }}
     >
       <TooltipTrigger asChild>
-        <span ref={ref} className="status-text">
+        <span ref={ref} className="line-clamp-2 min-w-0 flex-1">
           {text}
         </span>
       </TooltipTrigger>
@@ -1192,7 +1212,11 @@ function ProjectRow({
   return (
     <li
       ref={rowRef}
-      className={`row${isFlashing ? " is-flashing" : ""}${isDiffable ? " is-diffable" : ""}`}
+      className={`group/row relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2.5 gap-y-1.5 rounded-2xl border-[1.5px] bg-linear-to-b from-white/80 to-[#fff7fb]/80 p-[11px] transition-[border-color,box-shadow] ${
+        isDiffable
+          ? "cursor-pointer hover:border-ring/75 hover:shadow-[0_4px_14px_rgba(94,200,212,0.18)]"
+          : ""
+      }${isFlashing ? " animate-[row-flash_0.7s_ease-in-out_2]" : ""}`}
       title={isDiffable ? "查看变更" : undefined}
       onClick={(event) => void onOpenDiff(event)}
       onAnimationEnd={(e) => {
@@ -1201,54 +1225,79 @@ function ProjectRow({
         }
       }}
     >
-      <div className="meta">
-        <div className="name" title={row.project.path}>
-          {row.project.displayName}
-        </div>
+      <div
+        className="min-w-0 self-center truncate text-[15px] font-semibold text-[#4a4458]"
+        title={row.project.path}
+      >
+        {row.project.displayName}
       </div>
-      <button
-        type="button"
-        className={`btn-primary${pres.btnBusy ? " busy" : ""}`}
+      <Button
+        size="sm"
+        className={
+          pres.btnBusy
+            ? "disabled:bg-accent disabled:text-accent-foreground disabled:opacity-100"
+            : "disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
+        }
         disabled={primaryDisabled}
         title={pres.btnTitle}
         onClick={onCommit}
       >
+        {pres.btnBusy ? <Loader2 className="animate-spin" /> : null}
         {pres.btnBusy ? "提交中…" : "提交并推送"}
-      </button>
-      <div className={`git-status ${pres.kind}`}>
-        <span className="pip" aria-hidden />
+      </Button>
+      <div
+        className={`col-span-full row-start-2 mr-14 flex min-w-0 gap-1.5 leading-snug ${
+          pres.kind === "dirty" || pres.kind === "run" ? "items-center" : "items-start"
+        } ${STATUS_CLASS[pres.kind].text}`}
+      >
+        <span
+          className={`size-1 flex-none rounded-full ${STATUS_CLASS[pres.kind].pip}`}
+          aria-hidden
+        />
         <CommitTip text={pres.statusText} />
       </div>
-      <div className="row-tools">
-        <button
-          type="button"
-          className="row-open"
+      {/* 提交中不允许打开/移除，直接不显示 */}
+      {isRunning ? null : (
+      <div className="col-start-2 row-start-2 flex gap-0.5 self-center justify-self-end text-muted-foreground">
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100"
           aria-label="打开文件夹"
           title="打开文件夹"
-          disabled={isRunning}
           onClick={onOpenFolder}
         >
-          <Icon d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
-        </button>
-        <button
-          type="button"
-          className={`row-remove${isConfirming ? " is-open" : ""}`}
+          <FolderOpen />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 hover:bg-destructive/10 hover:text-destructive"
           aria-label="移除项目"
-          disabled={isRunning}
+          title="移除项目"
           onClick={() => setIsConfirming(true)}
         >
-          <Icon d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
-        </button>
+          <Trash2 />
+        </Button>
       </div>
+      )}
       {isConfirming ? (
-        <div className="row-confirm" role="alertdialog" aria-label="确认移除">
+        <div
+          className="absolute inset-0 z-2 flex items-center justify-end gap-2 rounded-[inherit] bg-[#fffcfd]/95 px-3 text-xs text-[#4a4458]"
+          role="alertdialog"
+          aria-label="确认移除"
+        >
           <span>从列表移除？本地仓库还在</span>
-          <button type="button" onClick={() => setIsConfirming(false)}>
+          <Button variant="outline" size="sm" onClick={() => setIsConfirming(false)}>
             取消
-          </button>
-          <button type="button" className="is-danger" onClick={onRemove}>
+          </Button>
+          <Button
+            size="sm"
+            className="bg-destructive text-white hover:bg-destructive/85"
+            onClick={onRemove}
+          >
             移除
-          </button>
+          </Button>
         </div>
       ) : null}
     </li>
