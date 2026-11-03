@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { isHighlighterLoaded, parsePatchFiles, type FileDiffMetadata } from "@pierre/diffs";
-import { FileDiff, Virtualizer } from "@pierre/diffs/react";
+import { FileDiff, Virtualizer, WorkerPoolContextProvider } from "@pierre/diffs/react";
+import DiffsWorker from "@pierre/diffs/worker/worker-portable.js?worker";
 import logoUrl from "./assets/asurada-logo.png";
 import type { CommitPushResult, ICommitPushEvent } from "./types";
 import { RefreshCw, Loader2 } from "lucide-react";
@@ -70,6 +71,18 @@ const DIFF_UNSAFE_CSS = `
 }
 `;
 
+// 语法高亮放到 worker 里跑：大文件在主线程高亮一次要几百毫秒，切换文件会卡住界面。
+// 这里的 theme / lineDiffType 必须和下面 FileDiff 的 options 一致
+const DIFF_THEME = "pierre-light";
+const LINE_DIFF_TYPE = "word";
+const WORKER_POOL_OPTIONS = {
+  workerFactory: () => new DiffsWorker(),
+  poolSize: Math.min(4, navigator.hardwareConcurrency || 2),
+  // 小文件主线程直接高亮更快，省掉先画纯文本再上色的闪烁
+  mainThreadMaxCharacters: 4000,
+};
+const HIGHLIGHTER_OPTIONS = { theme: DIFF_THEME, lineDiffType: LINE_DIFF_TYPE } as const;
+
 const DIFF_STYLE_KEY = "asurada.diffStyle";
 const SHOW_TESTS_KEY = "asurada.diffShowTests";
 
@@ -126,6 +139,37 @@ function DiffCount({ additions, deletions }: { additions: number; deletions: num
     </span>
   );
 }
+
+// 文件多时每次切换都会重渲染整个列表；只有选中态变化的两行需要更新
+const FileItem = memo(function FileItem({
+  entry,
+  isActive,
+  onSelect,
+}: {
+  entry: IDiffEntry;
+  isActive: boolean;
+  onSelect: (name: string) => void;
+}) {
+  const { base, dir } = splitPath(entry.file.name);
+  return (
+    <li>
+      <button
+        type="button"
+        className={isActive ? "is-active" : undefined}
+        data-name={entry.file.name}
+        title={entry.file.name}
+        onClick={() => onSelect(entry.file.name)}
+      >
+        <span className={`dw-status is-${entry.status}`}>{entry.status}</span>
+        <span className="dw-file-text">
+          <span className="dw-file-base">{base}</span>
+          {dir ? <span className="dw-file-dir">{dir}</span> : null}
+        </span>
+        <DiffCount additions={entry.additions} deletions={entry.deletions} />
+      </button>
+    </li>
+  );
+});
 
 export default function DiffWindow({ projectId }: { projectId: string }) {
   const [diff, setDiff] = useState<IProjectDiff | null>(null);
@@ -271,13 +315,21 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
     }
   }
 
-  const testCount = entries.filter((e) => isTestFile(e.file.name)).length;
+  const testCount = useMemo(
+    () => entries.filter((e) => isTestFile(e.file.name)).length,
+    [entries],
+  );
   // 头部统计跟随开关：隐藏的测试文件不计入
-  const countedEntries = isShowTests ? entries : entries.filter((e) => !isTestFile(e.file.name));
-  const visibleEntries = entries.filter(
-    (e) =>
-      (isShowTests || !isTestFile(e.file.name)) &&
-      e.file.name.toLowerCase().includes(filter.trim().toLowerCase()),
+  const countedEntries = useMemo(
+    () => (isShowTests ? entries : entries.filter((e) => !isTestFile(e.file.name))),
+    [entries, isShowTests],
+  );
+  const visibleEntries = useMemo(
+    () =>
+      countedEntries.filter((e) =>
+        e.file.name.toLowerCase().includes(filter.trim().toLowerCase()),
+      ),
+    [countedEntries, filter],
   );
   // 只渲染选中的一个文件；选中的被筛掉或刷新后已不在变更里时回到第一个
   const selected =
@@ -315,6 +367,10 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
   }, [visibleEntries, selected]);
 
   return (
+    <WorkerPoolContextProvider
+      poolOptions={WORKER_POOL_OPTIONS}
+      highlighterOptions={HIGHLIGHTER_OPTIONS}
+    >
     <div className="dw">
       <header className="dw-top" data-tauri-drag-region>
         <div className="dw-title" data-tauri-drag-region>
@@ -434,27 +490,14 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
               onChange={(e) => setFilter(e.target.value)}
             />
             <ul className="dw-files">
-              {visibleEntries.map((entry) => {
-                const { base, dir } = splitPath(entry.file.name);
-                return (
-                  <li key={entry.file.name}>
-                    <button
-                      type="button"
-                      className={entry === selected ? "is-active" : undefined}
-                      data-name={entry.file.name}
-                      title={entry.file.name}
-                      onClick={() => setSelectedName(entry.file.name)}
-                    >
-                      <span className={`dw-status is-${entry.status}`}>{entry.status}</span>
-                      <span className="dw-file-text">
-                        <span className="dw-file-base">{base}</span>
-                        {dir ? <span className="dw-file-dir">{dir}</span> : null}
-                      </span>
-                      <DiffCount additions={entry.additions} deletions={entry.deletions} />
-                    </button>
-                  </li>
-                );
-              })}
+              {visibleEntries.map((entry) => (
+                <FileItem
+                  key={entry.file.name}
+                  entry={entry}
+                  isActive={entry === selected}
+                  onSelect={setSelectedName}
+                />
+              ))}
             </ul>
             <div className="dw-resizer" onPointerDown={onResizeStart} />
           </aside>
@@ -476,14 +519,14 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
                 <FileDiff
                   fileDiff={selected.file}
                   options={{
-                    theme: "pierre-light",
+                    theme: DIFF_THEME,
                     themeType: "light",
                     diffStyle,
                     overflow: "scroll",
                     // 行首用 +/- 号，不靠颜色也能分清增删
                     diffIndicators: "classic",
                     // 按整词标出行内改动，比默认 word-alt 更整齐
-                    lineDiffType: "word",
+                    lineDiffType: LINE_DIFF_TYPE,
                     unsafeCSS: DIFF_UNSAFE_CSS,
                   }}
                   renderHeaderMetadata={() => (
@@ -510,5 +553,6 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
         </div>
       )}
     </div>
+    </WorkerPoolContextProvider>
   );
 }

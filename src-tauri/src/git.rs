@@ -112,10 +112,15 @@ pub fn git_working_diff(project_path: &Path) -> Result<(String, Vec<String>), St
 }
 
 pub fn git_add_commit_push(project_path: &Path, message: &str) -> Result<String, String> {
-    // push 被拒（远端有更新）时先 rebase 再推一次；rebase 冲突则撤回，保持本地提交不变
+    // 只有远端有新提交导致的拒绝才 rebase 后重推；权限、hook 等其他拒绝直接报错，避免同一错误输出两遍。
+    // rebase 冲突则撤回，保持本地提交不变
     let script = format!(
         r#"git add -A && git commit -m {} || exit 1
-git push && exit 0
+if out=$(git push 2>&1); then echo "$out" >&2; exit 0; fi
+case "$out" in
+  *"fetch first"*|*non-fast-forward*) ;;
+  *) echo "$out" >&2; exit 1 ;;
+esac
 if ! git pull --rebase; then
   if git rev-parse -q --verify REBASE_HEAD >/dev/null; then
     git rebase --abort
@@ -209,6 +214,24 @@ mod tests {
         let (root, a) = setup("retry", "b.txt");
         fs::write(a.join("a.txt"), "from a").unwrap();
         assert!(git_add_commit_push(&a, "a").is_ok());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn other_push_rejection_is_reported_once() {
+        let (root, a) = setup("hook", "b.txt");
+        let hook = root.join("remote.git/hooks/pre-receive");
+        fs::write(&hook, "#!/bin/sh\necho denied-by-hook >&2\nexit 1\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&hook, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        // 先让本地追上远端，push 被拒只会是 hook 的原因
+        git(&a, &["pull", "-q", "--rebase"]);
+        fs::write(a.join("a.txt"), "from a").unwrap();
+        let err = git_add_commit_push(&a, "a").unwrap_err();
+        assert_eq!(err.matches("denied-by-hook").count(), 1, "{err}");
         fs::remove_dir_all(root).unwrap();
     }
 

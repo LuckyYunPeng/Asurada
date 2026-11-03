@@ -169,7 +169,8 @@ export function bootstrapCapture(scene: CaptureScene): CaptureBootstrap {
           {
             project: mockProjectB,
             uiState: "failure",
-            resultSummary: "失败 · push 被拒（non-fast-forward）",
+            resultSummary:
+              "失败 · To https://github.com/LuckyYunPeng/asurada.git\n ! [remote rejected] main -> main (refusing to allow an OAuth App to create or update workflow `.github/workflows/build-macos.yml` without `workflow` scope)\nerror: failed to push some refs to 'https://github.com/LuckyYunPeng/asurada.git'",
           },
         ],
       };

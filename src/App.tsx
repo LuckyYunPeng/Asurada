@@ -1153,7 +1153,7 @@ function CommitTip({ text }: { text: string }) {
           {text}
         </span>
       </TooltipTrigger>
-      <TooltipContent side="top" align="start" className="max-w-[220px]">
+      <TooltipContent side="top" align="start" className="max-w-[300px] whitespace-pre-wrap">
         {text}
       </TooltipContent>
     </Tooltip>
