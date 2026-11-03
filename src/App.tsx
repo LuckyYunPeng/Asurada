@@ -166,6 +166,45 @@ function SettingsShortcutRow({
   );
 }
 
+function SettingsAutostartRow({ skipInvoke }: { skipInvoke?: boolean }) {
+  const [isEnabled, setIsEnabled] = useState(false);
+
+  useEffect(() => {
+    if (skipInvoke || !isTauri) {
+      return;
+    }
+    void invoke<boolean>("plugin:autostart|is_enabled")
+      .then(setIsEnabled)
+      .catch((e) => console.error("读取开机启动状态失败", e));
+  }, [skipInvoke]);
+
+  async function onToggleAutostart() {
+    const next = !isEnabled;
+    setIsEnabled(next);
+    if (skipInvoke || !isTauri) {
+      return;
+    }
+    try {
+      await invoke(next ? "plugin:autostart|enable" : "plugin:autostart|disable");
+    } catch (e) {
+      console.error("设置开机启动失败", e);
+      setIsEnabled(!next);
+    }
+  }
+
+  return (
+    <label className="settings-row">
+      <span className="settings-row-label">开机自动启动</span>
+      <input
+        type="checkbox"
+        className="toggle toggle-sm settings-toggle"
+        checked={isEnabled}
+        onChange={() => void onToggleAutostart()}
+      />
+    </label>
+  );
+}
+
 const captureScene = getCaptureScene();
 const captureBoot = captureScene ? bootstrapCapture(captureScene) : null;
 const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -770,6 +809,7 @@ function App() {
                     onToast={setToast}
                     onRecordingChange={handleShortcutRecordingChange}
                   />
+                  <SettingsAutostartRow skipInvoke={captureBoot?.skipInvoke} />
                   <button type="button" className="settings-row" onClick={replayIntro}>
                     <span className="settings-row-label">查看引导</span>
                     <span className="settings-chevron" aria-hidden>

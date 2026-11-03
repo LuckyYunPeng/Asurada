@@ -17,6 +17,7 @@ pub fn run() {
     {
         builder = builder.plugin(tauri_nspanel::init());
         builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
+        builder = builder.plugin(tauri_plugin_autostart::Builder::new().build());
     }
 
     builder

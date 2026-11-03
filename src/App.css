@@ -1236,6 +1236,10 @@ body {
   border: 1.5px solid rgba(180, 220, 220, 0.55);
 }
 
+.settings-toggle:checked {
+  --input-color: #5ec8d4;
+}
+
 .settings-chevron {
   color: var(--ink-3);
 }
