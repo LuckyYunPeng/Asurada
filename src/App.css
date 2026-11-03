@@ -1208,22 +1208,26 @@ body {
   padding: 24px;
 }
 
-.settings-menu {
-  position: relative;
+.btn-icon.is-active {
+  background: rgba(94, 200, 212, 0.12);
+  color: #2a8a96;
 }
 
-.settings-pop {
-  position: absolute;
-  right: 0;
-  top: 100%;
-  margin-top: 4px;
-  min-width: 240px;
+.settings-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.settings-list {
   padding: 6px;
-  border-radius: 12px;
+  border-radius: 14px;
   background: #fff;
   border: 1.5px solid rgba(180, 220, 220, 0.55);
-  box-shadow: 0 8px 24px rgba(94, 170, 180, 0.15);
-  z-index: 40;
+}
+
+.settings-chevron {
+  color: var(--ink-3);
 }
 
 .settings-row {
@@ -1298,23 +1302,6 @@ body {
 .settings-reset:disabled {
   opacity: 0.45;
   cursor: default;
-}
-
-.settings-pop > button:not(.settings-row):not(.settings-reset) {
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: transparent;
-  padding: 8px 10px;
-  border-radius: 8px;
-  font: inherit;
-  font-size: 13px;
-  color: var(--ink-2);
-  cursor: pointer;
-}
-
-.settings-pop > button:not(.settings-row):not(.settings-reset):hover {
-  background: #eef8f7;
 }
 
 .toast {

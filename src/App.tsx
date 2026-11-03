@@ -483,12 +483,16 @@ function App() {
         if (shortcutRecordingRef.current) {
           return;
         }
+        if (settingsOpen) {
+          setSettingsOpen(false);
+          return;
+        }
         onCollapsePanel();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCollapsePanel]);
+  }, [onCollapsePanel, settingsOpen]);
 
   useEffect(() => {
     if (captureBoot || !isTauri) return;
@@ -740,32 +744,16 @@ function App() {
                 </button>
               ) : null}
               {inMain ? (
-                <div className="settings-menu">
-                  <button
-                    type="button"
-                    className="btn-icon"
-                    aria-label="设置"
-                    title="设置"
-                    aria-expanded={settingsOpen}
-                    onClick={() => setSettingsOpen((o) => !o)}
-                  >
+                <button
+                  type="button"
+                  className={`btn-icon${settingsOpen ? " is-active" : ""}`}
+                  aria-label="设置"
+                  title="设置"
+                  aria-pressed={settingsOpen}
+                  onClick={() => setSettingsOpen((o) => !o)}
+                >
                     <Icon d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-                  </button>
-                  {settingsOpen ? (
-                    <div className="settings-pop">
-                      <SettingsShortcutRow
-                        active={settingsOpen}
-                        initialDisplay={captureBoot?.toggleShortcutDisplay}
-                        skipInvoke={captureBoot?.skipInvoke}
-                        onToast={setToast}
-                        onRecordingChange={handleShortcutRecordingChange}
-                      />
-                      <button type="button" onClick={replayIntro}>
-                        查看引导
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
+                </button>
               ) : null}
               <button
                 type="button"
@@ -782,7 +770,7 @@ function App() {
           {loadError ? <p className="banner-error">{loadError}</p> : null}
 
           <div className="panel-body">
-            {inMain && projectCount > 0 ? (
+            {inMain && projectCount > 0 && !settingsOpen ? (
               <div className="risk" role="status">
                 <span className="ico">!</span>
                 <span>一键会暂存、提交并推送到远端哦</span>
@@ -800,6 +788,33 @@ function App() {
                 }
                 onStart={finishIntro}
               />
+            ) : settingsOpen && inMain ? (
+              <div className="settings">
+                <div className="settings-list">
+                  <SettingsShortcutRow
+                    active={settingsOpen}
+                    initialDisplay={captureBoot?.toggleShortcutDisplay}
+                    skipInvoke={captureBoot?.skipInvoke}
+                    onToast={setToast}
+                    onRecordingChange={handleShortcutRecordingChange}
+                  />
+                  <button type="button" className="settings-row" onClick={replayIntro}>
+                    <span className="settings-row-label">查看引导</span>
+                    <span className="settings-chevron" aria-hidden>
+                      ›
+                    </span>
+                  </button>
+                </div>
+                <div className="settings-foot">
+                  <button
+                    type="button"
+                    className="btn-text"
+                    onClick={() => setSettingsOpen(false)}
+                  >
+                    返回
+                  </button>
+                </div>
+              </div>
             ) : preflightLoading ? (
               <PreflightGateView loading checks={preflight?.checks} />
             ) : isCheckOpen && isEnvFailed && preflight ? (
