@@ -556,10 +556,14 @@ body {
 }
 
 .panel-body {
-  flex: 1;
+  flex: 0 1 auto;
   overflow: auto;
-  padding: 0 16px 16px;
   min-height: 0;
+  transition: height 0.24s ease;
+}
+
+.panel-body-inner {
+  padding: 0 16px 16px;
 }
 
 /* Tauri macOS 的 WKWebView 走 webkit 伪元素 */

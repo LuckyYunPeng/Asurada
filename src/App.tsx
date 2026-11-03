@@ -244,6 +244,8 @@ function App() {
     kind: ToastKind;
   } | null>(() => captureBoot?.toast ?? null);
   const cloudRef = useRef<HTMLDivElement>(null);
+  const bodyInnerRef = useRef<HTMLDivElement>(null);
+  const [bodyHeight, setBodyHeight] = useState<number | null>(null);
   const [rowOrder, setRowOrder] = useState<string[]>([]);
   // 重复添加时闪烁高亮的已有项目
   const [flashId, setFlashId] = useState<string | null>(null);
@@ -467,6 +469,18 @@ function App() {
   }, [toast]);
 
   // 按云朵实际高度给窗口留位，文案长短不同时 Tag 不会被盖住
+  // 面板内容高度变化（切页、增删项目）时，用显式高度做过渡动画
+  useLayoutEffect(() => {
+    const el = bodyInnerRef.current;
+    if (!panelOpen || !el) {
+      setBodyHeight(null);
+      return;
+    }
+    const observer = new ResizeObserver(() => setBodyHeight(el.offsetHeight));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [panelOpen]);
+
   useLayoutEffect(() => {
     const el = cloudRef.current;
     if (panelOpen || !el) {
@@ -780,7 +794,11 @@ function App() {
 
           {loadError ? <p className="banner-error">{loadError}</p> : null}
 
-          <div className="panel-body">
+          <div
+            className="panel-body"
+            style={bodyHeight === null ? undefined : { height: bodyHeight }}
+          >
+            <div ref={bodyInnerRef} className="panel-body-inner">
             {inMain && projectCount > 0 && !settingsOpen ? (
               <div className="risk" role="status">
                 <span className="ico">!</span>
@@ -873,6 +891,7 @@ function App() {
                 ))}
               </ul>
             )}
+            </div>
           </div>
         </aside>
       ) : null}
