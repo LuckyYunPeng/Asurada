@@ -1,6 +1,6 @@
 # Asurada 工程落地图帧
 
-由真实 React 壳（`npm run dev:web` + `?capture=` 场景驱动）经 Playwright 截取，非设计 HTML mockup。
+由真实 React 壳（`pnpm dev:web` + `?capture=` 场景驱动）经 Playwright 截取，非设计 HTML mockup。
 
 | 文件 | 场景 |
 |---|---|
@@ -17,7 +17,7 @@
 重新生成：
 
 ```bash
-npm run dev:web
+pnpm dev:web
 node scripts/capture-artifacts.mjs
 ```
 

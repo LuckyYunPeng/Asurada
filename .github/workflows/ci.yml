@@ -19,11 +19,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
+          cache: pnpm
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -45,10 +48,10 @@ jobs:
             patchelf
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Typecheck and build frontend
-        run: npm run build
+        run: pnpm build
 
       - name: cargo check (Linux — macOS NSPanel 在 Actions macOS job 验证)
         run: cargo check --manifest-path src-tauri/Cargo.toml

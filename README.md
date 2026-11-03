@@ -53,20 +53,20 @@ cd src-tauri && cargo test preflight::
 ```bash
 git clone https://github.com/LuckyYunPeng/asurada.git
 cd asurada
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 仅前端壳（端口 **4721**，无 Tauri 命令）：
 
 ```bash
-npm run dev:web
+pnpm dev:web
 ```
 
 本地打 mac 包（与 CI 相同 bundles）：
 
 ```bash
-npm run tauri build -- --bundles app,dmg
+pnpm tauri build --bundles app,dmg
 # 产物：src-tauri/target/release/bundle/dmg/*.dmg
 #       src-tauri/target/release/bundle/macos/*.app
 ```
@@ -83,16 +83,16 @@ npm run tauri build -- --bundles app,dmg
 
 | 命令 | 说明 |
 |---|---|
-| `npm run dev:web` | Vite（4721） |
-| `npm run dev` | 完整 App |
-| `npm run tauri build` | 生产构建 |
-| `npm run capture:artifacts` | 需先 `npm run dev:web`，生成 `artifacts/*.png` |
+| `pnpm dev:web` | Vite（4721） |
+| `pnpm dev` | 完整 App |
+| `pnpm tauri build` | 生产构建 |
+| `pnpm capture:artifacts` | 需先 `pnpm dev:web`，生成 `artifacts/*.png` |
 
 ## CI/CD
 
 | Workflow | Runner | 作用 |
 |---|---|---|
-| [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) | `ubuntu-latest` | 前端 `npm run build`、`cargo check`、预检单元测试 |
+| [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) | `ubuntu-latest` | 前端 `pnpm build`、`cargo check`、预检单元测试 |
 | [`.github/workflows/build-macos.yml`](./.github/workflows/build-macos.yml) | `macos-latest` | 产出未签名 `.app` / `.dmg`（整体验收请下载此产物） |
 
 macOS 边缘吸附与 **NSPanel** 行为只能在 macOS 上验证；Linux CI 不跑 UI，但保证 Rust/前端可编译。

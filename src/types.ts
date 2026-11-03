@@ -29,6 +29,13 @@ export interface CommitPushResult {
   error?: string | null;
 }
 
+/** 后端广播的提交进度，主面板和 diff 窗口共用 */
+export interface ICommitPushEvent {
+  id: string;
+  phase: "running" | "done";
+  result: CommitPushResult | null;
+}
+
 export interface ProjectRowState {
   project: ProjectView;
   uiState: RowUiState;

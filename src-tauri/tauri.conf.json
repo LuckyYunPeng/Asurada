@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.asurada.app",
   "build": {
-    "beforeDevCommand": "npm run dev:web",
+    "beforeDevCommand": "pnpm dev:web",
     "devUrl": "http://localhost:4721",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "pnpm build",
     "frontendDist": "../dist"
   },
   "app": {

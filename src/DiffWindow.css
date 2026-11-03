@@ -1,4 +1,4 @@
-/* diff 独立窗口，复用 App.css 的变量与 .btn-primary。
+/* diff 独立窗口，复用 App.css 的变量；控件用 shadcn/ui。
    不要写 html/body 等全局样式，以免将来被主窗口引入时盖掉它的透明背景；全局设置在 DiffWindow.tsx 里用 JS 加 */
 .dw {
   /* 固定铺满，文档本身不产生滚动 */
@@ -82,54 +82,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.dw-seg {
-  display: inline-flex;
-  padding: 2px;
-  border-radius: 999px;
-  background: #eef8f7;
-}
-
-.dw-seg button {
-  appearance: none;
-  border: none;
-  background: transparent;
-  font: inherit;
-  font-size: 12px;
-  color: var(--ink-2);
-  padding: 4px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.dw-seg button.is-on {
-  background: #fff;
-  color: #1f7f8c;
-  font-weight: 600;
-  box-shadow: 0 1px 3px rgba(23, 18, 42, 0.1);
-}
-
-.dw-icon-btn {
-  appearance: none;
-  border: none;
-  background: transparent;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
-  color: var(--ink-3);
-  cursor: pointer;
-}
-
-.dw-icon-btn:hover:not(:disabled) {
-  background: rgba(94, 200, 212, 0.12);
-  color: #2a8a96;
-}
-
-.dw-icon-btn:disabled {
-  opacity: 0.45;
 }
 
 .dw-notice {

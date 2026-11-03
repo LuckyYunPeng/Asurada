@@ -7,7 +7,6 @@ import {
   useState,
 } from "react";
 import type { CSSProperties } from "react";
-import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -25,8 +24,18 @@ import {
   keyboardEventToShortcut,
 } from "./shortcutSettings";
 import { Toast, type ToastKind } from "./Toast";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type {
   CommitPushResult,
+  ICommitPushEvent,
   PreflightItem,
   PreflightResult,
   ProjectRowState,
@@ -166,6 +175,72 @@ function SettingsShortcutRow({
   );
 }
 
+interface IDiffWindowSize {
+  width: number;
+  height: number;
+}
+
+const DIFF_WINDOW_PRESETS: IDiffWindowSize[] = [
+  { width: 1280, height: 800 },
+  { width: 1440, height: 900 },
+  { width: 1680, height: 1050 },
+  { width: 1920, height: 1200 },
+];
+
+/** diff 窗口默认尺寸；用户拖拽窗口后后端会自动记下，这里显示的就是最新值 */
+function SettingsDiffSizeRow({ active, skipInvoke }: { active: boolean; skipInvoke?: boolean }) {
+  const [size, setSize] = useState<IDiffWindowSize>({ width: 1680, height: 1050 });
+
+  useEffect(() => {
+    if (!active || skipInvoke || !isTauri) {
+      return;
+    }
+    void invoke<IDiffWindowSize>("get_diff_window_size")
+      .then(setSize)
+      .catch((e) => console.error("读取 diff 窗口尺寸失败", e));
+  }, [active, skipInvoke]);
+
+  async function onChangeSize(value: string) {
+    const [width, height] = value.split("x").map(Number);
+    setSize({ width, height });
+    if (skipInvoke || !isTauri) {
+      return;
+    }
+    try {
+      setSize(await invoke<IDiffWindowSize>("set_diff_window_size", { width, height }));
+    } catch (e) {
+      console.error("设置 diff 窗口尺寸失败", e);
+    }
+  }
+
+  const value = `${size.width}x${size.height}`;
+  const isPreset = DIFF_WINDOW_PRESETS.some((p) => `${p.width}x${p.height}` === value);
+
+  return (
+    <div className="settings-row">
+      <span className="settings-row-label">变更窗口大小</span>
+      <Select value={value} onValueChange={(v) => void onChangeSize(v)}>
+        <SelectTrigger size="sm" className="settings-select">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent position="popper" align="end">
+          {/* 拖拽出来的非预设尺寸也要能显示 */}
+          {isPreset ? null : (
+            <SelectItem value={value}>
+              {size.width} × {size.height}（自定义）
+            </SelectItem>
+          )}
+          {DIFF_WINDOW_PRESETS.map((p) => (
+            <SelectItem key={`${p.width}x${p.height}`} value={`${p.width}x${p.height}`}>
+              {p.width} × {p.height}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 function SettingsAutostartRow({ skipInvoke }: { skipInvoke?: boolean }) {
   const [isEnabled, setIsEnabled] = useState(false);
 
@@ -195,12 +270,7 @@ function SettingsAutostartRow({ skipInvoke }: { skipInvoke?: boolean }) {
   return (
     <label className="settings-row">
       <span className="settings-row-label">开机自动启动</span>
-      <input
-        type="checkbox"
-        className="toggle toggle-sm settings-toggle"
-        checked={isEnabled}
-        onChange={() => void onToggleAutostart()}
-      />
+      <Switch checked={isEnabled} onCheckedChange={() => void onToggleAutostart()} />
     </label>
   );
 }
@@ -422,6 +492,65 @@ function App() {
     };
   }, [onCollapsePanel]);
 
+  const onCommitPushEvent = useCallback(async (event: ICommitPushEvent) => {
+    const { id, phase, result } = event;
+    if (phase === "running") {
+      setRows((prev) =>
+        prev.map((r) => (r.project.id === id ? { ...r, uiState: "running" } : r)),
+      );
+      return;
+    }
+    let refreshed: ProjectView | null = null;
+    try {
+      refreshed = await invoke<ProjectView>("refresh_project_status", { id });
+    } catch (e) {
+      console.error("刷新项目状态失败", e);
+    }
+    const isSuccess = !!(result?.success && result.commitMessage);
+    const message = isSuccess
+      ? summarizeCommitMessage(result?.commitMessage ?? "")
+      : (result?.error ?? "提交失败");
+    setToast(
+      isSuccess
+        ? { title: "已推送", message, kind: "ok" }
+        : { title: "失败", message, kind: "err" },
+    );
+    setRows((prev) =>
+      prev.map((r) =>
+        r.project.id === id
+          ? {
+              project: refreshed ?? r.project,
+              uiState: isSuccess ? "success" : "failure",
+              resultSummary: isSuccess ? `已推送 · ${message}` : message,
+            }
+          : r,
+      ),
+    );
+    if (isSuccess) {
+      // 成功绿色只短暂提示，之后回到普通灰色
+      setTimeout(() => {
+        setRows((prev) =>
+          prev.map((r) =>
+            r.project.id === id && r.uiState === "success"
+              ? { project: r.project, uiState: "idle" }
+              : r,
+          ),
+        );
+      }, 3000);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (captureBoot || !isTauri) return;
+    let unlisten: (() => void) | undefined;
+    void listen<ICommitPushEvent>("commit-push", (event) => {
+      void onCommitPushEvent(event.payload);
+    }).then((stop) => {
+      unlisten = stop;
+    });
+    return () => unlisten?.();
+  }, [onCommitPushEvent]);
+
   useEffect(() => {
     if (captureBoot || !isTauri) return;
     let unlisten: (() => void) | undefined;
@@ -588,82 +717,15 @@ function App() {
     }
   }
 
+  // 状态由后端 commit-push 事件驱动（见下方 useEffect），diff 窗口发起的提交也会同步过来
   async function handleCommitPush(row: ProjectRowState) {
     if (!inMain || row.project.gitClean || row.uiState === "running") {
       return;
     }
-
-    setRows((prev) =>
-      prev.map((r) =>
-        r.project.id === row.project.id ? { ...r, uiState: "running" } : r,
-      ),
-    );
-
     try {
-      const result = await invoke<CommitPushResult>("run_commit_push", {
-        id: row.project.id,
-      });
-      const refreshed = await invoke<ProjectView>("refresh_project_status", {
-        id: row.project.id,
-      });
-
-      if (result.success && result.commitMessage) {
-        const summary = `已推送 · ${summarizeCommitMessage(result.commitMessage)}`;
-        setToast({
-          title: "已推送",
-          message: summarizeCommitMessage(result.commitMessage),
-          kind: "ok",
-        });
-        setRows((prev) =>
-          prev.map((r) =>
-            r.project.id === row.project.id
-              ? {
-                  project: refreshed,
-                  uiState: "success",
-                  resultSummary: summary,
-                }
-              : r,
-          ),
-        );
-        // 成功绿色只短暂提示，之后回到普通灰色
-        setTimeout(() => {
-          setRows((prev) =>
-            prev.map((r) =>
-              r.project.id === row.project.id && r.uiState === "success"
-                ? { project: r.project, uiState: "idle" }
-                : r,
-            ),
-          );
-        }, 3000);
-      } else {
-        const errMsg = result.error ?? "提交失败";
-        setToast({ title: "失败", message: errMsg, kind: "err" });
-        setRows((prev) =>
-          prev.map((r) =>
-            r.project.id === row.project.id
-              ? {
-                  project: refreshed,
-                  uiState: "failure",
-                  resultSummary: errMsg,
-                }
-              : r,
-          ),
-        );
-      }
+      await invoke<CommitPushResult>("run_commit_push", { id: row.project.id });
     } catch (e) {
-      const errMsg = String(e);
-      setToast({ title: "失败", message: errMsg, kind: "err" });
-      setRows((prev) =>
-        prev.map((r) =>
-          r.project.id === row.project.id
-            ? {
-                ...r,
-                uiState: "failure",
-                resultSummary: errMsg,
-              }
-            : r,
-        ),
-      );
+      console.error("提交并推送失败", e);
     }
   }
 
@@ -826,6 +888,10 @@ function App() {
                     skipInvoke={captureBoot?.skipInvoke}
                     onToast={setToast}
                     onRecordingChange={handleShortcutRecordingChange}
+                  />
+                  <SettingsDiffSizeRow
+                    active={settingsOpen}
+                    skipInvoke={captureBoot?.skipInvoke}
                   />
                   <SettingsAutostartRow skipInvoke={captureBoot?.skipInvoke} />
                   <button type="button" className="settings-row" onClick={replayIntro}>
@@ -1049,69 +1115,28 @@ function PreflightCheckRow({
   );
 }
 
+/** 提交信息最多两行；被截断时悬停显示完整内容 */
 function CommitTip({ text }: { text: string }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const [tip, setTip] = useState<{
-    top: number;
-    left: number;
-    width: number;
-    height: number;
-  } | null>(null);
-
-  useLayoutEffect(() => {
-    setTip(null);
-  }, [text]);
-
-  useEffect(() => {
-    if (!tip) {
-      return;
-    }
-    const onScroll = () => setTip(null);
-    window.addEventListener("scroll", onScroll, true);
-    return () => window.removeEventListener("scroll", onScroll, true);
-  }, [tip]);
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <>
-      <span
-        ref={ref}
-        className="status-text"
-        onMouseEnter={() => {
-          const el = ref.current;
-          if (!el || el.scrollHeight <= el.clientHeight + 1) {
-            return;
-          }
-          const rect = el.getBoundingClientRect();
-          setTip({
-            top: rect.top,
-            left: rect.left,
-            width: rect.width,
-            height: rect.height,
-          });
-        }}
-        onMouseLeave={() => setTip(null)}
-      >
+    <Tooltip
+      open={isOpen}
+      onOpenChange={(open) => {
+        const el = ref.current;
+        setIsOpen(open && !!el && el.scrollHeight > el.clientHeight + 1);
+      }}
+    >
+      <TooltipTrigger asChild>
+        <span ref={ref} className="status-text">
+          {text}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" align="start" className="max-w-[220px]">
         {text}
-      </span>
-      {tip
-        ? createPortal(
-            <div
-              className="commit-tip tooltip tooltip-open tooltip-top tooltip-start"
-              data-tip={text}
-              style={{
-                position: "fixed",
-                top: tip.top,
-                left: tip.left,
-                width: tip.width,
-                height: tip.height,
-                zIndex: 40,
-                pointerEvents: "none",
-              }}
-            />,
-            document.body,
-          )
-        : null}
-    </>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

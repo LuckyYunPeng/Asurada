@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { isHighlighterLoaded, parsePatchFiles, type FileDiffMetadata } from "@pierre/diffs";
 import { FileDiff, Virtualizer } from "@pierre/diffs/react";
 import logoUrl from "./assets/asurada-logo.png";
-import type { CommitPushResult } from "./types";
+import type { CommitPushResult, ICommitPushEvent } from "./types";
+import { RefreshCw, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import "./App.css";
 import "./DiffWindow.css";
 
@@ -64,6 +71,15 @@ const DIFF_UNSAFE_CSS = `
 `;
 
 const DIFF_STYLE_KEY = "asurada.diffStyle";
+const SHOW_TESTS_KEY = "asurada.diffShowTests";
+
+// 测试目录（tests/、__tests__/、spec/、e2e/ 等）和常见测试文件命名（*.test.ts、*_test.go、test_*.py、FooTest.java）
+const TEST_FILE_RE =
+  /(^|\/)(__tests__|__mocks__|__snapshots__|tests?|specs?|e2e)\/|\.(test|spec)\.[^/]+$|(^|\/)test_[^/]+\.py$|_test\.(go|py|rs|exs?)$|(Tests?|Spec)\.(java|kt|swift|cs|scala)$/i;
+
+function isTestFile(name: string) {
+  return TEST_FILE_RE.test(name);
+}
 const SIDEBAR_WIDTH_KEY = "asurada.diffSidebarWidth";
 
 function toEntries(diff: IProjectDiff): IDiffEntry[] {
@@ -124,6 +140,10 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
     () => Number(localStorage.getItem(SIDEBAR_WIDTH_KEY)) || 260,
   );
   const [filter, setFilter] = useState("");
+  // 默认不看测试文件；只影响查看，提交时仍会一起提交
+  const [isShowTests, setIsShowTests] = useState(
+    () => localStorage.getItem(SHOW_TESTS_KEY) === "1",
+  );
   const [selectedName, setSelectedName] = useState<string | null>(null);
   // 首次语法高亮完成前，库会画灰色骨架线；用 logo 动画盖住
   const [isRendered, setIsRendered] = useState(false);
@@ -177,6 +197,11 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
   }, [isRendered]);
 
 
+  function onToggleShowTests() {
+    setIsShowTests(!isShowTests);
+    localStorage.setItem(SHOW_TESTS_KEY, isShowTests ? "0" : "1");
+  }
+
   function onChangeDiffStyle(style: TDiffStyle) {
     setDiffStyle(style);
     localStorage.setItem(DIFF_STYLE_KEY, style);
@@ -210,32 +235,55 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
     }
   }
 
-  async function onCommit() {
-    setIsCommitting(true);
-    setNotice(null);
-    try {
-      const result = await invoke<CommitPushResult>("run_commit_push", { id: projectId });
+  // 提交状态以后端为准：主面板发起的提交也会在这里显示"提交中…"
+  useEffect(() => {
+    void invoke<string[]>("get_committing_ids")
+      .then((ids) => setIsCommitting(ids.includes(projectId)))
+      .catch((e) => console.error("读取提交状态失败", e));
+    let unlisten: (() => void) | undefined;
+    void listen<ICommitPushEvent>("commit-push", ({ payload }) => {
+      if (payload.id !== projectId) {
+        return;
+      }
+      setIsCommitting(payload.phase === "running");
+      if (payload.phase === "running") {
+        setNotice(null);
+        return;
+      }
       setNotice(
-        result.success
-          ? { kind: "ok", text: `已推送 · ${result.commitMessage ?? ""}` }
-          : { kind: "err", text: result.error ?? "提交失败" },
+        payload.result?.success
+          ? { kind: "ok", text: `已推送 · ${payload.result.commitMessage ?? ""}` }
+          : { kind: "err", text: payload.result?.error ?? "提交失败" },
       );
+      void fetchDiff();
+    }).then((stop) => {
+      unlisten = stop;
+    });
+    return () => unlisten?.();
+  }, [projectId, fetchDiff]);
+
+  async function onCommit() {
+    try {
+      await invoke<CommitPushResult>("run_commit_push", { id: projectId });
     } catch (e) {
       console.error("提交并推送失败", e);
       setNotice({ kind: "err", text: String(e) });
-    } finally {
-      setIsCommitting(false);
-      void fetchDiff();
     }
   }
 
-  const visibleEntries = entries.filter((e) =>
-    e.file.name.toLowerCase().includes(filter.trim().toLowerCase()),
+  const testCount = entries.filter((e) => isTestFile(e.file.name)).length;
+  // 头部统计跟随开关：隐藏的测试文件不计入
+  const countedEntries = isShowTests ? entries : entries.filter((e) => !isTestFile(e.file.name));
+  const visibleEntries = entries.filter(
+    (e) =>
+      (isShowTests || !isTestFile(e.file.name)) &&
+      e.file.name.toLowerCase().includes(filter.trim().toLowerCase()),
   );
-  // 只渲染选中的一个文件；刷新后原文件已不在变更里时回到第一个
-  const selected = entries.find((e) => e.file.name === selectedName) ?? entries[0];
-  const totalAdditions = entries.reduce((n, e) => n + e.additions, 0);
-  const totalDeletions = entries.reduce((n, e) => n + e.deletions, 0);
+  // 只渲染选中的一个文件；选中的被筛掉或刷新后已不在变更里时回到第一个
+  const selected =
+    visibleEntries.find((e) => e.file.name === selectedName) ?? visibleEntries[0];
+  const totalAdditions = countedEntries.reduce((n, e) => n + e.additions, 0);
+  const totalDeletions = countedEntries.reduce((n, e) => n + e.deletions, 0);
 
   // ↑/↓ 在当前筛选结果里切换文件；筛选框里输入时也可用
   useEffect(() => {
@@ -280,44 +328,73 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
           <strong>{diff?.displayName ?? "加载中…"}</strong>
           {entries.length ? (
             <>
-              <span className="dw-sub">{entries.length} 个文件</span>
+              <span className="dw-sub">{countedEntries.length} 个文件</span>
               <DiffCount additions={totalAdditions} deletions={totalDeletions} />
             </>
           ) : null}
         </div>
         <div className="dw-actions">
-          <div className="dw-seg" role="group" aria-label="对比方式">
-            {(["unified", "split"] as const).map((style) => (
-              <button
-                key={style}
-                type="button"
-                className={diffStyle === style ? "is-on" : undefined}
-                onClick={() => onChangeDiffStyle(style)}
-              >
-                {style === "unified" ? "上下" : "左右"}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            className="dw-icon-btn"
-            aria-label="刷新"
-            title="刷新"
-            disabled={isLoading}
-            onClick={() => void fetchDiff()}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground select-none">
+                <Switch checked={isShowTests} onCheckedChange={onToggleShowTests} />
+                <span>
+                  显示测试文件
+                  {!isShowTests && testCount ? (
+                    <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[11px] font-normal">
+                      已隐藏 {testCount}
+                    </Badge>
+                  ) : null}
+                </span>
+              </label>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              只影响查看，隐藏的测试文件提交时仍会一起提交
+            </TooltipContent>
+          </Tooltip>
+          <ToggleGroup
+            type="single"
+            size="sm"
+            variant="outline"
+            spacing={0}
+            value={diffStyle}
+            aria-label="对比方式"
+            onValueChange={(v) => {
+              if (v) {
+                onChangeDiffStyle(v as TDiffStyle);
+              }
+            }}
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M21 12a9 9 0 1 1-2.64-6.36L21 8M21 3v5h-5" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className={`btn-primary${isCommitting ? " busy" : ""}`}
+            <ToggleGroupItem value="unified" className="px-3 text-xs">
+              上下
+            </ToggleGroupItem>
+            <ToggleGroupItem value="split" className="px-3 text-xs">
+              左右
+            </ToggleGroupItem>
+          </ToggleGroup>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="刷新"
+                disabled={isLoading}
+                onClick={() => void fetchDiff()}
+              >
+                <RefreshCw className={isLoading ? "animate-spin" : undefined} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">刷新</TooltipContent>
+          </Tooltip>
+          <Button
+            size="sm"
+            className="px-4"
             disabled={isCommitting || !entries.length}
             onClick={() => void onCommit()}
           >
+            {isCommitting ? <Loader2 className="animate-spin" /> : null}
             {isCommitting ? "提交中…" : "提交并推送"}
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -334,9 +411,9 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
         <div className="dw-state">
           <p>读取变更失败</p>
           <pre>{error}</pre>
-          <button type="button" className="btn-primary" onClick={() => void fetchDiff()}>
+          <Button size="sm" onClick={() => void fetchDiff()}>
             重试
-          </button>
+          </Button>
         </div>
       ) : !diff ? (
         <div className="dw-state">
@@ -388,7 +465,8 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
                 <LogoLoading />
               </div>
             )}
-            {/* key 随文件变化，切换文件时滚动位置回到顶部 */}
+            {selected ? (
+            /* key 随文件变化，切换文件时滚动位置回到顶部 */
             <Virtualizer
               key={selected.file.name}
               className="dw-scroll"
@@ -401,7 +479,6 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
                     theme: "pierre-light",
                     themeType: "light",
                     diffStyle,
-                    stickyHeader: true,
                     overflow: "scroll",
                     // 行首用 +/- 号，不靠颜色也能分清增删
                     diffIndicators: "classic",
@@ -424,6 +501,11 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
                 ) : null}
               </section>
             </Virtualizer>
+            ) : (
+              <div className="dw-state">
+                <p>{filter.trim() ? "没有匹配的文件" : "只有测试文件有变更，打开右上角开关查看"}</p>
+              </div>
+            )}
           </div>
         </div>
       )}
