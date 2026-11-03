@@ -43,7 +43,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build Tauri (unsigned)
-        run: pnpm tauri build -- --bundles app,dmg
+        run: pnpm exec tauri build --bundles app,dmg
         env:
           CI: true
           # 未配置签名时 Tauri 产出未签名 .app / .dmg（本地 Gatekeeper 需右键打开或 ad-hoc 信任）
