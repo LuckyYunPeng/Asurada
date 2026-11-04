@@ -4,6 +4,10 @@
 
 <h1 align="center">Asurada</h1>
 
+<p align="center">
+  <a href="./README.md">English</a> · <strong>简体中文</strong> · <a href="./README.zh-TW.md">繁體中文</a> · <a href="./README.ja.md">日本語</a> · <a href="./README.ko.md">한국어</a>
+</p>
+
 <p align="center"><strong>AI 写代码，但你得看懂自己的项目。</strong></p>
 
 <p align="center">

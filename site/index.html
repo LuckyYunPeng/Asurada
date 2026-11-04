@@ -265,6 +265,7 @@
   .feature ul { margin-top: 22px; list-style: none; display: grid; gap: 12px; }
   .feature li { display: flex; gap: 10px; color: var(--muted); }
   .feature li::before { content: "✦"; color: var(--violet); }
+  .feature li.soon { color: var(--fg); }
   .commit-sample {
     display: block; width: fit-content; margin-top: 8px; padding: 6px 12px; border-radius: 8px; font-size: 14px;
     color: var(--fg); background: rgba(255, 255, 255, .05); border: 1px solid var(--line);
@@ -456,7 +457,7 @@
         <ul>
           <li data-i18n="diff1">隐藏测试文件，聚焦业务改动</li>
           <li data-i18n="diff2">左右 / 上下两种对比布局，色弱友好配色</li>
-          <li data-i18n="diff3">看到可疑处，直接跳到编辑器打开</li>
+          <li class="soon"><span data-i18n="diff3">看到看不懂的改动，直接让 AI 讲解<span class="soon-tag">即将推出</span></span></li>
         </ul>
       </div>
       <div class="shot reveal d2"><img src="./assets/diff.jpg" alt="差异窗口" data-i18n-alt="altDiff"></div>
@@ -490,7 +491,7 @@
     <div class="grid">
       <div class="card reveal"><div class="icon">🧠</div><h3 data-i18n="g1Title">对话里没有噪音</h3><p data-i18n="g1Desc">提交用的 diff 和 git 输出不进主对话，Agent 的上下文只留给核心工作。</p></div>
       <div class="card reveal d1"><div class="icon">🎯</div><h3 data-i18n="g2Title">一眼锁定待处理的项目</h3><p data-i18n="g2Desc">有改动的项目自动排在最前，没改动的自动变灰，不用在项目之间翻找。</p></div>
-      <div class="card reveal"><div class="icon">🛡️</div><h3 data-i18n="g3Title">Git 杂事不打扰你</h3><p data-i18n="g3Desc">同步、重试、冲突撤回自动处理，注意力不会被琐碎的 Git 操作分走。</p></div>
+      <div class="card reveal"><div class="icon">🔍</div><h3 data-i18n="g3Title">聚焦核心代码和逻辑</h3><p data-i18n="g3Desc">同步、重试、冲突撤回这些 Git 杂事自动处理，你的注意力只留给核心代码和业务逻辑。</p></div>
       <div class="card reveal d1"><div class="icon">⚡</div><h3 data-i18n="g4Title">用完即走</h3><p data-i18n="g4Desc">平时只是屏幕边缘的小标签；按 ⌃E 呼出，Review 完就收起，不占你的屏幕和注意力。</p></div>
     </div>
   </div>
@@ -564,7 +565,7 @@
     diffLead: 'The diff window is your review desk: changes laid out by folder, noise tucked away, key lines compared side by side.',
     diff1: 'Hide test files and focus on business logic',
     diff2: 'Split or unified layout, color-blind friendly palette',
-    diff3: 'Spot something odd? Jump straight to your editor',
+    diff3: 'Don\'t get a change? Ask AI to explain it on the spot<span class="soon-tag">Coming soon</span>',
     altDiff: 'Diff window',
     commitTitle: 'Done reviewing?<br><span class="grad-text">Wrap up in one click</span>',
     commitLead: 'All your projects on one screen, the ones with changes first. Finish your review, click once, and let Asurada handle the rest.',
@@ -581,8 +582,8 @@
     g1Desc: 'Diffs and git output for commits never enter your main conversation. Your agent\'s context stays on the core work.',
     g2Title: 'Spot what needs you at a glance',
     g2Desc: 'Projects with changes float to the top, untouched ones are grayed out. No hunting across projects.',
-    g3Title: 'Git chores stay out of your way',
-    g3Desc: 'Syncing, retrying and backing out of conflicts happen automatically, so git busywork never steals your focus.',
+    g3Title: 'Focus on the core code and logic',
+    g3Desc: 'Syncing, retrying and backing out of conflicts are handled for you, so your attention stays on the core code and business logic.',
     g4Title: 'There when you need it, gone when you don\'t',
     g4Desc: 'Just a small tab at the screen edge. Press ⌃E to open, tuck it away after review — no screen space, no distraction.',
     finalTitle: 'Let AI write the code,<br><span class="grad-text">and you understand the project</span>',
