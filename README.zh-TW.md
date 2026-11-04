@@ -11,6 +11,7 @@
 <p align="center"><strong>AI 寫程式，但你得看懂自己的專案。</strong></p>
 
 <p align="center">
+  <a href="https://asurada-4yq.pages.dev/"><img src="https://img.shields.io/badge/%E5%AE%98%E7%B6%B2-asurada--4yq.pages.dev-8b5cf6" alt="官網"></a>
   <a href="https://github.com/LuckyYunPeng/asurada/actions/workflows/build-macos.yml"><img src="https://github.com/LuckyYunPeng/asurada/actions/workflows/build-macos.yml/badge.svg" alt="Build macOS"></a>
   <a href="https://github.com/LuckyYunPeng/asurada/releases"><img src="https://img.shields.io/github/downloads/LuckyYunPeng/asurada/total" alt="Downloads"></a>
 </p>
