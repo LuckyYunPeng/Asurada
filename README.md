@@ -97,6 +97,15 @@ pnpm tauri build --bundles app,dmg
 只支持 macOS（Apple Silicon）。
 
 - 触发：`push` tag `v*`、手动 **workflow_dispatch**
+
+## 发版
+
+```bash
+scripts/release.sh 0.2.0 notes.md          # notes.md 是本次更新说明（markdown）
+scripts/release.sh 0.2.0 notes.md --dry-run # 只预览改动，不提交
+```
+
+脚本会改好四处版本号（`tauri.conf.json`、`package.json`、`Cargo.toml`、`Cargo.lock`），把说明插到 `CHANGELOG.md` 顶部，提交「chore: 发布 vX.Y.Z」并推送 main 和 tag。CI 随后签名、公证并发布 GitHub Release，Release 正文取自 `CHANGELOG.md` 对应段落，已安装的 App 会提示更新。
 - DMG 产物名：`asurada-macos-<sha>`（及 tag 时 `asurada-macos-release-<tag>`）
 
 ## 许可证
