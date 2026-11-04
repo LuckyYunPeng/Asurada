@@ -11,6 +11,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openPath } from "@tauri-apps/plugin-opener";
+import { getVersion } from "@tauri-apps/api/app";
+import { check, type Update } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { bootstrapCapture, getCaptureScene } from "./captureMode";
 import logoUrl from "./assets/asurada-logo.png";
 import {
@@ -307,6 +310,97 @@ function SettingsConfirmCommitRow() {
   );
 }
 
+/** 设置里的版本行：显示当前版本，点「检查更新」查 GitHub Release；有新版本时变成「更新到 x.y.z」，点了下载安装并重启 */
+function SettingsUpdateRow({
+  skipInvoke,
+  pendingUpdate,
+  onFoundUpdate,
+}: {
+  skipInvoke?: boolean;
+  pendingUpdate: Update | null;
+  onFoundUpdate: (update: Update | null) => void;
+}) {
+  const [version, setVersion] = useState("");
+  const [status, setStatus] = useState<"idle" | "checking" | "latest" | "installing" | "error">("idle");
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (skipInvoke || !isTauri) {
+      return;
+    }
+    void getVersion()
+      .then(setVersion)
+      .catch((e) => console.error("读取版本号失败", e));
+  }, [skipInvoke]);
+
+  async function onCheckUpdate() {
+    setStatus("checking");
+    try {
+      const update = await check();
+      onFoundUpdate(update);
+      setStatus(update ? "idle" : "latest");
+    } catch (e) {
+      console.error("检查更新失败", e);
+      setStatus("error");
+    }
+  }
+
+  async function onInstallUpdate() {
+    if (!pendingUpdate) {
+      return;
+    }
+    setStatus("installing");
+    let total = 0;
+    let downloaded = 0;
+    try {
+      await pendingUpdate.downloadAndInstall((event) => {
+        if (event.event === "Started") {
+          total = event.data.contentLength ?? 0;
+        } else if (event.event === "Progress") {
+          downloaded += event.data.chunkLength;
+          setProgress(total ? Math.round((downloaded / total) * 100) : 0);
+        }
+      });
+      await relaunch();
+    } catch (e) {
+      console.error("安装更新失败", e);
+      setStatus("error");
+    }
+  }
+
+  const statusText = {
+    idle: "",
+    checking: "检查中…",
+    latest: "已是最新",
+    installing: progress ? `下载中 ${progress}%` : "下载中…",
+    error: "更新失败，稍后再试",
+  }[status];
+
+  return (
+    <div className={SETTINGS_ROW_CLASS}>
+      <span>
+        版本 <span className="font-mono">{version || "—"}</span>
+        {statusText ? <span className="ml-2 text-xs text-muted-foreground">{statusText}</span> : null}
+      </span>
+      {pendingUpdate ? (
+        <Button size="sm" disabled={status === "installing"} onClick={() => void onInstallUpdate()}>
+          {status === "installing" ? <Loader2 className="animate-spin" /> : null}
+          更新到 {pendingUpdate.version}
+        </Button>
+      ) : (
+        <Button
+          variant="secondary"
+          size="sm"
+          disabled={status === "checking"}
+          onClick={() => void onCheckUpdate()}
+        >
+          检查更新
+        </Button>
+      )}
+    </div>
+  );
+}
+
 const THEME_OPTIONS = [
   { value: ThemeModeEnum.Light, label: "亮色", icon: Sun },
   { value: ThemeModeEnum.Dark, label: "深色", icon: Moon },
@@ -544,6 +638,27 @@ function App() {
       void runPreflight();
     }
   }, [introComplete, inIntro, runPreflight]);
+
+  // 启动后静默检查一次更新：有新版本只提示，不自动安装（会重启，可能打断正在进行的提交）
+  const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null);
+  useEffect(() => {
+    if (captureBoot || !isTauri) {
+      return;
+    }
+    void check()
+      .then((update) => {
+        if (update) {
+          setPendingUpdate(update);
+          setToast({
+            title: `有新版本 ${update.version}`,
+            message: "打开设置即可更新",
+            kind: "info",
+          });
+        }
+      })
+      // 离线、还没发过 Release 时都会失败，不打扰用户
+      .catch((e) => console.error("检查更新失败", e));
+  }, []);
 
   useEffect(() => {
     if (captureBoot || !isTauri) return;
@@ -971,6 +1086,11 @@ function App() {
                   />
                   <SettingsConfirmCommitRow />
                   <SettingsAutostartRow skipInvoke={captureBoot?.skipInvoke} />
+                  <SettingsUpdateRow
+                    skipInvoke={captureBoot?.skipInvoke}
+                    pendingUpdate={pendingUpdate}
+                    onFoundUpdate={setPendingUpdate}
+                  />
                   <button type="button" className={SETTINGS_ROW_CLASS} onClick={replayIntro}>
                     <span>查看引导</span>
                     <ChevronRight className="size-4 text-muted-foreground" aria-hidden />

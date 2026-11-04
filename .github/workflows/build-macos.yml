@@ -16,6 +16,9 @@ jobs:
   build-macos:
     runs-on: macos-latest
     timeout-minutes: 60
+    # 打 v* 标签时要创建 Release 并上传文件
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,16 +45,16 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      # 普通推送和 PR：只打包验收，不生成更新包（不需要私钥）
       - name: Build Tauri (unsigned)
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         run: pnpm tauri build -- --bundles app,dmg
         env:
           CI: true
-          # 未配置签名时 Tauri 产出未签名 .app / .dmg（本地 Gatekeeper 需右键打开或 ad-hoc 信任）
-          # 正式分发需后续在仓库 Secrets 配置：
-          # APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
-          # APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID 及公证相关变量
+          # 验收包不签名；正式签名、公证只在下方打标签发版时进行
 
       - name: Upload macOS bundles
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         uses: actions/upload-artifact@v4
         with:
           name: asurada-macos-${{ github.sha }}
@@ -61,13 +64,35 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload on tag (release files)
+      # 公证用的 App Store Connect API Key：Secret 里是 .p8 内容，Tauri 要的是文件路径
+      - name: Write notarization API key
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: actions/upload-artifact@v4
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          key_path="$RUNNER_TEMP/AuthKey.p8"
+          printf '%s' "$APPLE_API_KEY_P8" > "$key_path"
+          echo "APPLE_API_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+
+      # 打 v* 标签：用个人 Developer ID 签名并公证，生成并签名更新包，发布 GitHub Release，附带 latest.json 供 App 内在线更新
+      - name: Build and publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Tauri 会把证书导入临时钥匙串并签名，签名身份写死为个人账号，避免误用其他证书
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: "Developer ID Application: Jinjing Zhou (2WHP7P8PG6)"
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         with:
-          name: asurada-macos-release-${{ github.ref_name }}
-          path: |
-            src-tauri/target/release/bundle/macos/*.app
-            src-tauri/target/release/bundle/dmg/*.dmg
-          if-no-files-found: error
-          retention-days: 90
+          tagName: ${{ github.ref_name }}
+          releaseName: Asurada ${{ github.ref_name }}
+          releaseBody: 下载 dmg 安装；已安装的版本会在 App 内提示更新。
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
+          args: --bundles app,dmg --config '{"bundle":{"createUpdaterArtifacts":true}}'

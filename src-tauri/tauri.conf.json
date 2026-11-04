@@ -28,6 +28,14 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcyMUU4QkUxREREODVFODcKUldTSFh0amQ0WXNlY2l5dytZVVhSdFhJSHBtTEcwUDdRTnpOb0ZPblZOK1UyQWxRZnp5ZGliRzMK",
+      "endpoints": [
+        "https://github.com/LuckyYunPeng/asurada/releases/latest/download/latest.json"
+      ]
+    }
+  },
   "bundle": {
     "active": true,
     "targets": ["app", "dmg"],
