@@ -146,13 +146,16 @@
     position: relative; margin-top: 70px; width: min(1100px, 100%);
     perspective: 1800px;
   }
-  .stage .desk {
-    width: 100%; border-radius: 16px; border: 1px solid var(--line);
+  /* 电脑屏幕：截图、面板、快捷键提示同在其中，一起倾斜；overflow 裁切让面板从屏幕右边缘滑进滑出 */
+  .stage .screen {
+    position: relative; overflow: hidden;
+    border-radius: 16px; border: 1px solid var(--line);
     box-shadow: 0 40px 120px -30px rgba(139, 92, 246, .55);
     transform: rotateX(14deg); transform-origin: top center;
     /* backwards：结束后不保留关键帧，否则会压过滚动时设的 transform */
     animation: tilt-in 1.4s cubic-bezier(.2, .8, .2, 1) .2s backwards;
   }
+  .stage .desk { display: block; width: 100%; }
   @keyframes tilt-in {
     from { opacity: 0; transform: rotateX(35deg) translateY(80px); }
   }
@@ -167,10 +170,11 @@
     box-shadow: 0 30px 80px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .08), 0 0 60px -10px rgba(236, 72, 153, .5);
     animation: panel-demo var(--demo) cubic-bezier(.2, .9, .2, 1) var(--demo-delay) infinite backwards;
   }
+  /* 面板 right: 3%，宽 25%：平移 115% 即整块退到屏幕右边缘之外 */
   @keyframes panel-demo {
-    0%, 30% { opacity: 0; transform: translateX(120%) scale(.92); }
-    40%, 88% { opacity: 1; transform: none; }
-    96%, 100% { opacity: 0; transform: translateX(120%) scale(.92); }
+    0%, 30% { transform: translateX(115%); }
+    40%, 88% { transform: none; }
+    96%, 100% { transform: translateX(115%); }
   }
   .hotkey {
     position: absolute; left: 50%; top: 45%; translate: -50% -50%;
@@ -320,10 +324,10 @@
     border-radius: 8px; text-align: center; font-family: inherit; font-size: 15px; font-weight: 600;
     background: linear-gradient(#24242c, #17171d); border: 1px solid #33333d;
     box-shadow: 0 3px 0 #0d0d11, 0 0 0 1px rgba(0, 0, 0, .3);
-    animation: press 3s ease-in-out infinite;
   }
-  kbd:nth-child(2) { animation-delay: .12s; }
-  kbd:nth-child(3) { animation-delay: .24s; }
+  /* 只作用于功能区的快捷键提示；首屏 .hotkey 有自己的时间轴，不能被这里的延迟覆盖 */
+  .keys kbd { animation: press 3s ease-in-out infinite; }
+  .keys kbd:nth-child(2) { animation-delay: .12s; }
   @keyframes press {
     0%, 70%, 100% { transform: translateY(0); box-shadow: 0 3px 0 #0d0d11; }
     75%, 85% { transform: translateY(3px); box-shadow: 0 0 0 #0d0d11, 0 0 24px rgba(139, 92, 246, .7); }
@@ -358,14 +362,13 @@
     .flow::before { display: none; }
     .feature, .feature.rev { grid-template-columns: 1fr; gap: 32px; margin-top: 72px; }
     .feature.rev .text { order: 0; }
-    .stage .desk { transform: none; }
+    .stage .screen { transform: none; }
     nav { padding: 12px 18px; }
     .hero { min-height: auto; padding: 110px 20px 40px; }
     h1 { font-size: 32px; }
     .sub { font-size: 16px; }
     .badge { font-size: 12px; }
-    /* 面板从右侧滑入时不撑宽页面（桌面端不裁，保留阴影） */
-    .stage { margin-top: 40px; overflow-x: clip; }
+    .stage { margin-top: 40px; }
     section { padding: 72px 20px; }
     .manifesto { padding: 20px; }
     .sieve { font-size: 12px; padding: 12px; }
@@ -403,9 +406,11 @@
 
   <div class="stage">
     <div class="glow"></div>
-    <img class="desk" src="./assets/desktop.jpg" alt="Asurada 平时停靠在屏幕边缘的小标签" data-i18n-alt="altDesk">
-    <img class="panel" src="./assets/panel.png" alt="展开后的项目面板" data-i18n-alt="altPanel">
-    <div class="hotkey" aria-hidden="true"><kbd>⌃</kbd><kbd>E</kbd></div>
+    <div class="screen">
+      <img class="desk" src="./assets/desktop.jpg" alt="Asurada 平时停靠在屏幕边缘的小标签" data-i18n-alt="altDesk">
+      <img class="panel" src="./assets/panel.png" alt="展开后的项目面板" data-i18n-alt="altPanel">
+      <div class="hotkey" aria-hidden="true"><kbd>⌃</kbd><kbd>E</kbd></div>
+    </div>
   </div>
 </header>
 
@@ -730,13 +735,13 @@
   onScrollNav();
 
   // Hero 截图随滚动放平
-  const desk = document.querySelector('.stage .desk');
+  const screen = document.querySelector('.stage .screen');
   addEventListener('scroll', () => {
     if (innerWidth <= 860) {
       return;
     }
     const deg = Math.max(0, 14 - scrollY / 25);
-    desk.style.transform = `rotateX(${deg}deg)`;
+    screen.style.transform = `rotateX(${deg}deg)`;
   }, { passive: true });
 </script>
 </body>
