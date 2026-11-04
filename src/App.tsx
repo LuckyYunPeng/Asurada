@@ -99,7 +99,7 @@ const LEAD_CLASS = "mb-3.5 text-left leading-normal text-(--ink-2)";
 
 /** 设置列表的一行 */
 const SETTINGS_ROW_CLASS =
-  "flex w-full items-center justify-between gap-2.5 rounded-lg px-2.5 py-2 text-left text-(--ink-2) hover:bg-accent disabled:hover:bg-transparent";
+  "flex min-h-11 w-full items-center justify-between gap-2.5 rounded-lg px-3 py-2.5 text-left text-(--ink-2) hover:bg-accent disabled:hover:bg-transparent";
 
 function SettingsShortcutRow({
   active,
@@ -956,7 +956,7 @@ function App() {
               />
             ) : settingsOpen && inMain ? (
               <div>
-                <div className="rounded-xl border bg-card p-1.5">
+                <div className="flex flex-col gap-0.5 rounded-xl border bg-card p-1.5">
                   <SettingsShortcutRow
                     active={settingsOpen}
                     initialDisplay={captureBoot?.toggleShortcutDisplay}
