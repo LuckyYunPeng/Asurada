@@ -1,11 +1,9 @@
 name: Build macOS
 
+# 日常推送不跑；推 v* 标签发版，或在 Actions 页面手动运行打一个未签名验收包
 on:
   push:
-    branches: [main]
     tags: ["v*"]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
@@ -45,10 +43,14 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      # 普通推送和 PR：只打包验收，不生成更新包（不需要私钥）
+      # 发版和手动运行都先跑单测，失败就不打包、不发布
+      - name: cargo test (preflight)
+        run: cargo test --manifest-path src-tauri/Cargo.toml "preflight::"
+
+      # 手动运行：只打包验收，不生成更新包（不需要私钥）
       - name: Build Tauri (unsigned)
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        run: pnpm tauri build -- --bundles app,dmg
+        run: pnpm tauri build --bundles app,dmg
         env:
           CI: true
           # 验收包不签名；正式签名、公证只在下方打标签发版时进行

@@ -92,12 +92,11 @@ pnpm tauri build --bundles app,dmg
 
 | Workflow | Runner | 作用 |
 |---|---|---|
-| [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) | `ubuntu-latest` | 前端 `pnpm build`、`cargo check`、预检单元测试 |
-| [`.github/workflows/build-macos.yml`](./.github/workflows/build-macos.yml) | `macos-latest` | 产出未签名 `.app` / `.dmg`（整体验收请下载此产物） |
+| [`.github/workflows/build-macos.yml`](./.github/workflows/build-macos.yml) | `macos-latest` | 日常推送不运行。推 `v*` tag：预检单元测试 → 签名、公证并发布 GitHub Release（含应用内更新用的 `latest.json`）；在 Actions 页面手动 **Run workflow**：单元测试 + 未签名 `.app` / `.dmg` 验收包 |
 
-macOS 边缘吸附与 **NSPanel** 行为只能在 macOS 上验证；Linux CI 不跑 UI，但保证 Rust/前端可编译。
+只支持 macOS（Apple Silicon）。
 
-- 触发：`push` / PR 到 `main`、`push` tag `v*`、手动 **workflow_dispatch**
+- 触发：`push` tag `v*`、手动 **workflow_dispatch**
 - DMG 产物名：`asurada-macos-<sha>`（及 tag 时 `asurada-macos-release-<tag>`）
 
 ## 许可证
