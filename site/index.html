@@ -261,6 +261,7 @@
   /* 功能展示：左右交替 */
   .feature { display: grid; grid-template-columns: 1fr 1.2fr; gap: 64px; align-items: center; margin-top: 100px; }
   .feature.rev { grid-template-columns: 1.2fr 1fr; }
+  .features > .feature:first-child { margin-top: 0; }
   .feature.rev .text { order: 2; }
   .feature ul { margin-top: 22px; list-style: none; display: grid; gap: 12px; }
   .feature li { display: flex; gap: 10px; color: var(--muted); }
@@ -294,8 +295,6 @@
   .keys { margin-top: 26px; display: flex; align-items: center; gap: 6px; color: var(--muted); }
 
   /* 更多功能网格 */
-  .grid-head { margin-top: 120px; text-align: center; }
-  .grid { margin-top: 48px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
 
   /* 收尾 CTA */
   .final { text-align: center; }
@@ -319,7 +318,7 @@
 
   @media (max-width: 860px) {
     nav .links a:not(.btn) { display: none; }
-    .pains, .grid, .flow, .focus-grid { grid-template-columns: 1fr; }
+    .pains, .flow, .focus-grid { grid-template-columns: 1fr; }
     .flow::before { display: none; }
     .feature, .feature.rev { grid-template-columns: 1fr; gap: 32px; margin-top: 72px; }
     .feature.rev .text { order: 0; }
@@ -360,7 +359,7 @@
 <header class="hero">
   <span class="badge"><span class="dot"></span><span data-i18n="badge">为 Vibe Coding 时代的代码 Review 而生 · macOS</span></span>
   <h1 data-i18n="heroTitle">AI 写代码，<br><span class="grad-text">但你得看懂自己的项目</span></h1>
-  <p class="sub" data-i18n="heroSub">Review 不是因为不信任 AI，而是为了让<mark>「人」始终了解自己的项目</mark>，尤其是那些关键的地方。Asurada 的出发点是帮你<mark>滤掉噪音</mark>，<mark>提高你的 Review 效率</mark>，尤其是在<mark>多个项目之间穿插</mark>时，开发体验更加丝滑。</p>
+  <p class="sub" data-i18n="heroSub">Asurada 的出发点是帮你<mark>滤掉噪音</mark>，<mark>提高你的 Review 效率</mark>，尤其是在<mark>多个项目之间穿插</mark>时，开发体验更加丝滑。</p>
   <div class="cta">
     <a class="btn primary" href="https://github.com/LuckyYunPeng/asurada/releases/latest" data-i18n="ctaDownload">免费下载 macOS 版</a>
     <a class="btn ghost" href="https://github.com/LuckyYunPeng/asurada" data-i18n="ctaGithub">在 GitHub 上查看</a>
@@ -412,10 +411,8 @@
       <p class="lead" data-i18n="focusLead">一次改动里，真正需要你把关的往往只有那几个文件。Asurada 帮你把它们挑出来，其余的先收起，注意力只花在真正影响项目的地方。</p>
       <ul class="checks">
         <li data-i18n="focus1">噪音一键收起：测试等文件先藏起来，只影响查看，提交时照常带上</li>
-        <li data-i18n="focus2">目录树浏览，先看清这次动了哪些模块</li>
-        <li data-i18n="focus3">整词级别的行内对比，一眼看出改了什么</li>
-        <li data-i18n="focus4">按文件名筛选，直奔你关心的那一处</li>
         <li class="soon"><span data-i18n="focus5">AI 挑出关键文件：自动识别本次改动里最值得你看的部分<span class="soon-tag">即将推出</span></span></li>
+        <li class="soon"><span data-i18n="focus6">看到看不懂的改动，直接让 AI 讲解<span class="soon-tag">即将推出</span></span></li>
       </ul>
     </div>
     <div class="sieve reveal d2" aria-hidden="true">
@@ -446,31 +443,15 @@
 </section>
 
 <section id="features">
-  <div class="wrap">
-    <p class="eyebrow reveal" data-i18n="featEyebrow">功能</p>
-    <h2 class="reveal d1" data-i18n="featTitle">小，但刚好够用</h2>
-
-    <div class="feature rev">
-      <div class="text reveal">
-        <h2 data-i18n="diffTitle">提交之前，<span class="grad-text">看懂关键改动</span></h2>
-        <p class="lead" data-i18n="diffLead">差异窗口就是你的 Review 台：变更按目录排开，噪音可以收起，重点逐行对比。</p>
-        <ul>
-          <li data-i18n="diff1">隐藏测试文件，聚焦业务改动</li>
-          <li data-i18n="diff2">左右 / 上下两种对比布局，色弱友好配色</li>
-          <li class="soon"><span data-i18n="diff3">看到看不懂的改动，直接让 AI 讲解<span class="soon-tag">即将推出</span></span></li>
-        </ul>
-      </div>
-      <div class="shot reveal d2"><img src="./assets/diff.jpg" alt="差异窗口" data-i18n-alt="altDiff"></div>
-    </div>
-
+  <div class="wrap features">
     <div class="feature">
       <div class="text reveal">
         <h2 data-i18n="commitTitle">看完，<span class="grad-text">一键收尾</span></h2>
         <p class="lead" data-i18n="commitLead">所有项目一屏看完，有改动的排在最前面。Review 完点一下，剩下的杂事交给 Asurada。</p>
         <ul>
           <li><span data-i18n="commit1">根据改动自动生成一行提交信息，语言跟随界面<code class="commit-sample">feat: 新增深色模式</code></span></li>
-          <li data-i18n="commit2">远端有新提交时自动同步后重试</li>
-          <li data-i18n="commit3">遇到冲突就撤回并提示，不会弄乱仓库</li>
+          <li data-i18n="commit2">远端有新提交就自动同步后重试，遇到冲突就撤回，不会弄乱仓库</li>
+          <li data-i18n="commit3">提交在独立的短会话里完成，diff 和 git 输出不进你的 Agent 主对话</li>
         </ul>
       </div>
       <div class="shot tall reveal d2"><img src="./assets/panel.png" alt="项目面板" data-i18n-alt="altPanelShort"></div>
@@ -480,19 +461,9 @@
       <div class="text reveal">
         <h2 data-i18n="dockTitle">不找它，<span class="grad-text">它就不打扰你</span></h2>
         <p class="lead" data-i18n="dockLead">平时只在屏幕边缘露出一个小标签，有待提交的改动时会亮起提示。在任何应用里按快捷键都能呼出面板。</p>
-        <div class="keys"><kbd>⌃</kbd><kbd>E</kbd><span data-i18n="dockKeys">&nbsp;展开 / 收起，可在设置中修改</span></div>
+        <div class="keys"><kbd>⌃</kbd><kbd>E</kbd><span data-i18n="dockKeys">&nbsp;随时展开 / 收起</span></div>
       </div>
       <div class="shot reveal d2"><img src="./assets/desktop.jpg" alt="停靠在屏幕边缘的小标签" data-i18n-alt="altDock"></div>
-    </div>
-
-    <div class="grid-head">
-      <h2 class="reveal" data-i18n="gridTitle">每一处细节，<span class="grad-text">都在帮你减少噪音、聚焦核心</span></h2>
-    </div>
-    <div class="grid">
-      <div class="card reveal"><div class="icon">🧠</div><h3 data-i18n="g1Title">对话里没有噪音</h3><p data-i18n="g1Desc">提交用的 diff 和 git 输出不进主对话，Agent 的上下文只留给核心工作。</p></div>
-      <div class="card reveal d1"><div class="icon">🎯</div><h3 data-i18n="g2Title">一眼锁定待处理的项目</h3><p data-i18n="g2Desc">有改动的项目自动排在最前，没改动的自动变灰，不用在项目之间翻找。</p></div>
-      <div class="card reveal"><div class="icon">🔍</div><h3 data-i18n="g3Title">聚焦核心代码和逻辑</h3><p data-i18n="g3Desc">同步、重试、冲突撤回这些 Git 杂事自动处理，你的注意力只留给核心代码和业务逻辑。</p></div>
-      <div class="card reveal d1"><div class="icon">⚡</div><h3 data-i18n="g4Title">用完即走</h3><p data-i18n="g4Desc">平时只是屏幕边缘的小标签；按 ⌃E 呼出，Review 完就收起，不占你的屏幕和注意力。</p></div>
     </div>
   </div>
 </section>
@@ -522,7 +493,7 @@
     navDownload: 'Download',
     badge: 'Built for code review in the Vibe Coding era · macOS',
     heroTitle: 'AI writes the code,<br><span class="grad-text">but you still need to understand your project</span>',
-    heroSub: 'Review isn\'t about distrusting AI. It\'s about <mark>keeping humans in touch with their own project</mark>, especially the parts that matter most. Asurada <mark>filters out the noise</mark> to <mark>make your reviews faster</mark>, so <mark>working across multiple projects</mark> feels effortlessly smooth.',
+    heroSub: 'Asurada <mark>filters out the noise</mark> to <mark>make your reviews faster</mark>, so <mark>working across multiple projects</mark> feels effortlessly smooth.',
     ctaDownload: 'Download for macOS — Free',
     ctaGithub: 'View on GitHub',
     altDesk: 'Asurada docked as a small tab at the edge of the screen',
@@ -543,10 +514,8 @@
     focusTitle: 'Filter out the noise,<br><span class="grad-text">keep what deserves your eyes</span>',
     focusLead: 'In any change set, only a handful of files truly need your judgment. Asurada surfaces them and tucks the rest away, so your attention goes only where it affects the project.',
     focus1: 'Tuck away the noise in one click, like test files — view only, they\'re still committed',
-    focus2: 'Browse a folder tree to see which modules were touched',
-    focus3: 'Word-level inline diff shows exactly what changed',
-    focus4: 'Filter by file name to jump straight to what you care about',
     focus5: 'AI picks the key files: automatically surfaces what most deserves your review<span class="soon-tag">Coming soon</span>',
+    focus6: 'Don\'t get a change? Ask AI to explain it on the spot<span class="soon-tag">Coming soon</span>',
     sieveTitle: 'Changes',
     sieveUnit: 'files',
     flowEyebrow: 'How it works',
@@ -559,33 +528,16 @@
     step3Desc: 'Commit message generated for you',
     step4Title: 'On to the next round',
     step4Desc: 'Push and conflict handling done for you',
-    featEyebrow: 'Features',
-    featTitle: 'Small, but just enough',
-    diffTitle: 'Before you commit,<br><span class="grad-text">understand the key changes</span>',
-    diffLead: 'The diff window is your review desk: changes laid out by folder, noise tucked away, key lines compared side by side.',
-    diff1: 'Hide test files and focus on business logic',
-    diff2: 'Split or unified layout, color-blind friendly palette',
-    diff3: 'Don\'t get a change? Ask AI to explain it on the spot<span class="soon-tag">Coming soon</span>',
-    altDiff: 'Diff window',
     commitTitle: 'Done reviewing?<br><span class="grad-text">Wrap up in one click</span>',
     commitLead: 'All your projects on one screen, the ones with changes first. Finish your review, click once, and let Asurada handle the rest.',
     commit1: 'Generates a one-line Conventional Commit message in your UI language<code class="commit-sample">feat: add dark mode</code>',
-    commit2: 'Syncs and retries automatically when the remote has new commits',
-    commit3: 'Backs out and tells you on conflicts, so your repo stays clean',
+    commit2: 'Syncs and retries when the remote moves ahead, backs out on conflicts, so your repo stays clean',
+    commit3: 'Commits run in a separate short-lived session, so diffs and git output never enter your main agent chat',
     altPanelShort: 'Project panel',
     dockTitle: 'Out of sight,<br><span class="grad-text">out of your way</span>',
     dockLead: 'Just a small tab at the edge of your screen that lights up when there are changes to commit. Summon the panel with a shortcut from any app.',
-    dockKeys: '&nbsp;to show / hide, customizable in Settings',
+    dockKeys: '&nbsp;to show / hide anytime',
     altDock: 'Small tab docked at the edge of the screen',
-    gridTitle: 'Every detail is built to<br><span class="grad-text">cut the noise and keep you on the core</span>',
-    g1Title: 'No noise in your agent chat',
-    g1Desc: 'Diffs and git output for commits never enter your main conversation. Your agent\'s context stays on the core work.',
-    g2Title: 'Spot what needs you at a glance',
-    g2Desc: 'Projects with changes float to the top, untouched ones are grayed out. No hunting across projects.',
-    g3Title: 'Focus on the core code and logic',
-    g3Desc: 'Syncing, retrying and backing out of conflicts are handled for you, so your attention stays on the core code and business logic.',
-    g4Title: 'There when you need it, gone when you don\'t',
-    g4Desc: 'Just a small tab at the screen edge. Press ⌃E to open, tuck it away after review — no screen space, no distraction.',
     finalTitle: 'Let AI write the code,<br><span class="grad-text">and you understand the project</span>',
     finalLead: 'Free and open source under the MIT License.',
     req: 'Requires an Apple Silicon Mac with git and pi installed',
