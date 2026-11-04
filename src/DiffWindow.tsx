@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { isHighlighterLoaded, parsePatchFiles, type FileDiffMetadata } from "@pierre/diffs";
-import { FileDiff, Virtualizer, WorkerPoolContextProvider } from "@pierre/diffs/react";
+import { FileDiff, Virtualizer, WorkerPoolContextProvider, useWorkerPool } from "@pierre/diffs/react";
 import DiffsWorker from "@pierre/diffs/worker/worker-portable.js?worker";
 import logoUrl from "./assets/asurada-logo.png";
 import type { CommitPushResult, ICommitPushEvent } from "./types";
@@ -82,11 +82,16 @@ const DIFF_UNSAFE_CSS = `
 // 这里的 theme / lineDiffType 必须和下面 FileDiff 的 options 一致
 const DIFF_THEME = { light: "pierre-light", dark: "pierre-dark" } as const;
 const LINE_DIFF_TYPE = "word";
+// 后台预高亮的文件数上限（也决定高亮缓存大小）；文件再多时靠悬停预高亮兜底
+const PREFETCH_LIMIT = 150;
+// 后台只占 2 个 worker，留出其余的给用户点击的文件，点击不会排在预高亮后面
+const PREFETCH_CONCURRENCY = 2;
 const WORKER_POOL_OPTIONS = {
   workerFactory: () => new DiffsWorker(),
   poolSize: Math.min(4, navigator.hardwareConcurrency || 2),
   // 小文件主线程直接高亮更快，省掉先画纯文本再上色的闪烁
   mainThreadMaxCharacters: 4000,
+  totalASTLRUCacheSize: PREFETCH_LIMIT + 50,
 };
 const HIGHLIGHTER_OPTIONS = { theme: DIFF_THEME, lineDiffType: LINE_DIFF_TYPE } as const;
 
@@ -102,9 +107,13 @@ function isTestFile(name: string) {
 }
 const SIDEBAR_WIDTH_KEY = "asurada.diffSidebarWidth";
 
+// 每次拉取 diff 换一个前缀：文件内容可能变了，不能复用上一轮的高亮缓存
+let fetchSeq = 0;
+
 function toEntries(diff: IProjectDiff): IDiffEntry[] {
   const untracked = new Set(diff.untracked);
-  return parsePatchFiles(diff.patch)
+  // 带 cacheKey 才能预高亮并命中 worker 池的高亮缓存
+  return parsePatchFiles(diff.patch, `f${++fetchSeq}`)
     .flatMap((p) => p.files)
     .map((file) => ({
       file,
@@ -152,10 +161,12 @@ const FileItem = memo(function FileItem({
   entry,
   isActive,
   onSelect,
+  onPrefetch,
 }: {
   entry: IDiffEntry;
   isActive: boolean;
   onSelect: (name: string) => void;
+  onPrefetch: (entry: IDiffEntry) => void;
 }) {
   const { base, dir } = splitPath(entry.file.name);
   return (
@@ -166,6 +177,7 @@ const FileItem = memo(function FileItem({
         data-name={entry.file.name}
         title={entry.file.name}
         onClick={() => onSelect(entry.file.name)}
+        onPointerEnter={() => onPrefetch(entry)}
       >
         <span className={`dw-status is-${entry.status}`}>{entry.status}</span>
         <span className="dw-file-text">
@@ -178,7 +190,8 @@ const FileItem = memo(function FileItem({
   );
 });
 
-export default function DiffWindow({ projectId }: { projectId: string }) {
+function DiffView({ projectId }: { projectId: string }) {
+  const workerPool = useWorkerPool();
   const { isDark } = useThemeMode();
   const [diff, setDiff] = useState<IProjectDiff | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -342,6 +355,38 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
   // 只渲染选中的一个文件；选中的被筛掉或刷新后已不在变更里时回到第一个
   const selected =
     visibleEntries.find((e) => e.file.name === selectedName) ?? visibleEntries[0];
+  // 悬停时就在 worker 里预先高亮，点下去直接命中缓存；失败了点击时会正常再高亮一次，不影响查看
+  const onPrefetch = useCallback(
+    (entry: IDiffEntry) => {
+      workerPool?.primeDiffHighlightCache(entry.file).catch((e) => console.error("预高亮失败", e));
+    },
+    [workerPool],
+  );
+
+  // 打开后在后台按列表顺序把文件都预高亮好，之后点哪个都直接命中缓存
+  useEffect(() => {
+    if (!workerPool) {
+      return;
+    }
+    let isCancelled = false;
+    const queue = visibleEntries.slice(0, PREFETCH_LIMIT);
+    const runPrefetch = async () => {
+      while (!isCancelled && queue.length) {
+        try {
+          await workerPool.primeDiffHighlightCache(queue.shift()!.file);
+        } catch (e) {
+          console.error("预高亮失败", e);
+        }
+      }
+    };
+    for (let i = 0; i < PREFETCH_CONCURRENCY; i++) {
+      void runPrefetch();
+    }
+    return () => {
+      isCancelled = true;
+    };
+  }, [visibleEntries, workerPool]);
+
   const totalAdditions = countedEntries.reduce((n, e) => n + e.additions, 0);
   const totalDeletions = countedEntries.reduce((n, e) => n + e.deletions, 0);
 
@@ -375,10 +420,6 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
   }, [visibleEntries, selected]);
 
   return (
-    <WorkerPoolContextProvider
-      poolOptions={WORKER_POOL_OPTIONS}
-      highlighterOptions={HIGHLIGHTER_OPTIONS}
-    >
     <div className="dw">
       <header className="dw-top" data-tauri-drag-region>
         <div className="dw-title" data-tauri-drag-region>
@@ -504,6 +545,7 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
                   entry={entry}
                   isActive={entry === selected}
                   onSelect={setSelectedName}
+                  onPrefetch={onPrefetch}
                 />
               ))}
             </ul>
@@ -561,6 +603,17 @@ export default function DiffWindow({ projectId }: { projectId: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** worker 池要包在外层，DiffView 里才能用 useWorkerPool 预高亮 */
+export default function DiffWindow({ projectId }: { projectId: string }) {
+  return (
+    <WorkerPoolContextProvider
+      poolOptions={WORKER_POOL_OPTIONS}
+      highlighterOptions={HIGHLIGHTER_OPTIONS}
+    >
+      <DiffView projectId={projectId} />
     </WorkerPoolContextProvider>
   );
 }

@@ -7,8 +7,33 @@ mod store;
 #[cfg(target_os = "macos")]
 mod macos_panel;
 
+/// Finder 启动的 App 只有系统默认 PATH，找不到 pi / nvm 的 node；从用户交互式登录 shell 取一次完整 PATH
+#[cfg(target_os = "macos")]
+fn inherit_shell_path() {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    // 用标记截取，避开 .zshrc 里可能打印的其它输出
+    match std::process::Command::new(shell)
+        .args(["-ilc", "printf '__ASURADA_PATH__%s__ASURADA_PATH__' \"$PATH\""])
+        .stdin(std::process::Stdio::null())
+        .output()
+    {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if let Some(path) = stdout.split("__ASURADA_PATH__").nth(1) {
+                if !path.is_empty() {
+                    std::env::set_var("PATH", path);
+                }
+            }
+        }
+        Err(e) => eprintln!("Asurada: 读取 shell PATH 失败 ({e})"),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "macos")]
+    inherit_shell_path();
+
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init());
