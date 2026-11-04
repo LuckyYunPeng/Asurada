@@ -150,10 +150,11 @@
   color: var(--err-fg);
 }
 
+/* 英文标签更长，开关、分段、按钮之间要留足间距才分得清分组 */
 .dw-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 20px;
 }
 
 .dw-notice {

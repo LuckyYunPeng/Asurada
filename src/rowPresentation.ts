@@ -1,8 +1,9 @@
+import type { TMessages } from "./i18n";
 import type { ProjectRowState } from "./types";
 
 export type RowKind = "clean" | "dirty" | "run" | "ok" | "err";
 
-export function getRowPresentation(row: ProjectRowState): {
+export function getRowPresentation(row: ProjectRowState, t: TMessages): {
   kind: RowKind;
   statusText: string;
   btnDisabled: boolean;
@@ -14,27 +15,27 @@ export function getRowPresentation(row: ProjectRowState): {
   if (uiState === "running") {
     return {
       kind: "run",
-      statusText: "提交中… 稍等一下呀",
+      statusText: t.committingRow,
       btnDisabled: true,
       btnBusy: true,
     };
   }
 
   if (uiState === "failure") {
-    const summary = row.resultSummary ?? "提交失败";
+    const summary = row.resultSummary ?? t.commitFailed;
     return {
       kind: "err",
-      statusText: summary.startsWith("失败") ? summary : `失败 · ${summary}`,
+      statusText: summary.startsWith(t.failed) ? summary : `${t.failed} · ${summary}`,
       btnDisabled: project.gitClean,
       btnBusy: false,
-      btnTitle: project.gitClean ? "无变更" : undefined,
+      btnTitle: project.gitClean ? t.noChanges : undefined,
     };
   }
 
   if (!project.gitClean) {
     return {
       kind: "dirty",
-      statusText: "有未提交变更",
+      statusText: t.uncommitted,
       btnDisabled: false,
       btnBusy: false,
     };
@@ -42,9 +43,9 @@ export function getRowPresentation(row: ProjectRowState): {
 
   return {
     kind: uiState === "success" ? "ok" : "clean",
-    statusText: project.lastCommitMessage ?? "暂无变更",
+    statusText: project.lastCommitMessage ?? t.noChanges,
     btnDisabled: true,
     btnBusy: false,
-    btnTitle: project.lastCommitMessage ? "无变更" : "暂无变更",
+    btnTitle: t.noChanges,
   };
 }

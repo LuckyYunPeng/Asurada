@@ -1,8 +1,9 @@
 use std::path::Path;
 use std::process::Command;
 
-/// Fixed prompt for `pi --print` (configurable later). Documented in README.
+/// `pi --print` 的提示词，按设置里的语言选；中文版也是预检的基准提示词
 pub const PI_COMMIT_PROMPT: &str = r#"你是 Asurada 提交助手。请根据当前仓库的 git status 与 git diff（含已暂存与未暂存）生成一条 Conventional Commits 格式的提交标题：type 使用英文（如 feat、fix、chore、docs），冒号后使用简体中文简述变更。只输出一行提交信息，不要引号、不要解释、不要 Markdown。"#;
+const PI_COMMIT_PROMPT_EN: &str = r#"You are the Asurada commit assistant. Based on the current repository's git status and git diff (staged and unstaged), write one Conventional Commits subject line: an English type (feat, fix, chore, docs, etc.), then a concise English description of the change after the colon. Output only that one line: no quotes, no explanation, no Markdown."#;
 
 pub fn git_is_clean(project_path: &Path) -> Result<bool, String> {
     let output = Command::new("git")
@@ -40,9 +41,11 @@ pub fn git_last_commit_subject(project_path: &Path) -> Option<String> {
     }
 }
 
-pub fn run_pi_print(project_path: &Path) -> Result<String, String> {
+/// language 是前端当前生效的语言："zh" 用中文提交信息，其他一律英文
+pub fn run_pi_print(project_path: &Path, language: &str) -> Result<String, String> {
+    let prompt = if language == "zh" { PI_COMMIT_PROMPT } else { PI_COMMIT_PROMPT_EN };
     let output = Command::new("pi")
-        .args(["--no-session", "--print", PI_COMMIT_PROMPT])
+        .args(["--no-session", "--print", prompt])
         .current_dir(project_path)
         .output()
         .map_err(|e| format!("无法执行 pi（请确认已安装并在 PATH 中）: {e}"))?;

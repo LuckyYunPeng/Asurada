@@ -477,6 +477,23 @@ body {
   gap: 8px;
 }
 
+/* logo + 品牌名，点击回到主面板 */
+.home {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.home:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 .brand {
   flex: none;
   display: block;

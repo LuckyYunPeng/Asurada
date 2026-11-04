@@ -39,7 +39,7 @@ macOS 边缘吸附小标签 + 浮层面板：管理多个本地 git 仓库，验
 对 **有未提交变更** 的行：
 
 1. 在该项目目录非交互执行：`pi --print '<固化提示词>'`  
-   - 提示词要求：根据 `git status` / `git diff` 生成 **Conventional Commits** 一行标题；**type 英文**（feat/fix/chore/docs 等），**冒号后简体中文**；只输出一行，无引号、无 Markdown。
+   - 提示词要求：根据 `git status` / `git diff` 生成 **Conventional Commits** 一行标题；**type 英文**（feat/fix/chore/docs 等），冒号后的描述跟随设置里的语言（默认跟随系统语言：系统为中文时用简体中文，其他用英文；可在设置中切换）；只输出一行，无引号、无 Markdown。
 2. 无用户确认地执行：`git add -A && git commit -m '<消息>' && git push`
 3. 回写 UI：**Toast** + 行内结果（成功：`已推送 · …`；失败：原因可辨）。
 

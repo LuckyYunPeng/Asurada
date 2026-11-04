@@ -433,7 +433,11 @@ pub fn get_committing_ids() -> Vec<String> {
 
 /// 结果通过 `commit-push` 事件广播给所有窗口；返回值同样带上结果，失败也放在 result 里
 #[tauri::command]
-pub async fn run_commit_push(app: tauri::AppHandle, id: String) -> Result<CommitPushResult, String> {
+pub async fn run_commit_push(
+    app: tauri::AppHandle,
+    id: String,
+    language: String,
+) -> Result<CommitPushResult, String> {
     let is_new = COMMITTING
         .lock()
         .unwrap()
@@ -447,7 +451,7 @@ pub async fn run_commit_push(app: tauri::AppHandle, id: String) -> Result<Commit
         CommitPushEvent { id: id.clone(), phase: "running", result: None },
     );
 
-    let result = commit_push(&app, &id).unwrap_or_else(|e| CommitPushResult {
+    let result = commit_push(&app, &id, &language).unwrap_or_else(|e| CommitPushResult {
         success: false,
         commit_message: None,
         push_output: String::new(),
@@ -464,7 +468,7 @@ pub async fn run_commit_push(app: tauri::AppHandle, id: String) -> Result<Commit
     Ok(result)
 }
 
-fn commit_push(app: &tauri::AppHandle, id: &str) -> Result<CommitPushResult, String> {
+fn commit_push(app: &tauri::AppHandle, id: &str, language: &str) -> Result<CommitPushResult, String> {
     let project = find_project(app, id)?;
     let path = PathBuf::from(&project.path);
     if git_is_clean(&path)? {
@@ -476,7 +480,7 @@ fn commit_push(app: &tauri::AppHandle, id: &str) -> Result<CommitPushResult, Str
         });
     }
 
-    let commit_message = run_pi_print(&path)?;
+    let commit_message = run_pi_print(&path, language)?;
     let push_output = git_add_commit_push(&path, &commit_message)?;
 
     Ok(CommitPushResult {
@@ -542,6 +546,18 @@ pub fn open_with_app(path: String, app: String) -> Result<(), String> {
         Ok(())
     } else {
         Err(format!("用 {app} 打开失败"))
+    }
+}
+
+/// 系统首选语言是中文时返回 "zh"，否则 "en"。WKWebView 的 navigator.language 受 App 本地化声明影响，不可靠，直接读系统设置
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub fn get_system_language() -> &'static str {
+    let languages = objc2_foundation::NSLocale::preferredLanguages();
+    if languages.firstObject().is_some_and(|first| first.to_string().starts_with("zh")) {
+        "zh"
+    } else {
+        "en"
     }
 }
 

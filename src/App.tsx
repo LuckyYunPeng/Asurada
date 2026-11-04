@@ -16,11 +16,8 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { bootstrapCapture, getCaptureScene } from "./captureMode";
 import logoUrl from "./assets/asurada-logo.png";
-import {
-  INTRO_STEPS,
-  INTRO_STORAGE_KEY,
-  PREFLIGHT_CHECK_META,
-} from "./introContent";
+import { INTRO_STORAGE_KEY } from "./introContent";
+import { getMessages, LanguageEnum, readLanguage, setLanguage, useLanguage } from "./i18n";
 import { getRowPresentation, type RowKind } from "./rowPresentation";
 import {
   DEFAULT_TOGGLE_SHORTCUT_DISPLAY,
@@ -121,6 +118,7 @@ function SettingsShortcutRow({
     initialDisplay ?? DEFAULT_TOGGLE_SHORTCUT_DISPLAY,
   );
   const [recording, setRecording] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     onRecordingChange(recording);
@@ -162,7 +160,7 @@ function SettingsShortcutRow({
         })
         .catch((e) => {
           onToast({
-            title: "快捷键不可用",
+            title: t.shortcutUnavailable,
             message: String(e),
             kind: "err",
           });
@@ -171,7 +169,7 @@ function SettingsShortcutRow({
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [recording, skipInvoke, onToast]);
+  }, [recording, skipInvoke, onToast, t]);
 
   return (
     <button
@@ -180,7 +178,7 @@ function SettingsShortcutRow({
       onClick={() => setRecording(true)}
       disabled={recording}
     >
-      <span>自定义快捷键</span>
+      <span>{t.toggleShortcut}</span>
       <Kbd
         className={
           recording
@@ -188,7 +186,7 @@ function SettingsShortcutRow({
             : "h-6 bg-accent px-2 font-mono font-semibold text-accent-foreground"
         }
       >
-        {recording ? "按下新组合…" : display}
+        {recording ? t.pressNewShortcut : display}
       </Kbd>
     </button>
   );
@@ -209,6 +207,7 @@ const DIFF_WINDOW_PRESETS: IDiffWindowSize[] = [
 /** diff 窗口默认尺寸；用户拖拽窗口后后端会自动记下，这里显示的就是最新值 */
 function SettingsDiffSizeRow({ active, skipInvoke }: { active: boolean; skipInvoke?: boolean }) {
   const [size, setSize] = useState<IDiffWindowSize>({ width: 1680, height: 1050 });
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!active || skipInvoke || !isTauri) {
@@ -237,7 +236,7 @@ function SettingsDiffSizeRow({ active, skipInvoke }: { active: boolean; skipInvo
 
   return (
     <div className={SETTINGS_ROW_CLASS}>
-      <span>变更窗口大小</span>
+      <span>{t.diffWindowSize}</span>
       <Select value={value} onValueChange={(v) => void onChangeSize(v)}>
         <SelectTrigger size="sm" className="min-w-32 text-xs">
           <SelectValue />
@@ -246,7 +245,8 @@ function SettingsDiffSizeRow({ active, skipInvoke }: { active: boolean; skipInvo
           {/* 拖拽出来的非预设尺寸也要能显示 */}
           {isPreset ? null : (
             <SelectItem value={value}>
-              {size.width} × {size.height}（自定义）
+              {size.width} × {size.height}
+              {t.customSize}
             </SelectItem>
           )}
           {DIFF_WINDOW_PRESETS.map((p) => (
@@ -262,6 +262,7 @@ function SettingsDiffSizeRow({ active, skipInvoke }: { active: boolean; skipInvo
 
 function SettingsAutostartRow({ skipInvoke }: { skipInvoke?: boolean }) {
   const [isEnabled, setIsEnabled] = useState(false);
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (skipInvoke || !isTauri) {
@@ -288,7 +289,7 @@ function SettingsAutostartRow({ skipInvoke }: { skipInvoke?: boolean }) {
 
   return (
     <label className={`${SETTINGS_ROW_CLASS} cursor-pointer`}>
-      <span>开机自动启动</span>
+      <span>{t.launchAtLogin}</span>
       <Switch checked={isEnabled} onCheckedChange={() => void onToggleAutostart()} />
     </label>
   );
@@ -296,6 +297,7 @@ function SettingsAutostartRow({ skipInvoke }: { skipInvoke?: boolean }) {
 
 function SettingsConfirmCommitRow() {
   const [isEnabled, setIsEnabled] = useState(isConfirmCommitEnabled);
+  const { t } = useLanguage();
 
   function onToggleConfirmCommit() {
     localStorage.setItem(CONFIRM_COMMIT_KEY, isEnabled ? "0" : "1");
@@ -304,7 +306,7 @@ function SettingsConfirmCommitRow() {
 
   return (
     <label className={`${SETTINGS_ROW_CLASS} cursor-pointer`}>
-      <span>提交前确认</span>
+      <span>{t.confirmBeforeCommit}</span>
       <Switch checked={isEnabled} onCheckedChange={onToggleConfirmCommit} />
     </label>
   );
@@ -323,6 +325,7 @@ function SettingsUpdateRow({
   const [version, setVersion] = useState("");
   const [status, setStatus] = useState<"idle" | "checking" | "latest" | "installing" | "checkError" | "error">("idle");
   const [progress, setProgress] = useState(0);
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (skipInvoke || !isTauri) {
@@ -370,23 +373,23 @@ function SettingsUpdateRow({
 
   const statusText = {
     idle: "",
-    checking: "检查中…",
-    latest: "已是最新",
-    installing: progress ? `下载中 ${progress}%` : "下载中…",
-    checkError: "检查失败，稍后再试",
-    error: "更新失败，稍后再试",
+    checking: t.updateChecking,
+    latest: t.updateLatest,
+    installing: t.updateDownloading(progress),
+    checkError: t.updateCheckError,
+    error: t.updateInstallError,
   }[status];
 
   return (
     <div className={SETTINGS_ROW_CLASS}>
       <span>
-        版本 <span className="font-mono">{version || "—"}</span>
+        {t.version} <span className="font-mono">{version || "—"}</span>
         {statusText ? <span className="ml-2 text-xs text-muted-foreground">{statusText}</span> : null}
       </span>
       {pendingUpdate ? (
         <Button size="sm" disabled={status === "installing"} onClick={() => void onInstallUpdate()}>
           {status === "installing" ? <Loader2 className="animate-spin" /> : null}
-          更新到 {pendingUpdate.version}
+          {t.updateTo(pendingUpdate.version)}
         </Button>
       ) : (
         <Button
@@ -395,7 +398,7 @@ function SettingsUpdateRow({
           disabled={status === "checking"}
           onClick={() => void onCheckUpdate()}
         >
-          检查更新
+          {t.checkUpdate}
         </Button>
       )}
     </div>
@@ -403,24 +406,25 @@ function SettingsUpdateRow({
 }
 
 const THEME_OPTIONS = [
-  { value: ThemeModeEnum.Light, label: "亮色", icon: Sun },
-  { value: ThemeModeEnum.Dark, label: "深色", icon: Moon },
-  { value: ThemeModeEnum.System, label: "跟随系统", icon: Monitor },
-];
+  { value: ThemeModeEnum.Light, labelKey: "themeLight", icon: Sun },
+  { value: ThemeModeEnum.Dark, labelKey: "themeDark", icon: Moon },
+  { value: ThemeModeEnum.System, labelKey: "themeSystem", icon: Monitor },
+] as const;
 
 function SettingsThemeRow() {
   const { mode, onChangeThemeMode } = useThemeMode();
+  const { t } = useLanguage();
 
   return (
     <div className={SETTINGS_ROW_CLASS}>
-      <span>外观</span>
+      <span>{t.appearance}</span>
       <ToggleGroup
         type="single"
         size="sm"
         variant="outline"
         spacing={0}
         value={mode}
-        aria-label="外观"
+        aria-label={t.appearance}
         onValueChange={(v) => {
           if (v) {
             onChangeThemeMode(v as ThemeModeEnum);
@@ -432,10 +436,45 @@ function SettingsThemeRow() {
             key={o.value}
             value={o.value}
             className="px-2.5"
-            aria-label={o.label}
-            title={o.label}
+            aria-label={t[o.labelKey]}
+            title={t[o.labelKey]}
           >
             <o.icon />
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+    </div>
+  );
+}
+
+const LANGUAGE_OPTIONS = [
+  { value: LanguageEnum.Zh, label: "中文" },
+  { value: LanguageEnum.En, label: "English" },
+];
+
+/** 界面语言，同时决定生成提交信息用的语言 */
+function SettingsLanguageRow() {
+  const { language, t } = useLanguage();
+
+  return (
+    <div className={SETTINGS_ROW_CLASS}>
+      <span>{t.language}</span>
+      <ToggleGroup
+        type="single"
+        size="sm"
+        variant="outline"
+        spacing={0}
+        value={language}
+        aria-label={t.language}
+        onValueChange={(v) => {
+          if (v) {
+            setLanguage(v as LanguageEnum);
+          }
+        }}
+      >
+        {LANGUAGE_OPTIONS.map((o) => (
+          <ToggleGroupItem key={o.value} value={o.value} className="px-2.5 text-xs">
+            {o.label}
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
@@ -450,6 +489,7 @@ const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 function App() {
   // 常驻：跟随系统切换、接收 diff 窗口里改的主题
   useThemeMode();
+  const { t } = useLanguage();
   const [panelOpen, setPanelOpen] = useState(
     () => captureBoot?.panelOpen ?? true,
   );
@@ -651,8 +691,8 @@ function App() {
         if (update) {
           setPendingUpdate(update);
           setToast({
-            title: `有新版本 ${update.version}`,
-            message: "打开设置即可更新",
+            title: getMessages().newVersion(update.version),
+            message: getMessages().openSettingsToUpdate,
             kind: "info",
           });
         }
@@ -698,13 +738,14 @@ function App() {
       console.error("刷新项目状态失败", e);
     }
     const isSuccess = !!(result?.success && result.commitMessage);
+    const t = getMessages();
     const message = isSuccess
       ? summarizeCommitMessage(result?.commitMessage ?? "")
-      : (result?.error ?? "提交失败");
+      : (result?.error ?? t.commitFailed);
     setToast(
       isSuccess
-        ? { title: "已推送", message, kind: "ok" }
-        : { title: "失败", message, kind: "err" },
+        ? { title: t.pushed, message, kind: "ok" }
+        : { title: t.failed, message, kind: "err" },
     );
     setRows((prev) =>
       prev.map((r) =>
@@ -712,7 +753,7 @@ function App() {
           ? {
               project: refreshed ?? r.project,
               uiState: isSuccess ? "success" : "failure",
-              resultSummary: isSuccess ? `已推送 · ${message}` : message,
+              resultSummary: isSuccess ? `${t.pushed} · ${message}` : message,
             }
           : r,
       ),
@@ -890,7 +931,7 @@ function App() {
       const message = String(e);
       // 与 commands.rs 的 DUPLICATE_PROJECT_PREFIX 一致
       if (message.startsWith("DUPLICATE_PROJECT:")) {
-        setToast({ title: "已在列表中", message: "这个项目之前加过啦", kind: "info" });
+        setToast({ title: t.alreadyAdded, message: t.alreadyAddedMessage, kind: "info" });
         setFlashId(message.slice("DUPLICATE_PROJECT:".length));
         return;
       }
@@ -914,7 +955,10 @@ function App() {
       return;
     }
     try {
-      await invoke<CommitPushResult>("run_commit_push", { id: row.project.id });
+      await invoke<CommitPushResult>("run_commit_push", {
+        id: row.project.id,
+        language: readLanguage(),
+      });
     } catch (e) {
       console.error("提交并推送失败", e);
     }
@@ -969,9 +1013,9 @@ function App() {
             <img className="tag-logo" src={logoUrl} alt="" />
           </span>
           {hasUnreadFailure ? (
-            <span className="tag-pending is-failed" aria-label="有项目提交失败" />
+            <span className="tag-pending is-failed" aria-label={t.tagFailed} />
           ) : isAnyDirty ? (
-            <span className="tag-pending" aria-label="有项目待提交" />
+            <span className="tag-pending" aria-label={t.tagPending} />
           ) : null}
         </button>
         </>
@@ -982,19 +1026,31 @@ function App() {
           className={`panel${isPanelFromBottom ? " panel--up" : ""}${
             isPanelClosing ? " panel--closing" : ""
           }`}
-          role="dialog" aria-label="ASURADA 面板">
+          role="dialog" aria-label={t.panel}>
           <header className="chrome">
             <div className="title-wrap">
-              <div className="brand">
-                <img src={logoUrl} alt="" />
-              </div>
-              <h1 className="title">ASURADA</h1>
+              {/* 从设置、环境检查等子页回到项目列表 */}
+              <button
+                type="button"
+                className="home"
+                aria-label={t.backToMain}
+                title={t.backToMain}
+                onClick={() => {
+                  setSettingsOpen(false);
+                  setIsCheckOpen(false);
+                }}
+              >
+                <span className="brand">
+                  <img src={logoUrl} alt="" />
+                </span>
+                <span className="title">ASURADA</span>
+              </button>
               {isEnvFailed ? (
                 <Button
                   size="icon-xs"
                   className="rounded-full bg-(--warn-bg) text-(--warn-fg) hover:bg-(--risk-ico)"
-                  aria-label="环境异常，查看检查"
-                  title="环境异常，查看检查"
+                  aria-label={t.envIssue}
+                  title={t.envIssue}
                   onClick={() => setIsCheckOpen((open) => !open)}
                 >
                   <TriangleAlert />
@@ -1006,8 +1062,8 @@ function App() {
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label="添加项目"
-                  title="添加项目"
+                  aria-label={t.addProject}
+                  title={t.addProject}
                   onClick={() => void handleAddProject()}
                 >
                   <Plus />
@@ -1018,8 +1074,8 @@ function App() {
                   variant="ghost"
                   size="icon-sm"
                   className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
-                  aria-label="设置"
-                  title="设置"
+                  aria-label={t.settings}
+                  title={t.settings}
                   aria-pressed={settingsOpen}
                   onClick={() => setSettingsOpen((o) => !o)}
                 >
@@ -1029,8 +1085,8 @@ function App() {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                aria-label="收起"
-                title="收起"
+                aria-label={t.collapse}
+                title={t.collapse}
                 onClick={onCollapsePanel}
               >
                 <ChevronRight />
@@ -1055,7 +1111,7 @@ function App() {
                 className="mb-3 flex items-center gap-1.5 px-1 text-xs leading-snug text-(--risk-fg)"
               >
                 <Info className="size-3.5 flex-none" aria-hidden />
-                一键会暂存全部变更、提交并推送到远端
+                {t.commitHint}
               </div>
             ) : null}
 
@@ -1065,7 +1121,7 @@ function App() {
                 onSkip={finishIntro}
                 onNext={() =>
                   setIntroStep((s) =>
-                    s >= INTRO_STEPS.length - 1 ? s : s + 1,
+                    s >= t.introSteps.length - 1 ? s : s + 1,
                   )
                 }
                 onStart={finishIntro}
@@ -1081,6 +1137,7 @@ function App() {
                     onRecordingChange={handleShortcutRecordingChange}
                   />
                   <SettingsThemeRow />
+                  <SettingsLanguageRow />
                   <SettingsDiffSizeRow
                     active={settingsOpen}
                     skipInvoke={captureBoot?.skipInvoke}
@@ -1093,13 +1150,13 @@ function App() {
                     onFoundUpdate={setPendingUpdate}
                   />
                   <button type="button" className={SETTINGS_ROW_CLASS} onClick={replayIntro}>
-                    <span>查看引导</span>
+                    <span>{t.viewIntro}</span>
                     <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
                   </button>
                 </div>
                 <div className="mt-2.5 flex justify-end">
                   <Button variant="secondary" onClick={() => setSettingsOpen(false)}>
-                    返回
+                    {t.back}
                   </Button>
                 </div>
               </div>
@@ -1112,16 +1169,16 @@ function App() {
                 onBack={() => setIsCheckOpen(false)}
               />
             ) : loading ? (
-              <p className="p-6 text-center text-muted-foreground">加载中…</p>
+              <p className="p-6 text-center text-muted-foreground">{t.loading}</p>
             ) : projectCount === 0 ? (
               <div className="px-1 pt-8 pb-3 text-center">
                 <LogoHero badge="+" />
-                <h2 className={HEADING_CLASS}>还没有项目呢</h2>
+                <h2 className={HEADING_CLASS}>{t.emptyTitle}</h2>
                 <p className={`${LEAD_CLASS} text-center`}>
-                  添加本地 git 仓库后，就能一键生成提交并推送啦
+                  {t.emptyLead}
                 </p>
                 <Button disabled={!inMain} onClick={() => void handleAddProject()}>
-                  添加项目
+                  {t.addProject}
                 </Button>
               </div>
             ) : (
@@ -1174,19 +1231,20 @@ function IntroView({
   onNext: () => void;
   onStart: () => void;
 }) {
-  const content = INTRO_STEPS[step];
-  const isLast = step === INTRO_STEPS.length - 1;
+  const { t } = useLanguage();
+  const content = t.introSteps[step];
+  const isLast = step === t.introSteps.length - 1;
 
   return (
     <div className="px-1 pt-2 pb-3 text-center">
       <LogoHero />
       <h2 className={HEADING_CLASS}>{content.title}</h2>
-      {"sub" in content && content.sub ? (
+      {content.sub ? (
         <p className="mb-2 text-xs font-medium text-muted-foreground">{content.sub}</p>
       ) : null}
       <p className={LEAD_CLASS}>{content.lead}</p>
       <div className="mb-3 flex justify-center gap-1.5" aria-hidden>
-        {INTRO_STEPS.map((_, i) => (
+        {t.introSteps.map((_, i) => (
           <span
             key={i}
             className={`h-[7px] rounded-full ${i === step ? "w-4 bg-ring" : "w-[7px] bg-(--dot-off)"}`}
@@ -1195,10 +1253,10 @@ function IntroView({
       </div>
       <div className="flex items-center justify-end gap-2">
         <Button variant="ghost" className="text-muted-foreground" onClick={onSkip}>
-          跳过
+          {t.skip}
         </Button>
         <Button onClick={isLast ? onStart : onNext}>
-          {isLast ? "开始使用" : "下一步"}
+          {isLast ? t.getStarted : t.next}
         </Button>
       </div>
     </div>
@@ -1212,6 +1270,7 @@ function PreflightGateView({
   loading: boolean;
   checks?: PreflightItem[];
 }) {
+  const { t } = useLanguage();
   const items = checks?.length
     ? checks
     : [
@@ -1232,8 +1291,8 @@ function PreflightGateView({
           <img src={logoUrl} alt="" />
         </div>
       ) : null}
-      <h2 className={HEADING_CLASS}>{loading ? "正在检查本机环境" : "环境检查"}</h2>
-      <p className={`${LEAD_CLASS} text-center`}>依赖本机 pi agent，先确认能不能跑～</p>
+      <h2 className={HEADING_CLASS}>{loading ? t.checkingEnv : t.envCheck}</h2>
+      <p className={`${LEAD_CLASS} text-center`}>{t.envLead}</p>
       <div className={CHECKS_CLASS}>
         {items.map((c) => (
           <PreflightCheckRow key={c.id} item={c} loading={loading} />
@@ -1252,11 +1311,12 @@ function PreflightFailView({
   onRecheck: () => void;
   onBack: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <div className={GATE_CLASS}>
       <LogoHero badge="!" />
-      <h2 className={HEADING_CLASS}>本机还差一点</h2>
-      <p className={`${LEAD_CLASS} text-center`}>环境没齐的话没法提交并推送，先修好再来呀</p>
+      <h2 className={HEADING_CLASS}>{t.envFailTitle}</h2>
+      <p className={`${LEAD_CLASS} text-center`}>{t.envFailLead}</p>
       <div className={CHECKS_CLASS}>
         {result.checks.map((c) => (
           <PreflightCheckRow key={c.id} item={c} loading={false} />
@@ -1264,9 +1324,9 @@ function PreflightFailView({
       </div>
       <div className="flex flex-wrap justify-center gap-2">
         <Button variant="ghost" className="text-muted-foreground" onClick={onBack}>
-          返回
+          {t.back}
         </Button>
-        <Button onClick={onRecheck}>重新检查</Button>
+        <Button onClick={onRecheck}>{t.recheck}</Button>
       </div>
       <p className="mt-3 text-[11px] text-muted-foreground">{result.summary}</p>
     </div>
@@ -1280,7 +1340,8 @@ function PreflightCheckRow({
   item: PreflightItem;
   loading: boolean;
 }) {
-  const meta = PREFLIGHT_CHECK_META[item.id] ?? {
+  const { t } = useLanguage();
+  const meta = t.preflightChecks[item.id] ?? {
     label: item.id,
     detail: item.message,
   };
@@ -1375,7 +1436,8 @@ function ProjectRow({
       rowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   }, [isFlashing]);
-  const pres = getRowPresentation(row);
+  const { t } = useLanguage();
+  const pres = getRowPresentation(row, t);
   const isRunning = row.uiState === "running";
   const primaryDisabled = pres.btnDisabled || !canCommit || isRunning;
 
@@ -1410,7 +1472,7 @@ function ProjectRow({
           ? "cursor-pointer hover:border-ring/60 hover:bg-(--surface-2)"
           : ""
       }${isFlashing ? " animate-[row-flash_0.7s_ease-in-out_2]" : ""}`}
-      title={isDiffable ? "查看变更" : undefined}
+      title={isDiffable ? t.viewChanges : undefined}
       onClick={(event) => void onOpenDiff(event)}
       onAnimationEnd={(e) => {
         if (e.animationName === "row-flash") {
@@ -1442,7 +1504,7 @@ function ProjectRow({
         }}
       >
         {pres.btnBusy ? <Loader2 className="animate-spin" /> : null}
-        {pres.btnBusy ? "提交中…" : "提交并推送"}
+        {pres.btnBusy ? t.committing : t.commitPush}
       </Button>
       <div
         className={`col-span-full row-start-2 mr-14 flex min-w-0 gap-1.5 leading-snug ${
@@ -1462,8 +1524,8 @@ function ProjectRow({
           variant="ghost"
           size="icon-xs"
           className="opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100"
-          aria-label="打开文件夹"
-          title="打开文件夹"
+          aria-label={t.openFolder}
+          title={t.openFolder}
           onClick={onOpenFolder}
         >
           <FolderOpen />
@@ -1472,8 +1534,8 @@ function ProjectRow({
           variant="ghost"
           size="icon-xs"
           className="opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 hover:bg-destructive/10 hover:text-destructive"
-          aria-label="移除项目"
-          title="移除项目"
+          aria-label={t.removeProject}
+          title={t.removeProject}
           onClick={() => setConfirmAction("remove")}
         >
           <Trash2 />
@@ -1484,15 +1546,15 @@ function ProjectRow({
         <div
           className="absolute inset-0 z-2 flex items-center justify-end gap-2 rounded-[inherit] bg-(--surface)/95 px-3 text-xs text-(--ink-strong)"
           role="alertdialog"
-          aria-label={confirmAction === "commit" ? "确认提交" : "确认移除"}
+          aria-label={confirmAction === "commit" ? t.confirmCommit : t.confirmRemove}
         >
           <span>
             {confirmAction === "commit"
-              ? "暂存全部变更、提交并推送？"
-              : "从列表移除？本地仓库还在"}
+              ? t.confirmCommitQuestion
+              : t.confirmRemoveQuestion}
           </span>
           <Button variant="outline" size="sm" onClick={() => setConfirmAction(null)}>
-            取消
+            {t.cancel}
           </Button>
           {confirmAction === "commit" ? (
             <Button
@@ -1502,7 +1564,7 @@ function ProjectRow({
                 onCommit();
               }}
             >
-              提交
+              {t.commit}
             </Button>
           ) : (
             <Button
@@ -1510,7 +1572,7 @@ function ProjectRow({
               className="bg-destructive text-white hover:bg-destructive/85"
               onClick={onRemove}
             >
-              移除
+              {t.remove}
             </Button>
           )}
         </div>

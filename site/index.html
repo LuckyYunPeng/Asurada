@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Asurada · 写完代码，一键提交推送</title>
+<meta name="description" content="停靠在 macOS 屏幕边缘的小工具：AI 生成中文提交信息，一键提交并推送，多项目一览。">
+<link rel="icon" href="./assets/logo.png">
+<style>
+  :root {
+    --bg: #07070b;
+    --fg: #f4f4f7;
+    --muted: #9a9aa8;
+    --line: rgba(255, 255, 255, .08);
+    --violet: #8b5cf6;
+    --pink: #ec4899;
+    --cyan: #22d3ee;
+    --grad: linear-gradient(120deg, var(--cyan), var(--violet) 45%, var(--pink));
+    /* 首尾同色、水平方向，平铺后无接缝，供流光动画循环使用 */
+    --grad-loop: linear-gradient(90deg, var(--cyan), var(--violet), var(--pink), var(--cyan));
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
+    line-height: 1.6;
+    overflow-x: clip;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  code, .mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; }
+
+  /* 背景：星空 + 漂浮光斑 */
+  #stars { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -2; }
+  /* 光斑超出视口的部分要裁掉，否则移动端会出现横向滚动 */
+  .blobs { position: fixed; inset: 0; z-index: -1; overflow: hidden; contain: strict; pointer-events: none; }
+  .blob {
+    position: absolute; z-index: -1; border-radius: 50%;
+    filter: blur(90px); opacity: .35; pointer-events: none;
+    animation: drift 18s ease-in-out infinite alternate;
+  }
+  .blob.a { width: 520px; height: 520px; background: var(--violet); top: -120px; left: -120px; }
+  .blob.b { width: 460px; height: 460px; background: var(--pink); top: 30%; right: -160px; animation-delay: -6s; }
+  .blob.c { width: 380px; height: 380px; background: var(--cyan); bottom: -140px; left: 30%; animation-delay: -12s; opacity: .2; }
+  @keyframes drift {
+    to { transform: translate(80px, 60px) scale(1.15); }
+  }
+
+  /* 导航 */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 32px;
+    backdrop-filter: blur(16px);
+    background: rgba(7, 7, 11, .55);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: .12em; }
+  .brand img { width: 30px; height: 30px; border-radius: 8px; }
+  nav .links { display: flex; gap: 28px; color: var(--muted); font-size: 14px; align-items: center; }
+  nav .links a:hover { color: var(--fg); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 22px; border-radius: 999px; font-weight: 600; font-size: 15px;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn.primary {
+    background: var(--grad-loop); background-size: 200% 100%; color: #fff;
+    box-shadow: 0 10px 40px -10px rgba(139, 92, 246, .8);
+    animation: shine 6s linear infinite;
+  }
+  .btn.primary:hover { box-shadow: 0 16px 50px -8px rgba(236, 72, 153, .8); }
+  .btn.ghost { border: 1px solid var(--line); background: rgba(255, 255, 255, .04); }
+  .btn.small { padding: 8px 16px; font-size: 13px; }
+  @keyframes shine { to { background-position: 200% 0; } }
+
+  /* Hero */
+  .hero {
+    min-height: 100vh; padding: 140px 24px 80px;
+    display: flex; flex-direction: column; align-items: center; text-align: center;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 14px; border-radius: 999px; font-size: 13px; color: var(--muted);
+    border: 1px solid var(--line); background: rgba(255, 255, 255, .03);
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 12px #f59e0b; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
+  h1 {
+    margin-top: 24px; font-size: clamp(40px, 7vw, 84px); line-height: 1.08; font-weight: 800; letter-spacing: -.02em;
+  }
+  .grad-text {
+    background: var(--grad-loop); background-size: 200% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: shine 5s linear infinite;
+  }
+  .sub { margin-top: 20px; max-width: 640px; font-size: 18px; color: var(--muted); }
+  .cta { margin-top: 36px; display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+
+  /* 打字机提交信息 */
+  .terminal {
+    margin-top: 40px; padding: 14px 20px; border-radius: 12px;
+    border: 1px solid var(--line); background: rgba(255, 255, 255, .03);
+    font-size: 15px; min-width: min(520px, 90vw); text-align: left;
+  }
+  .terminal .prompt { color: var(--cyan); }
+  .terminal .ok { color: #4ade80; }
+  .caret { display: inline-block; width: 8px; height: 1.1em; background: var(--fg); vertical-align: -3px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Hero 截图舞台：桌面 + 从右侧滑入的面板 */
+  .stage {
+    position: relative; margin-top: 70px; width: min(1100px, 100%);
+    perspective: 1800px;
+  }
+  .stage .desk {
+    width: 100%; border-radius: 16px; border: 1px solid var(--line);
+    box-shadow: 0 40px 120px -30px rgba(139, 92, 246, .55);
+    transform: rotateX(14deg); transform-origin: top center;
+    /* backwards：结束后不保留关键帧，否则会压过滚动时设的 transform */
+    animation: tilt-in 1.4s cubic-bezier(.2, .8, .2, 1) .2s backwards;
+  }
+  @keyframes tilt-in {
+    from { opacity: 0; transform: rotateX(35deg) translateY(80px); }
+  }
+  .stage .panel {
+    position: absolute; right: 3%; top: 8%; width: 25%;
+    border-radius: 14px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .08), 0 0 60px -10px rgba(236, 72, 153, .5);
+    animation: slide-in 1s cubic-bezier(.2, .9, .2, 1.1) 1.5s both, float 6s ease-in-out 2.6s infinite;
+  }
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateX(120%) scale(.9); }
+  }
+  @keyframes float { 50% { transform: translateY(-12px); } }
+  .stage .glow {
+    position: absolute; inset: 10% 10% -10%; z-index: -1;
+    background: var(--grad); filter: blur(100px); opacity: .25;
+  }
+
+  /* 宣言 */
+  .manifesto {
+    margin-top: 40px; padding: 28px 32px; border-left: 3px solid; border-image: var(--grad) 1;
+    font-size: clamp(20px, 2.6vw, 28px); font-weight: 700; line-height: 1.5;
+    background: linear-gradient(90deg, rgba(139, 92, 246, .1), transparent);
+  }
+  .manifesto em { font-style: normal; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  /* 噪音过滤演示 */
+  .focus-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 64px; align-items: center; }
+  /* 否则长文件名（nowrap）会把网格列撑宽，导致移动端整页横向溢出 */
+  .focus-grid > * { min-width: 0; }
+  .sieve .row .path { overflow: hidden; text-overflow: ellipsis; }
+  .checks { margin-top: 24px; list-style: none; display: grid; gap: 12px; }
+  .checks li { display: flex; gap: 10px; color: var(--muted); }
+  .checks li::before { content: "✓"; color: #4ade80; font-weight: 700; }
+  .sieve {
+    position: relative; overflow: hidden; padding: 18px; border-radius: 18px; font-size: 13px;
+    background: rgba(18, 18, 24, .85); border: 1px solid var(--line);
+    box-shadow: 0 30px 80px -20px rgba(139, 92, 246, .45);
+  }
+  .sieve-head { display: flex; justify-content: space-between; padding: 4px 8px 12px; color: var(--muted); }
+  .sieve-count b { color: var(--fg); display: inline-block; min-width: 1.4em; text-align: right; }
+  .sieve .row {
+    display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: 8px;
+    font-family: "SF Mono", ui-monospace, Menlo, monospace; white-space: nowrap; overflow: hidden;
+    height: 38px; transition: height .6s ease, opacity .5s ease, background .5s, transform .5s;
+  }
+  .sieve .row .stat { margin-left: auto; color: var(--muted); }
+  .sieve .tag { width: 18px; font-weight: 700; }
+  .sieve .tag.m { color: #f59e0b; }
+  .sieve .tag.a { color: #4ade80; }
+  .sieve.filtered .row.noise { height: 0; opacity: 0; transform: translateX(40px); }
+  .sieve.filtered .row.key {
+    background: linear-gradient(90deg, rgba(139, 92, 246, .22), rgba(236, 72, 153, .08));
+    box-shadow: inset 2px 0 0 var(--violet);
+  }
+
+  /* 通用区块 */
+  section { padding: 120px 24px; }
+  .wrap { width: min(1100px, 100%); margin: 0 auto; }
+  .eyebrow { color: var(--pink); font-weight: 700; letter-spacing: .2em; font-size: 13px; text-transform: uppercase; }
+  h2 { margin-top: 12px; font-size: clamp(30px, 4.5vw, 52px); line-height: 1.15; letter-spacing: -.01em; }
+  .lead { margin-top: 16px; color: var(--muted); font-size: 17px; max-width: 620px; }
+
+  /* 痛点 */
+  .pains { margin-top: 56px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .card {
+    position: relative; padding: 28px; border-radius: 18px;
+    background: rgba(255, 255, 255, .03); border: 1px solid var(--line);
+    overflow: hidden; transition: transform .3s, border-color .3s;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0; opacity: 0; transition: opacity .3s;
+    background: radial-gradient(400px circle at var(--mx, 50%) var(--my, 50%), rgba(139, 92, 246, .18), transparent 60%);
+  }
+  .card:hover { transform: translateY(-6px); border-color: rgba(139, 92, 246, .4); }
+  .card:hover::before { opacity: 1; }
+  .card .icon { font-size: 28px; }
+  .card h3 { margin-top: 14px; font-size: 19px; }
+  .card p { margin-top: 8px; color: var(--muted); font-size: 15px; }
+  .strike { text-decoration: line-through; text-decoration-color: var(--pink); color: var(--muted); }
+
+  /* 流程 */
+  .flow { margin-top: 60px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; position: relative; }
+  .flow::before {
+    content: ""; position: absolute; top: 30px; left: 12%; right: 12%; height: 2px;
+    background: var(--grad-loop); background-size: 200% 100%; animation: shine 3s linear infinite; opacity: .6;
+  }
+  .step { text-align: center; position: relative; }
+  .step .num {
+    width: 60px; height: 60px; margin: 0 auto; border-radius: 50%;
+    display: grid; place-items: center; font-weight: 800; font-size: 20px;
+    background: var(--bg); border: 2px solid transparent;
+    background-image: linear-gradient(var(--bg), var(--bg)), var(--grad);
+    background-origin: border-box; background-clip: padding-box, border-box;
+  }
+  .step h3 { margin-top: 18px; font-size: 18px; }
+  .step p { margin-top: 6px; color: var(--muted); font-size: 14px; }
+
+  /* 功能展示：左右交替 */
+  .feature { display: grid; grid-template-columns: 1fr 1.2fr; gap: 64px; align-items: center; margin-top: 100px; }
+  .feature.rev { grid-template-columns: 1.2fr 1fr; }
+  .feature.rev .text { order: 2; }
+  .feature ul { margin-top: 22px; list-style: none; display: grid; gap: 12px; }
+  .feature li { display: flex; gap: 10px; color: var(--muted); }
+  .feature li::before { content: "✦"; color: var(--violet); }
+  .shot { position: relative; }
+  .shot img { width: 100%; border-radius: 14px; border: 1px solid var(--line); display: block; }
+  .shot.tall { display: flex; justify-content: center; }
+  .shot.tall img { width: 62%; }
+  .shot::after {
+    content: ""; position: absolute; inset: 15%; z-index: -1;
+    background: var(--grad); filter: blur(80px); opacity: .3;
+  }
+  kbd {
+    display: inline-block; min-width: 34px; padding: 6px 10px; margin: 0 2px;
+    border-radius: 8px; text-align: center; font-family: inherit; font-size: 15px; font-weight: 600;
+    background: linear-gradient(#24242c, #17171d); border: 1px solid #33333d;
+    box-shadow: 0 3px 0 #0d0d11, 0 0 0 1px rgba(0, 0, 0, .3);
+    animation: press 3s ease-in-out infinite;
+  }
+  kbd:nth-child(2) { animation-delay: .12s; }
+  kbd:nth-child(3) { animation-delay: .24s; }
+  @keyframes press {
+    0%, 70%, 100% { transform: translateY(0); box-shadow: 0 3px 0 #0d0d11; }
+    75%, 85% { transform: translateY(3px); box-shadow: 0 0 0 #0d0d11, 0 0 24px rgba(139, 92, 246, .7); }
+  }
+  .keys { margin-top: 26px; display: flex; align-items: center; gap: 6px; color: var(--muted); }
+
+  /* 更多功能网格 */
+  .grid { margin-top: 56px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+
+  /* 收尾 CTA */
+  .final { text-align: center; }
+  .final .logo-big {
+    width: 120px; height: 120px; border-radius: 28px; margin: 0 auto;
+    box-shadow: 0 0 80px rgba(139, 92, 246, .6);
+    animation: float 5s ease-in-out infinite;
+  }
+  .final .lead { margin-left: auto; margin-right: auto; }
+  .final .cta { margin-top: 32px; }
+  .req { margin-top: 18px; color: var(--muted); font-size: 13px; }
+
+  footer { padding: 40px 24px; text-align: center; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); }
+
+  /* 滚动进入动画 */
+  .reveal { opacity: 0; transform: translateY(40px); transition: opacity .9s ease, transform .9s cubic-bezier(.2, .8, .2, 1); }
+  .reveal.in { opacity: 1; transform: none; }
+  .reveal.d1 { transition-delay: .1s; }
+  .reveal.d2 { transition-delay: .2s; }
+  .reveal.d3 { transition-delay: .3s; }
+
+  @media (max-width: 860px) {
+    nav .links a:not(.btn) { display: none; }
+    .pains, .grid, .flow, .focus-grid { grid-template-columns: 1fr; }
+    .flow::before { display: none; }
+    .feature, .feature.rev { grid-template-columns: 1fr; gap: 32px; margin-top: 72px; }
+    .feature.rev .text { order: 0; }
+    .stage .desk { transform: none; }
+    nav { padding: 12px 18px; }
+    .hero { min-height: auto; padding: 110px 20px 40px; }
+    h1 { font-size: 32px; }
+    .sub { font-size: 16px; }
+    .badge { font-size: 12px; }
+    .terminal { font-size: 13px; min-width: 0; width: 100%; }
+    /* 面板从右侧滑入时不撑宽页面（桌面端不裁，保留阴影） */
+    .stage { margin-top: 40px; overflow-x: clip; }
+    section { padding: 72px 20px; }
+    .manifesto { padding: 20px; }
+    .sieve { font-size: 12px; padding: 12px; }
+    .sieve .row { gap: 8px; padding: 0 6px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .reveal { opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div class="blobs"><div class="blob a"></div><div class="blob b"></div><div class="blob c"></div></div>
+
+<nav>
+  <a class="brand" href="#"><img src="./assets/logo.png" alt="">ASURADA</a>
+  <div class="links">
+    <a href="#why">为什么</a>
+    <a href="#features">功能</a>
+    <a href="https://github.com/LuckyYunPeng/asurada">GitHub</a>
+    <a class="btn primary small" href="https://github.com/LuckyYunPeng/asurada/releases/latest">下载</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <span class="badge"><span class="dot"></span>为 Vibe Coding 时代的代码 Review 而生 · macOS</span>
+  <h1>AI 写代码，<br><span class="grad-text">但你得看懂自己的项目</span></h1>
+  <p class="sub">Review 不是因为不信任 AI，而是为了让「人」始终了解自己的项目，尤其是那些关键的地方。Asurada 的出发点是帮你滤掉噪音、只看重点，看完一键提交推送。</p>
+  <div class="cta">
+    <a class="btn primary" href="https://github.com/LuckyYunPeng/asurada/releases/latest">免费下载 macOS 版</a>
+    <a class="btn ghost" href="https://github.com/LuckyYunPeng/asurada">在 GitHub 上查看</a>
+  </div>
+
+  <div class="terminal mono" aria-live="polite">
+    <span class="prompt">❯ </span><span id="typed"></span><span class="caret"></span>
+  </div>
+
+  <div class="stage">
+    <div class="glow"></div>
+    <img class="desk" src="./assets/desktop.jpg" alt="Asurada 平时停靠在屏幕边缘的小标签">
+    <img class="panel" src="./assets/panel.png" alt="展开后的项目面板">
+  </div>
+</header>
+
+<section id="why">
+  <div class="wrap">
+    <p class="eyebrow reveal">我们的出发点</p>
+    <h2 class="reveal d1">代码可以交给 AI 写，<br><span class="grad-text">项目不能交给 AI 懂</span></h2>
+    <p class="lead reveal d2">Vibe Coding 让写代码快了十倍，可如果你不再看代码，项目就会慢慢变成一个你不认识的黑盒。出了问题时，你不知道该从哪里查；要做决定时，你不知道它现在长什么样。</p>
+    <blockquote class="manifesto reveal d3">
+      Review，不是为了挑 AI 的错，<br>而是为了让<em>你</em>始终是最了解这个项目的人。
+    </blockquote>
+    <div class="pains">
+      <div class="card reveal">
+        <div class="icon">🌊</div>
+        <h3>改动太多，看不过来</h3>
+        <p>AI 一轮就能改几十个文件，逐行看完不现实，于是干脆不看。</p>
+      </div>
+      <div class="card reveal d1">
+        <div class="icon">📢</div>
+        <h3>噪音淹没重点</h3>
+        <p>测试、样板代码混在业务改动里，真正需要你把关的那几行反而被埋掉。</p>
+      </div>
+      <div class="card reveal d2">
+        <div class="icon">🔁</div>
+        <h3>看完还要处理杂事</h3>
+        <p>写提交信息、推送、处理冲突、切换项目，Review 的专注力被一点点打散。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="focus">
+  <div class="wrap focus-grid">
+    <div class="reveal">
+      <p class="eyebrow">只看重点</p>
+      <h2>把噪音滤掉，<br><span class="grad-text">留下值得你看的</span></h2>
+      <p class="lead">打开差异窗口，测试文件默认收起，变更按目录一目了然，行内改动精确到词。你的注意力只花在真正影响项目的地方。</p>
+      <ul class="checks">
+        <li>一键隐藏测试文件，只影响查看，提交时照常带上</li>
+        <li>目录树浏览，先看清这次改了哪些模块</li>
+        <li>整词级别的行内对比，一眼看出改了什么</li>
+        <li>按文件名筛选，直奔你关心的那一处</li>
+      </ul>
+    </div>
+    <div class="sieve reveal d2" aria-hidden="true">
+      <div class="sieve-head"><span>本次变更</span><span class="sieve-count"><b id="sieveCount">12</b> 个文件</span></div>
+      <div class="row key"><span class="tag m">M</span><span class="path">src/payment/checkout.ts</span><span class="stat">+42 −8</span></div>
+      <div class="row noise"><span class="tag a">A</span><span class="path">src/payment/__tests__/checkout.test.ts</span><span class="stat">+186</span></div>
+      <div class="row key"><span class="tag m">M</span><span class="path">src/auth/session.ts</span><span class="stat">+15 −3</span></div>
+      <div class="row noise"><span class="tag m">M</span><span class="path">src/auth/session.spec.ts</span><span class="stat">+64 −2</span></div>
+      <div class="row noise"><span class="tag a">A</span><span class="path">tests/fixtures/orders.json</span><span class="stat">+320</span></div>
+      <div class="row key"><span class="tag m">M</span><span class="path">src/db/migrations/0042_orders.sql</span><span class="stat">+21</span></div>
+      <div class="row noise"><span class="tag a">A</span><span class="path">e2e/checkout.e2e.ts</span><span class="stat">+97</span></div>
+      <div class="row noise"><span class="tag m">M</span><span class="path">src/utils/__tests__/money.test.ts</span><span class="stat">+38 −1</span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow reveal">怎么用</p>
+    <h2 class="reveal d1">你只负责最重要的那一步：看懂</h2>
+    <div class="flow">
+      <div class="step reveal"><div class="num">1</div><h3>AI 写代码</h3><p>用你喜欢的 Agent 和编辑器</p></div>
+      <div class="step reveal d1"><div class="num">2</div><h3>你 Review 重点</h3><p>滤掉噪音，只看关键改动</p></div>
+      <div class="step reveal d2"><div class="num">3</div><h3>一键提交推送</h3><p>中文提交信息自动生成</p></div>
+      <div class="step reveal d3"><div class="num">4</div><h3>继续下一轮</h3><p>推送、冲突处理自动完成</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <p class="eyebrow reveal">功能</p>
+    <h2 class="reveal d1">小，但刚好够用</h2>
+
+    <div class="feature rev">
+      <div class="text reveal">
+        <h2>提交之前，<span class="grad-text">看懂关键改动</span></h2>
+        <p class="lead">差异窗口就是你的 Review 台：变更按目录排开，噪音可以收起，重点逐行对比。</p>
+        <ul>
+          <li>隐藏测试文件，聚焦业务改动</li>
+          <li>左右 / 上下两种对比布局，色弱友好配色</li>
+          <li>看到可疑处，直接跳到编辑器打开</li>
+        </ul>
+      </div>
+      <div class="shot reveal d2"><img src="./assets/diff.jpg" alt="差异窗口"></div>
+    </div>
+
+    <div class="feature">
+      <div class="text reveal">
+        <h2>看完，<span class="grad-text">一键收尾</span></h2>
+        <p class="lead">所有项目一屏看完，有改动的排在最前面。Review 完点一下，剩下的杂事交给 Asurada。</p>
+        <ul>
+          <li>根据改动自动生成一行中文提交信息，比如 <code>feat: 新增深色模式</code></li>
+          <li>远端有新提交时自动同步后重试</li>
+          <li>遇到冲突就撤回并提示，不会弄乱仓库</li>
+        </ul>
+      </div>
+      <div class="shot tall reveal d2"><img src="./assets/panel.png" alt="项目面板"></div>
+    </div>
+
+    <div class="feature rev">
+      <div class="text reveal">
+        <h2>不找它，<span class="grad-text">它就不打扰你</span></h2>
+        <p class="lead">平时只在屏幕边缘露出一个小标签，有待提交的改动时会亮起提示。在任何应用里按快捷键都能呼出面板。</p>
+        <div class="keys"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>G</kbd><span>&nbsp;展开 / 收起，可在设置中修改</span></div>
+      </div>
+      <div class="shot reveal d2"><img src="./assets/desktop.jpg" alt="停靠在屏幕边缘的小标签"></div>
+    </div>
+
+    <div class="grid">
+      <div class="card reveal"><div class="icon">🫧</div><h3>结果气泡</h3><p>面板收起时，用小气泡告诉你提交成功还是失败。</p></div>
+      <div class="card reveal d1"><div class="icon">📍</div><h3>想放哪就放哪</h3><p>小标签可以拖到屏幕边缘任意高度，位置会被记住。</p></div>
+      <div class="card reveal d2"><div class="icon">✅</div><h3>提交前确认</h3><p>想多一道保险？打开设置，提交前弹窗确认。</p></div>
+      <div class="card reveal"><div class="icon">🌗</div><h3>浅色 / 深色</h3><p>跟随系统，或手动指定外观。</p></div>
+      <div class="card reveal d1"><div class="icon">🚀</div><h3>开机自启动</h3><p>开机就待命，不用每次手动打开。</p></div>
+      <div class="card reveal d2"><div class="icon">🔄</div><h3>自动更新</h3><p>有新版本时应用内提示，一键安装重启。</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="final">
+  <div class="wrap">
+    <img class="logo-big reveal" src="./assets/logo.png" alt="Asurada">
+    <h2 class="reveal d1" style="margin-top: 32px;">让 AI 写代码，<br><span class="grad-text">让你看懂项目</span></h2>
+    <p class="lead reveal d2">免费、开源，MIT 协议。</p>
+    <div class="cta reveal d3">
+      <a class="btn primary" href="https://github.com/LuckyYunPeng/asurada/releases/latest">免费下载 macOS 版</a>
+      <a class="btn ghost" href="https://github.com/LuckyYunPeng/asurada">⭐ Star on GitHub</a>
+    </div>
+    <p class="req reveal d3">需要 Apple Silicon 的 Mac，并已安装 git 与 pi</p>
+  </div>
+</section>
+
+<footer>© Asurada · MIT License</footer>
+
+<script>
+  // 星空背景
+  const canvas = document.getElementById('stars');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+  function onResize() {
+    canvas.width = innerWidth * devicePixelRatio;
+    canvas.height = innerHeight * devicePixelRatio;
+    stars = Array.from({ length: 180 }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 1.4 * devicePixelRatio,
+      v: Math.random() * .25 + .05,
+      t: Math.random() * Math.PI * 2,
+    }));
+  }
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const s of stars) {
+      s.y -= s.v;
+      s.t += .02;
+      if (s.y < 0) {
+        s.y = canvas.height;
+      }
+      ctx.globalAlpha = .4 + Math.sin(s.t) * .4;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    requestAnimationFrame(draw);
+  }
+  addEventListener('resize', onResize);
+  onResize();
+  draw();
+
+  // 打字机：循环展示生成的提交信息
+  const messages = [
+    'feat(payment): 结算时校验优惠券有效期',
+    'fix(auth): 修复会话过期后未跳转登录',
+    'feat(db): 订单表新增退款状态字段',
+  ];
+  const typed = document.getElementById('typed');
+  async function typeLoop() {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    for (let i = 0; ; i = (i + 1) % messages.length) {
+      for (const ch of messages[i]) {
+        typed.textContent += ch;
+        await sleep(55);
+      }
+      typed.innerHTML += ' <span class="ok">✓ 已推送</span>';
+      await sleep(1800);
+      typed.textContent = '';
+      await sleep(300);
+    }
+  }
+  typeLoop();
+
+  // 滚动进入
+  const observer = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) {
+        e.target.classList.add('in');
+        observer.unobserve(e.target);
+      }
+    }
+  }, { threshold: .15 });
+  document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
+
+  // 噪音过滤演示：循环收起 / 展开测试文件
+  const sieve = document.querySelector('.sieve');
+  const sieveCount = document.getElementById('sieveCount');
+  setInterval(() => {
+    sieve.classList.toggle('filtered');
+    sieveCount.textContent = sieve.classList.contains('filtered') ? 3 : 12;
+  }, 2800);
+
+  // 卡片跟随鼠标的光晕
+  document.querySelectorAll('.card').forEach((card) => {
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      card.style.setProperty('--mx', `${e.clientX - rect.left}px`);
+      card.style.setProperty('--my', `${e.clientY - rect.top}px`);
+    });
+  });
+
+  // Hero 截图随滚动放平
+  const desk = document.querySelector('.stage .desk');
+  addEventListener('scroll', () => {
+    if (innerWidth <= 860) {
+      return;
+    }
+    const deg = Math.max(0, 14 - scrollY / 25);
+    desk.style.transform = `rotateX(${deg}deg)`;
+  }, { passive: true });
+</script>
+</body>
+</html>

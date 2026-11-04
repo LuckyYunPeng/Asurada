@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useThemeMode } from "./theme";
+import { getMessages, readLanguage, useLanguage } from "./i18n";
 import "./App.css";
 import "./DiffWindow.css";
 
@@ -212,7 +213,7 @@ const TREE_INDENT = 14;
 /** 与主面板 LogoHero 同款：虚线光环慢转 + logo 悬浮（样式在 App.css） */
 function LogoLoading() {
   return (
-    <div className="logo-idle" aria-label="加载中">
+    <div className="logo-idle" aria-label={getMessages().loading}>
       <span className="logo-idle-ring" />
       <img src={logoUrl} alt="" />
     </div>
@@ -237,6 +238,7 @@ interface IOpenWithApp {
 /** 文件 / 目录行的右键菜单，用系统原生菜单。relPath 是相对项目根的路径，删除的文件没有「打开」类操作 */
 async function popupPathMenu(root: string, relPath: string, kind: "file" | "dir", isDeleted: boolean) {
   const absPath = `${root}/${relPath}`;
+  const t = getMessages();
   const run = (label: string, action: () => Promise<unknown>) => () => {
     action().catch((e) => console.error(`${label}失败`, e));
   };
@@ -248,12 +250,12 @@ async function popupPathMenu(root: string, relPath: string, kind: "file" | "dir"
     const openItems =
       kind === "file" && !isDeleted
         ? [
-            { text: "打开", action: run("打开文件", () => openPath(absPath)) },
+            { text: t.menuOpen, action: run("打开文件", () => openPath(absPath)) },
             {
-              text: "打开方式",
+              text: t.menuOpenWith,
               enabled: apps.length > 0,
               items: apps.map((app) => ({
-                text: app.isDefault ? `${app.name}（默认）` : app.name,
+                text: app.isDefault ? t.menuDefaultApp(app.name) : app.name,
                 action: run("打开文件", () =>
                   invoke("open_with_app", { path: absPath, app: app.path }),
                 ),
@@ -266,18 +268,18 @@ async function popupPathMenu(root: string, relPath: string, kind: "file" | "dir"
       items: [
         ...openItems,
         {
-          text: "在访达中显示",
+          text: t.menuReveal,
           enabled: !isDeleted,
           action: run("在访达中显示", () => revealItemInDir(absPath)),
         },
         { item: "Separator" },
-        { text: "复制路径", action: run("复制路径", () => invoke("copy_text", { text: absPath })) },
+        { text: t.menuCopyPath, action: run("复制路径", () => invoke("copy_text", { text: absPath })) },
         {
-          text: "复制相对路径",
+          text: t.menuCopyRelativePath,
           action: run("复制相对路径", () => invoke("copy_text", { text: relPath })),
         },
         {
-          text: "复制名称",
+          text: t.menuCopyName,
           action: run("复制名称", () =>
             invoke("copy_text", { text: relPath.slice(relPath.lastIndexOf("/") + 1) }),
           ),
@@ -399,6 +401,7 @@ function DiffView({ projectId }: { projectId: string }) {
   const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(() => new Set());
   // 首次语法高亮完成前，库会画灰色骨架线；用 logo 动画盖住。窗口已预热时高亮器早就加载好了
   const [isRendered, setIsRendered] = useState(isHighlighterLoaded);
+  const { t } = useLanguage();
 
   const fetchDiff = useCallback(async () => {
     setIsLoading(true);
@@ -431,9 +434,9 @@ function DiffView({ projectId }: { projectId: string }) {
 
   useEffect(() => {
     if (diff) {
-      document.title = `${diff.displayName} 的变更`;
+      document.title = t.diffTitle(diff.displayName);
     }
-  }, [diff]);
+  }, [diff, t]);
 
   const entries = useMemo(() => (diff ? toEntries(diff) : []), [diff]);
 
@@ -531,8 +534,8 @@ function DiffView({ projectId }: { projectId: string }) {
       }
       setNotice(
         payload.result?.success
-          ? { kind: "ok", text: `已推送 · ${payload.result.commitMessage ?? ""}` }
-          : { kind: "err", text: payload.result?.error ?? "提交失败" },
+          ? { kind: "ok", text: `${getMessages().pushed} · ${payload.result.commitMessage ?? ""}` }
+          : { kind: "err", text: payload.result?.error ?? getMessages().commitFailed },
       );
       void fetchDiff();
     }).then((stop) => {
@@ -546,16 +549,16 @@ function DiffView({ projectId }: { projectId: string }) {
       // diff 窗口是普通窗口，用系统确认框；附在本窗口上，不会抢走主面板
       if (
         isConfirmCommitEnabled() &&
-        !(await ask("会暂存全部变更（含隐藏的测试文件）、提交并推送到远端。", {
-          title: "确认提交并推送？",
+        !(await ask(t.confirmCommitDetail, {
+          title: t.confirmCommitTitle,
           kind: "warning",
-          okLabel: "提交",
-          cancelLabel: "取消",
+          okLabel: t.commit,
+          cancelLabel: t.cancel,
         }))
       ) {
         return;
       }
-      await invoke<CommitPushResult>("run_commit_push", { id: projectId });
+      await invoke<CommitPushResult>("run_commit_push", { id: projectId, language: readLanguage() });
     } catch (e) {
       console.error("提交并推送失败", e);
       setNotice({ kind: "err", text: String(e) });
@@ -677,10 +680,10 @@ function DiffView({ projectId }: { projectId: string }) {
             <span className="title">ASURADA</span>
           </div>
           <span className="dw-divider" aria-hidden />
-          <strong>{diff?.displayName ?? "加载中…"}</strong>
+          <strong>{diff?.displayName ?? t.loading}</strong>
           {entries.length ? (
             <>
-              <span className="dw-sub">{countedEntries.length} 个文件</span>
+              <span className="dw-sub">{t.fileCount(countedEntries.length)}</span>
               <DiffCount additions={totalAdditions} deletions={totalDeletions} />
             </>
           ) : null}
@@ -690,10 +693,10 @@ function DiffView({ projectId }: { projectId: string }) {
             <TooltipTrigger asChild>
               <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground select-none">
                 <Switch checked={isColorblind} onCheckedChange={onToggleColorblind} />
-                <span>色弱模式</span>
+                <span>{t.colorblind}</span>
               </label>
             </TooltipTrigger>
-            <TooltipContent side="bottom">增删改用蓝色 / 橙色，红绿色弱也能分清</TooltipContent>
+            <TooltipContent side="bottom">{t.colorblindTip}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -701,17 +704,17 @@ function DiffView({ projectId }: { projectId: string }) {
                 {/* 存储仍沿用 asurada.diffShowTests，旧的选择不丢；开关表示「正在隐藏」 */}
                 <Switch checked={!isShowTests} onCheckedChange={onToggleShowTests} />
                 <span>
-                  隐藏测试文件
+                  {t.hideTests}
                   {!isShowTests && testCount ? (
                     <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[11px] font-normal">
-                      已隐藏 {testCount}
+                      {t.hiddenCount(testCount)}
                     </Badge>
                   ) : null}
                 </span>
               </label>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              只影响列表显示，提交时测试文件仍会一起提交
+              {t.hideTestsTip}
             </TooltipContent>
           </Tooltip>
           <ToggleGroup
@@ -720,7 +723,7 @@ function DiffView({ projectId }: { projectId: string }) {
             variant="outline"
             spacing={0}
             value={diffStyle}
-            aria-label="对比方式"
+            aria-label={t.diffLayout}
             onValueChange={(v) => {
               if (v) {
                 onChangeDiffStyle(v as TDiffStyle);
@@ -728,10 +731,10 @@ function DiffView({ projectId }: { projectId: string }) {
             }}
           >
             <ToggleGroupItem value="unified" className="px-3 text-xs">
-              上下
+              {t.diffUnified}
             </ToggleGroupItem>
             <ToggleGroupItem value="split" className="px-3 text-xs">
-              左右
+              {t.diffSplit}
             </ToggleGroupItem>
           </ToggleGroup>
           <Tooltip>
@@ -739,14 +742,14 @@ function DiffView({ projectId }: { projectId: string }) {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                aria-label="刷新"
+                aria-label={t.refresh}
                 disabled={isLoading}
                 onClick={() => void fetchDiff()}
               >
                 <RefreshCw className={isLoading ? "animate-spin" : undefined} />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">刷新</TooltipContent>
+            <TooltipContent side="bottom">{t.refresh}</TooltipContent>
           </Tooltip>
           <Button
             size="sm"
@@ -755,7 +758,7 @@ function DiffView({ projectId }: { projectId: string }) {
             onClick={() => void onCommit()}
           >
             {isCommitting ? <Loader2 className="animate-spin" /> : null}
-            {isCommitting ? "提交中…" : "提交并推送"}
+            {isCommitting ? t.committing : t.commitPush}
           </Button>
         </div>
       </header>
@@ -763,7 +766,7 @@ function DiffView({ projectId }: { projectId: string }) {
       {notice ? (
         <div className={`dw-notice is-${notice.kind}`} role="status">
           <span>{notice.text}</span>
-          <button type="button" aria-label="关闭" onClick={() => setNotice(null)}>
+          <button type="button" aria-label={t.close} onClick={() => setNotice(null)}>
             ×
           </button>
         </div>
@@ -771,10 +774,10 @@ function DiffView({ projectId }: { projectId: string }) {
 
       {error ? (
         <div className="dw-state">
-          <p>读取变更失败</p>
+          <p>{t.loadDiffFailed}</p>
           <pre>{error}</pre>
           <Button size="sm" onClick={() => void fetchDiff()}>
-            重试
+            {t.retry}
           </Button>
         </div>
       ) : !diff ? (
@@ -784,14 +787,14 @@ function DiffView({ projectId }: { projectId: string }) {
       ) : !entries.length ? (
         <div className="dw-state">
           <img src={logoUrl} alt="" />
-          <p>工作区很干净，没有要提交的变更</p>
+          <p>{t.workingTreeClean}</p>
         </div>
       ) : (
         <div className="dw-main">
           <aside className="dw-side" style={{ width: sidebarWidth }}>
             <input
               className="dw-filter"
-              placeholder="筛选文件…"
+              placeholder={t.filterFiles}
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
             />
@@ -857,18 +860,18 @@ function DiffView({ projectId }: { projectId: string }) {
                       className="dw-open"
                       onClick={() => void onOpenInEditor(selected.file.name)}
                     >
-                      在编辑器打开
+                      {t.openInEditor}
                     </button>
                   )}
                 />
                 {selected.file.hunks.length === 0 && selected.status !== "R" ? (
-                  <p className="dw-binary">二进制文件或无文本变化</p>
+                  <p className="dw-binary">{t.binaryFile}</p>
                 ) : null}
               </section>
             </Virtualizer>
             ) : (
               <div className="dw-state">
-                <p>{filter.trim() ? "没有匹配的文件" : "只有测试文件有变更，关闭右上角「隐藏测试文件」查看"}</p>
+                <p>{filter.trim() ? t.noMatchingFiles : t.onlyTestsChanged}</p>
               </div>
             )}
           </div>

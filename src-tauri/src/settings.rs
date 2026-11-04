@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub const DEFAULT_TOGGLE_PANEL_SHORTCUT: &str = "Alt+Super+KeyG";
+pub const DEFAULT_TOGGLE_PANEL_SHORTCUT: &str = "Control+KeyE";
 pub const DEFAULT_DIFF_WINDOW_SIZE: (f64, f64) = (1680.0, 1050.0);
 pub const MIN_DIFF_WINDOW_SIZE: (f64, f64) = (720.0, 480.0);
 

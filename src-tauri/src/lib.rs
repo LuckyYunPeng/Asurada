@@ -66,6 +66,8 @@ pub fn run() {
             commands::open_with_app,
             #[cfg(target_os = "macos")]
             commands::copy_text,
+            #[cfg(target_os = "macos")]
+            commands::get_system_language,
             commands::get_diff_window_size,
             commands::set_diff_window_size,
             #[cfg(target_os = "macos")]

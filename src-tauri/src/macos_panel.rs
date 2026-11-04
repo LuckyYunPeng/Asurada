@@ -488,9 +488,9 @@ static ACTIVE_TOGGLE_SHORTCUT: Mutex<String> = Mutex::new(String::new());
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ToggleShortcutInfo {
-    /// Tauri global-shortcut 字符串，如 Alt+Super+KeyG
+    /// Tauri global-shortcut 字符串，如 Control+KeyE
     pub shortcut: String,
-    /// 可读展示，如 ⌥⌘G
+    /// 可读展示，如 ⌃E
     pub display: String,
 }
 

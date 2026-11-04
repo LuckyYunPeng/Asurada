@@ -199,7 +199,7 @@ export function bootstrapCapture(scene: CaptureScene): CaptureBootstrap {
         ...base,
         rows: [{ project: mockProjectB, uiState: "idle" }],
         settingsOpen: true,
-        toggleShortcutDisplay: "⌥⌘G",
+        toggleShortcutDisplay: "⌃E",
         skipInvoke: true,
       };
     default:

@@ -1,5 +1,5 @@
 /** 与后端 settings.json / Tauri 全局快捷键字符串一致 */
-export const DEFAULT_TOGGLE_SHORTCUT_DISPLAY = "⌥⌘G";
+export const DEFAULT_TOGGLE_SHORTCUT_DISPLAY = "⌃E";
 
 const MODIFIER_ONLY = new Set([
   "Alt",
