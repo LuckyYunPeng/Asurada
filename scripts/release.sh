@@ -61,4 +61,6 @@ git commit -q -m "chore: 发布 $TAG"
 git tag -a "$TAG" -F "$NOTES"
 git push -q origin main
 git push -q origin "$TAG"
-echo "✓ 已推送 ${TAG}，CI 构建中：$(gh run list -w build-macos.yml -L 1 --json url -q '.[0].url' 2>/dev/null || echo 'GitHub Actions → Build macOS')"
+# 推送后运行要几秒才注册，按 tag 过滤，避免拿到上一次的运行
+sleep 10
+echo "✓ 已推送 ${TAG}，CI 构建中：$(gh run list -w build-macos.yml -b "$TAG" -L 1 --json url -q '.[0].url' 2>/dev/null || echo 'GitHub Actions → Build macOS')"

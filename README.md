@@ -1,113 +1,68 @@
 # Asurada
 
-- 产品需求：[docs/REQUIREMENTS.md](./docs/REQUIREMENTS.md)
-- 工程交接：[docs/HANDOFF.md](./docs/HANDOFF.md)
-
 [![Build macOS](https://github.com/LuckyYunPeng/asurada/actions/workflows/build-macos.yml/badge.svg)](https://github.com/LuckyYunPeng/asurada/actions/workflows/build-macos.yml)
 
-**Asurada** 是 macOS 边缘吸附小标签 + 浮层面板：管理本地 git 仓库，一键用本机 `pi --print` 生成中文 Conventional Commit 并无确认地 `git add -A && git commit && git push`。
+**让 AI 写完代码后的「提交、推送」只剩一次点击。**
 
-- 仓库：<https://github.com/LuckyYunPeng/asurada>
-- 协议：**MIT**（见 [LICENSE](./LICENSE)）
+Asurada 是一个停靠在 macOS 屏幕边缘的小工具。它帮你看住手头所有本地项目：哪个有改动、改了什么，一键就能生成规范的中文提交信息并推送到远端。
 
-## 安装（macOS）
+<p align="center">
+  <img src="./docs/screenshots/panel.png" alt="项目面板：所有项目一览，有改动的项目可一键提交并推送" width="360">
+</p>
 
-1. 打开 [Actions → Build macOS](https://github.com/LuckyYunPeng/asurada/actions/workflows/build-macos.yml)，选最近一次成功的 workflow run。
-2. 在 **Artifacts** 下载 `asurada-macos-<commit>`（含 `.dmg` 与 `.app`）。
-3. 打开 `.dmg` 后，将 **Asurada** 拖到「应用程序」文件夹即可（无单独安装向导，属正常）。
-4. 当前 CI **未做 Apple 代码签名与公证**，首次打开可能需：系统设置 → 隐私与安全性 → 仍要打开，或右键 App → 打开。
-5. 启动后可在 **Dock** 看到 Asurada 图标；若右缘 tag 不好找，点菜单栏 **Asurada 图标** →「显示面板 / 收起 / 退出」。
+## 它解决什么问题
 
-打 tag `v*` 并 push 时，会额外上传 `asurada-macos-release-<tag>` 产物（便于发版归档）。
+用 AI Agent 写代码时，节奏通常是：让 Agent 改代码 → 自己验收 → 提交推送 → 下一轮。最后这一步看起来简单，却很打断人：
 
-### 后续签名 / 公证（未接入阻断）
+- **占用对话上下文**：让主 Agent 顺手提交，会把 diff 和 git 输出塞进对话，挤占真正干活的上下文。
+- **写提交信息费神**：每次都要想一句准确的描述，草草写个 `update` 又不利于日后回溯。
+- **多项目来回切换**：同时维护几个仓库时，要逐个打开终端，查状态、看改动、提交、处理推送冲突。
 
-正式对外分发前，建议在 GitHub 仓库 **Secrets** 配置 Apple 开发者证书与公证相关变量（如 `APPLE_CERTIFICATE`、`APPLE_CERTIFICATE_PASSWORD`、`APPLE_SIGNING_IDENTITY`、`APPLE_ID`、`APPLE_PASSWORD`、`APPLE_TEAM_ID` 等），并在 workflow 中启用 Tauri 签名步骤。当前 workflow 故意跳过这些 secret，保证缺省时仍能产出**未签名**安装包。
+Asurada 把这些事收拢到屏幕边上的一个小面板里，不打扰你正在用的 Agent 和编辑器。
 
-## 产品行为
+## 能做什么
 
-- **macOS**：Dock 可见 + 菜单栏托盘图标；**NSPanel** 吸附屏幕右缘（失败则回退为置顶无边框窗，不会无 UI 秒退）
-- 首次打开默认**展开面板**（引导 / 预检）；收起后右缘为**高对比 tag**（铺满壳窗）
-- 收起：再点 tag、**Esc**、窗口失焦（点击其他应用）；也可从菜单栏托盘操作
-- 首次打开：**三步引导**（可跳过）→ **本机预检** → 项目列表
-- 设置 → **重看引导**
-- **工作区干净**：主按钮禁用 +「无变更」，不调用 `pi`
-- 提交结果：Toast + 行内状态（已推送 / 失败）
+- **一键提交并推送**：根据本次改动自动生成一行中文提交信息（如 `feat: 新增深色模式`），提交后直接推送。远端有新提交时自动同步后重试；有冲突就撤回并提示，不会弄乱你的仓库。
+- **多项目一览**：所有项目集中在一个列表，有改动的排在前面；没有改动的项目不能误点提交。
+- **提交前看改动**：在差异窗口里按目录浏览变更文件，看清增删内容；可以隐藏测试文件，也提供色弱友好配色。
+- **不打扰的停靠方式**：平时只是屏幕边缘的一个小标签，点击或快捷键（默认 `Option + Command + G`）展开。标签可以拖到合适的位置，收起后用小气泡告诉你提交结果。
+- **按你的习惯来**：可以开启「提交前确认」，也可以设置浅色/深色外观和开机自启动。
+- **自动更新**：有新版本时在应用内提示，一键安装。
 
-## 本机环境预检
+平时只在屏幕右缘露出一个小标签，有待提交的改动时会亮起提示：
 
-| 检查项 | 含义 |
-|---|---|
-| `pi_path` | `pi` 在 PATH 中 |
-| `pi_print` | `pi --print` 非交互可用（12 秒超时） |
-| `git` | 本机可执行 `git` |
+![收起时停靠在屏幕边缘的小标签](./docs/screenshots/desktop.jpg)
+
+提交前可以打开差异窗口，逐个文件确认改动：
+
+![差异窗口：按目录浏览变更文件并对比改动](./docs/screenshots/diff.jpg)
+
+## 适合谁
+
+- 在 macOS 上用 AI Agent 写代码、需要频繁验收和提交的开发者。
+- 同时维护多个本地 git 仓库，希望提交推送越省事越好的人。
+
+## 安装
+
+1. 从 [Releases](https://github.com/LuckyYunPeng/asurada/releases) 下载最新的 `.dmg`。
+2. 打开后把 **Asurada** 拖进「应用程序」。
+3. 首次打开会有简短引导，并自动检查运行环境。
+
+使用前需要本机已安装 `git` 和 `pi`（用来生成提交信息）。目前仅支持 Apple Silicon 的 Mac。
+
+## 参与开发
+
+- 产品需求：[docs/REQUIREMENTS.md](./docs/REQUIREMENTS.md)
+- 工程交接：[docs/HANDOFF.md](./docs/HANDOFF.md)
+- 更新日志：[CHANGELOG.md](./CHANGELOG.md)
 
 ```bash
-cd src-tauri && cargo test preflight::
-```
-
-## 本地开发
-
-前置：Node.js 18+、Rust stable（≥ 1.90，见 `rust-toolchain.toml`）、macOS 上 [Tauri 前置工具](https://tauri.app/start/prerequisites/#macos)、本机 `pi` 与 `git`。
-
-```bash
-git clone https://github.com/LuckyYunPeng/asurada.git
-cd asurada
 pnpm install
 pnpm dev
 ```
 
-仅前端壳（端口 **4721**，无 Tauri 命令）：
-
-```bash
-pnpm dev:web
-```
-
-本地打 mac 包（与 CI 相同 bundles）：
-
-```bash
-pnpm tauri build --bundles app,dmg
-# 产物：src-tauri/target/release/bundle/dmg/*.dmg
-#       src-tauri/target/release/bundle/macos/*.app
-```
-
-## `pi` 调用
-
-在项目目录执行 `pi --print '<提示词>'`；固化提示词为 Rust 常量 `PI_COMMIT_PROMPT`。
-
-## 工程图帧（设计验收）
-
-仓库 `artifacts/` 含各 UI 状态截图；开发态可用 `?capture=` 场景复拍（见 `artifacts/README.md`）。
-
-## 脚本
-
-| 命令 | 说明 |
-|---|---|
-| `pnpm dev:web` | Vite（4721） |
-| `pnpm dev` | 完整 App |
-| `pnpm tauri build` | 生产构建 |
-| `pnpm capture:artifacts` | 需先 `pnpm dev:web`，生成 `artifacts/*.png` |
-
-## CI/CD
-
-| Workflow | Runner | 作用 |
-|---|---|---|
-| [`.github/workflows/build-macos.yml`](./.github/workflows/build-macos.yml) | `macos-latest` | 日常推送不运行。推 `v*` tag：预检单元测试 → 签名、公证并发布 GitHub Release（含应用内更新用的 `latest.json`）；在 Actions 页面手动 **Run workflow**：单元测试 + 未签名 `.app` / `.dmg` 验收包 |
-
-只支持 macOS（Apple Silicon）。
-
-- 触发：`push` tag `v*`、手动 **workflow_dispatch**
-
-## 发版
-
-```bash
-scripts/release.sh 0.2.0 notes.md          # notes.md 是本次更新说明（markdown）
-scripts/release.sh 0.2.0 notes.md --dry-run # 只预览改动，不提交
-```
-
-脚本会改好四处版本号（`tauri.conf.json`、`package.json`、`Cargo.toml`、`Cargo.lock`），把说明插到 `CHANGELOG.md` 顶部，提交「chore: 发布 vX.Y.Z」并推送 main 和 tag。CI 随后签名、公证并发布 GitHub Release，Release 正文取自 `CHANGELOG.md` 对应段落，已安装的 App 会提示更新。
-- DMG 产物名：`asurada-macos-<sha>`（及 tag 时 `asurada-macos-release-<tag>`）
+发版统一使用 `scripts/release.sh`，详见 [AGENTS.md](./AGENTS.md)。
 
 ## 许可证
 
-MIT — [LICENSE](./LICENSE)
+MIT，见 [LICENSE](./LICENSE)。
