@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Asurada · 写完代码，一键提交推送</title>
-<meta name="description" content="停靠在 macOS 屏幕边缘的小工具：AI 生成中文提交信息，一键提交并推送，多项目一览。">
+<meta name="description" content="停靠在 macOS 屏幕边缘的小工具：帮你滤掉噪音，提高 Review 效率，在多个项目之间穿插时开发体验更丝滑。">
 <link rel="icon" href="./assets/logo.png">
 <style>
   :root {
@@ -32,6 +32,9 @@
   a { color: inherit; text-decoration: none; }
   code, .mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; }
 
+  /* 首屏面板从右侧滑入时会短暂超出视口，裁掉以免出现横向滚动条 */
+  .hero { overflow-x: clip; }
+
   /* 背景：星空 + 漂浮光斑 */
   #stars { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -2; }
   /* 光斑超出视口的部分要裁掉，否则移动端会出现横向滚动 */
@@ -53,14 +56,31 @@
     position: fixed; top: 0; left: 0; right: 0; z-index: 20;
     display: flex; align-items: center; justify-content: space-between;
     padding: 16px 32px;
+    /* 顶部透明，滚动后（.is-scrolled）渐变为磨砂玻璃 */
+    background: transparent;
+    border-bottom: 1px solid transparent;
+    transition: background .3s, border-color .3s, backdrop-filter .3s;
+  }
+  nav.is-scrolled {
     backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     background: rgba(7, 7, 11, .55);
-    border-bottom: 1px solid var(--line);
+    border-bottom-color: var(--line);
   }
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; letter-spacing: .12em; }
   .brand img { width: 30px; height: 30px; border-radius: 8px; }
   nav .links { display: flex; gap: 28px; color: var(--muted); font-size: 14px; align-items: center; }
   nav .links a:hover { color: var(--fg); }
+
+  /* 语言切换：「中 / EN」小分段开关，当前语言高亮 */
+  .lang {
+    display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 999px;
+    font: inherit; font-size: 12px; cursor: pointer; color: var(--muted);
+    background: rgba(255, 255, 255, .04); border: 1px solid var(--line);
+  }
+  .lang span { padding: 2px 8px; border-radius: 999px; line-height: 18px; transition: color .2s, background .2s; }
+  .lang span.is-active { color: var(--fg); background: rgba(255, 255, 255, .1); }
+  .lang:hover span:not(.is-active) { color: var(--fg); }
 
   .btn {
     display: inline-flex; align-items: center; gap: 8px;
@@ -75,7 +95,8 @@
   }
   .btn.primary:hover { box-shadow: 0 16px 50px -8px rgba(236, 72, 153, .8); }
   .btn.ghost { border: 1px solid var(--line); background: rgba(255, 255, 255, .04); }
-  .btn.small { padding: 8px 16px; font-size: 13px; }
+  /* 与语言开关同高（28px） */
+  .btn.small { padding: 0 14px; height: 28px; font-size: 12px; }
   @keyframes shine { to { background-position: 200% 0; } }
 
   /* Hero */
@@ -101,16 +122,24 @@
   .sub { margin-top: 20px; max-width: 640px; font-size: 18px; color: var(--muted); }
   .cta { margin-top: 36px; display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
 
-  /* 打字机提交信息 */
-  .terminal {
-    margin-top: 40px; padding: 14px 20px; border-radius: 12px;
-    border: 1px solid var(--line); background: rgba(255, 255, 255, .03);
-    font-size: 15px; min-width: min(520px, 90vw); text-align: left;
+  /* 副标题逐字浮现：base 为可见状态，减少动态效果时直接显示 */
+  .sub .ch {
+    display: inline-block; white-space: pre;
+    animation: ch-in .7s cubic-bezier(.2, .8, .2, 1) calc(var(--i) * var(--step) + .5s) backwards;
   }
-  .terminal .prompt { color: var(--cyan); }
-  .terminal .ok { color: #4ade80; }
-  .caret { display: inline-block; width: 8px; height: 1.1em; background: var(--fg); vertical-align: -3px; animation: blink 1s steps(1) infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes ch-in {
+    from { opacity: 0; filter: blur(8px); transform: translateY(.4em); }
+  }
+  /* 关键词：文字全部出现后，依次扫过渐变高亮 */
+  .sub mark {
+    color: var(--fg); background: none; position: relative;
+  }
+  .sub mark::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 2px;
+    background: var(--grad); transform-origin: left; border-radius: 2px;
+    animation: underline .6s cubic-bezier(.2, .8, .2, 1) calc(var(--done) + var(--k) * .25s) backwards;
+  }
+  @keyframes underline { from { transform: scaleX(0); } }
 
   /* Hero 截图舞台：桌面 + 从右侧滑入的面板 */
   .stage {
@@ -158,6 +187,12 @@
   .checks { margin-top: 24px; list-style: none; display: grid; gap: 12px; }
   .checks li { display: flex; gap: 10px; color: var(--muted); }
   .checks li::before { content: "✓"; color: #4ade80; font-weight: 700; }
+  .checks li.soon::before { content: "✦"; color: var(--violet); }
+  .soon-tag {
+    display: inline-block; margin-left: 8px; padding: 0 8px; border-radius: 999px; font-size: 12px; line-height: 20px;
+    vertical-align: 1px; white-space: nowrap;
+    color: var(--fg); border: 1px solid rgba(139, 92, 246, .5); background: rgba(139, 92, 246, .15);
+  }
   .sieve {
     position: relative; overflow: hidden; padding: 18px; border-radius: 18px; font-size: 13px;
     background: rgba(18, 18, 24, .85); border: 1px solid var(--line);
@@ -168,13 +203,13 @@
   .sieve .row {
     display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: 8px;
     font-family: "SF Mono", ui-monospace, Menlo, monospace; white-space: nowrap; overflow: hidden;
-    height: 38px; transition: height .6s ease, opacity .5s ease, background .5s, transform .5s;
+    height: 38px; margin-bottom: 6px; transition: height .6s ease, margin .6s ease, opacity .5s ease, background .5s, transform .5s;
   }
   .sieve .row .stat { margin-left: auto; color: var(--muted); }
   .sieve .tag { width: 18px; font-weight: 700; }
   .sieve .tag.m { color: #f59e0b; }
   .sieve .tag.a { color: #4ade80; }
-  .sieve.filtered .row.noise { height: 0; opacity: 0; transform: translateX(40px); }
+  .sieve.filtered .row.noise { height: 0; margin-bottom: 0; opacity: 0; transform: translateX(40px); }
   .sieve.filtered .row.key {
     background: linear-gradient(90deg, rgba(139, 92, 246, .22), rgba(236, 72, 153, .08));
     box-shadow: inset 2px 0 0 var(--violet);
@@ -188,7 +223,8 @@
   .lead { margin-top: 16px; color: var(--muted); font-size: 17px; max-width: 620px; }
 
   /* 痛点 */
-  .pains { margin-top: 56px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .pains { margin-top: 56px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+  @media (max-width: 1100px) { .pains { grid-template-columns: repeat(2, 1fr); } }
   .card {
     position: relative; padding: 28px; border-radius: 18px;
     background: rgba(255, 255, 255, .03); border: 1px solid var(--line);
@@ -229,6 +265,10 @@
   .feature ul { margin-top: 22px; list-style: none; display: grid; gap: 12px; }
   .feature li { display: flex; gap: 10px; color: var(--muted); }
   .feature li::before { content: "✦"; color: var(--violet); }
+  .commit-sample {
+    display: block; width: fit-content; margin-top: 8px; padding: 6px 12px; border-radius: 8px; font-size: 14px;
+    color: var(--fg); background: rgba(255, 255, 255, .05); border: 1px solid var(--line);
+  }
   .shot { position: relative; }
   .shot img { width: 100%; border-radius: 14px; border: 1px solid var(--line); display: block; }
   .shot.tall { display: flex; justify-content: center; }
@@ -253,7 +293,8 @@
   .keys { margin-top: 26px; display: flex; align-items: center; gap: 6px; color: var(--muted); }
 
   /* 更多功能网格 */
-  .grid { margin-top: 56px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .grid-head { margin-top: 120px; text-align: center; }
+  .grid { margin-top: 48px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
 
   /* 收尾 CTA */
   .final { text-align: center; }
@@ -287,7 +328,6 @@
     h1 { font-size: 32px; }
     .sub { font-size: 16px; }
     .badge { font-size: 12px; }
-    .terminal { font-size: 13px; min-width: 0; width: 100%; }
     /* 面板从右侧滑入时不撑宽页面（桌面端不裁，保留阴影） */
     .stage { margin-top: 40px; overflow-x: clip; }
     section { padding: 72px 20px; }
@@ -308,56 +348,56 @@
 <nav>
   <a class="brand" href="#"><img src="./assets/logo.png" alt="">ASURADA</a>
   <div class="links">
-    <a href="#why">为什么</a>
-    <a href="#features">功能</a>
+    <a href="#why" data-i18n="navWhy">为什么</a>
+    <a href="#features" data-i18n="navFeatures">功能</a>
     <a href="https://github.com/LuckyYunPeng/asurada">GitHub</a>
-    <a class="btn primary small" href="https://github.com/LuckyYunPeng/asurada/releases/latest">下载</a>
+    <button class="lang" id="langToggle" type="button" aria-label="切换语言 / Switch language"><span data-lang="zh">中</span><span data-lang="en">EN</span></button>
+    <a class="btn primary small" href="https://github.com/LuckyYunPeng/asurada/releases/latest" data-i18n="navDownload">下载</a>
   </div>
 </nav>
 
 <header class="hero">
-  <span class="badge"><span class="dot"></span>为 Vibe Coding 时代的代码 Review 而生 · macOS</span>
-  <h1>AI 写代码，<br><span class="grad-text">但你得看懂自己的项目</span></h1>
-  <p class="sub">Review 不是因为不信任 AI，而是为了让「人」始终了解自己的项目，尤其是那些关键的地方。Asurada 的出发点是帮你滤掉噪音、只看重点，看完一键提交推送。</p>
+  <span class="badge"><span class="dot"></span><span data-i18n="badge">为 Vibe Coding 时代的代码 Review 而生 · macOS</span></span>
+  <h1 data-i18n="heroTitle">AI 写代码，<br><span class="grad-text">但你得看懂自己的项目</span></h1>
+  <p class="sub" data-i18n="heroSub">Review 不是因为不信任 AI，而是为了让<mark>「人」始终了解自己的项目</mark>，尤其是那些关键的地方。Asurada 的出发点是帮你<mark>滤掉噪音</mark>，<mark>提高你的 Review 效率</mark>，尤其是在<mark>多个项目之间穿插</mark>时，开发体验更加丝滑。</p>
   <div class="cta">
-    <a class="btn primary" href="https://github.com/LuckyYunPeng/asurada/releases/latest">免费下载 macOS 版</a>
-    <a class="btn ghost" href="https://github.com/LuckyYunPeng/asurada">在 GitHub 上查看</a>
-  </div>
-
-  <div class="terminal mono" aria-live="polite">
-    <span class="prompt">❯ </span><span id="typed"></span><span class="caret"></span>
+    <a class="btn primary" href="https://github.com/LuckyYunPeng/asurada/releases/latest" data-i18n="ctaDownload">免费下载 macOS 版</a>
+    <a class="btn ghost" href="https://github.com/LuckyYunPeng/asurada" data-i18n="ctaGithub">在 GitHub 上查看</a>
   </div>
 
   <div class="stage">
     <div class="glow"></div>
-    <img class="desk" src="./assets/desktop.jpg" alt="Asurada 平时停靠在屏幕边缘的小标签">
-    <img class="panel" src="./assets/panel.png" alt="展开后的项目面板">
+    <img class="desk" src="./assets/desktop.jpg" alt="Asurada 平时停靠在屏幕边缘的小标签" data-i18n-alt="altDesk">
+    <img class="panel" src="./assets/panel.png" alt="展开后的项目面板" data-i18n-alt="altPanel">
   </div>
 </header>
 
 <section id="why">
   <div class="wrap">
-    <p class="eyebrow reveal">我们的出发点</p>
-    <h2 class="reveal d1">代码可以交给 AI 写，<br><span class="grad-text">项目不能交给 AI 懂</span></h2>
-    <p class="lead reveal d2">Vibe Coding 让写代码快了十倍，可如果你不再看代码，项目就会慢慢变成一个你不认识的黑盒。出了问题时，你不知道该从哪里查；要做决定时，你不知道它现在长什么样。</p>
-    <blockquote class="manifesto reveal d3">
-      Review，不是为了挑 AI 的错，<br>而是为了让<em>你</em>始终是最了解这个项目的人。
-    </blockquote>
+    <p class="eyebrow reveal" data-i18n="whyEyebrow">我们的出发点</p>
+    <h2 class="reveal d1" data-i18n="whyTitle">代码可以交给 AI 写，<br><span class="grad-text">项目架构、核心逻辑不能只让 AI 懂</span></h2>
+    <p class="lead reveal d2" data-i18n="whyLead">Vibe Coding 让写代码快了十倍，可如果你不再看代码，项目就会慢慢变成一个你不认识的黑盒。出了问题时，你不知道该从哪里查；要做决定时，你不知道它现在长什么样。<br><br>更何况 AI 还会「自我加工」：悄悄塞进你预期之外的逻辑，比如过多的防御判断和兜底分支。今天看着无害，日后都会变成你理解代码的包袱。</p>
+    <blockquote class="manifesto reveal d3" data-i18n="manifesto">Review，不是为了挑 AI 的错，<br>而是为了让<em>你</em>始终是最了解这个项目的人。</blockquote>
     <div class="pains">
       <div class="card reveal">
         <div class="icon">🌊</div>
-        <h3>改动太多，看不过来</h3>
-        <p>AI 一轮就能改几十个文件，逐行看完不现实，于是干脆不看。</p>
+        <h3 data-i18n="pain1Title">改动太多，看不过来</h3>
+        <p data-i18n="pain1Desc">AI 一轮就能改几十个文件，逐行看完不现实，于是干脆不看。</p>
       </div>
       <div class="card reveal d1">
         <div class="icon">📢</div>
-        <h3>噪音淹没重点</h3>
-        <p>测试、样板代码混在业务改动里，真正需要你把关的那几行反而被埋掉。</p>
+        <h3 data-i18n="pain2Title">噪音淹没重点</h3>
+        <p data-i18n="pain2Desc">测试、样板代码混在业务改动里，真正需要你把关的那几行反而被埋掉。</p>
       </div>
       <div class="card reveal d2">
+        <div class="icon">🔀</div>
+        <h3 data-i18n="pain4Title">别让人成为流程的瓶颈</h3>
+        <p data-i18n="pain4Desc">多个项目同时推进，AI 都在等你验收。每个项目的 Review 都该快进快出，别让「人」卡住整条流水线。</p>
+      </div>
+      <div class="card reveal d3">
         <div class="icon">🔁</div>
-        <h3>看完还要处理杂事</h3>
-        <p>写提交信息、推送、处理冲突、切换项目，Review 的专注力被一点点打散。</p>
+        <h3 data-i18n="pain3Title">看完还要处理杂事</h3>
+        <p data-i18n="pain3Desc">写提交信息、推送、处理冲突，Review 的专注力被一点点打散。</p>
       </div>
     </div>
   </div>
@@ -366,18 +406,19 @@
 <section class="focus">
   <div class="wrap focus-grid">
     <div class="reveal">
-      <p class="eyebrow">只看重点</p>
-      <h2>把噪音滤掉，<br><span class="grad-text">留下值得你看的</span></h2>
-      <p class="lead">打开差异窗口，测试文件默认收起，变更按目录一目了然，行内改动精确到词。你的注意力只花在真正影响项目的地方。</p>
+      <p class="eyebrow" data-i18n="focusEyebrow">只看重点</p>
+      <h2 data-i18n="focusTitle">把噪音滤掉，<br><span class="grad-text">留下值得你看的</span></h2>
+      <p class="lead" data-i18n="focusLead">一次改动里，真正需要你把关的往往只有那几个文件。Asurada 帮你把它们挑出来，其余的先收起，注意力只花在真正影响项目的地方。</p>
       <ul class="checks">
-        <li>一键隐藏测试文件，只影响查看，提交时照常带上</li>
-        <li>目录树浏览，先看清这次改了哪些模块</li>
-        <li>整词级别的行内对比，一眼看出改了什么</li>
-        <li>按文件名筛选，直奔你关心的那一处</li>
+        <li data-i18n="focus1">噪音一键收起：测试等文件先藏起来，只影响查看，提交时照常带上</li>
+        <li data-i18n="focus2">目录树浏览，先看清这次动了哪些模块</li>
+        <li data-i18n="focus3">整词级别的行内对比，一眼看出改了什么</li>
+        <li data-i18n="focus4">按文件名筛选，直奔你关心的那一处</li>
+        <li class="soon"><span data-i18n="focus5">AI 挑出关键文件：自动识别本次改动里最值得你看的部分<span class="soon-tag">即将推出</span></span></li>
       </ul>
     </div>
     <div class="sieve reveal d2" aria-hidden="true">
-      <div class="sieve-head"><span>本次变更</span><span class="sieve-count"><b id="sieveCount">12</b> 个文件</span></div>
+      <div class="sieve-head"><span data-i18n="sieveTitle">本次变更</span><span class="sieve-count"><b id="sieveCount">12</b> <span data-i18n="sieveUnit">个文件</span></span></div>
       <div class="row key"><span class="tag m">M</span><span class="path">src/payment/checkout.ts</span><span class="stat">+42 −8</span></div>
       <div class="row noise"><span class="tag a">A</span><span class="path">src/payment/__tests__/checkout.test.ts</span><span class="stat">+186</span></div>
       <div class="row key"><span class="tag m">M</span><span class="path">src/auth/session.ts</span><span class="stat">+15 −3</span></div>
@@ -392,64 +433,65 @@
 
 <section>
   <div class="wrap">
-    <p class="eyebrow reveal">怎么用</p>
-    <h2 class="reveal d1">你只负责最重要的那一步：看懂</h2>
+    <p class="eyebrow reveal" data-i18n="flowEyebrow">怎么用</p>
+    <h2 class="reveal d1" data-i18n="flowTitle">你只负责最重要的那一步：看懂</h2>
     <div class="flow">
-      <div class="step reveal"><div class="num">1</div><h3>AI 写代码</h3><p>用你喜欢的 Agent 和编辑器</p></div>
-      <div class="step reveal d1"><div class="num">2</div><h3>你 Review 重点</h3><p>滤掉噪音，只看关键改动</p></div>
-      <div class="step reveal d2"><div class="num">3</div><h3>一键提交推送</h3><p>中文提交信息自动生成</p></div>
-      <div class="step reveal d3"><div class="num">4</div><h3>继续下一轮</h3><p>推送、冲突处理自动完成</p></div>
+      <div class="step reveal"><div class="num">1</div><h3 data-i18n="step1Title">AI 写代码</h3><p data-i18n="step1Desc">用你喜欢的 Agent 和编辑器</p></div>
+      <div class="step reveal d1"><div class="num">2</div><h3 data-i18n="step2Title">你 Review 重点</h3><p data-i18n="step2Desc">滤掉噪音，只看关键改动</p></div>
+      <div class="step reveal d2"><div class="num">3</div><h3 data-i18n="step3Title">一键提交推送</h3><p data-i18n="step3Desc">提交信息自动生成</p></div>
+      <div class="step reveal d3"><div class="num">4</div><h3 data-i18n="step4Title">继续下一轮</h3><p data-i18n="step4Desc">推送、冲突处理自动完成</p></div>
     </div>
   </div>
 </section>
 
 <section id="features">
   <div class="wrap">
-    <p class="eyebrow reveal">功能</p>
-    <h2 class="reveal d1">小，但刚好够用</h2>
+    <p class="eyebrow reveal" data-i18n="featEyebrow">功能</p>
+    <h2 class="reveal d1" data-i18n="featTitle">小，但刚好够用</h2>
 
     <div class="feature rev">
       <div class="text reveal">
-        <h2>提交之前，<span class="grad-text">看懂关键改动</span></h2>
-        <p class="lead">差异窗口就是你的 Review 台：变更按目录排开，噪音可以收起，重点逐行对比。</p>
+        <h2 data-i18n="diffTitle">提交之前，<span class="grad-text">看懂关键改动</span></h2>
+        <p class="lead" data-i18n="diffLead">差异窗口就是你的 Review 台：变更按目录排开，噪音可以收起，重点逐行对比。</p>
         <ul>
-          <li>隐藏测试文件，聚焦业务改动</li>
-          <li>左右 / 上下两种对比布局，色弱友好配色</li>
-          <li>看到可疑处，直接跳到编辑器打开</li>
+          <li data-i18n="diff1">隐藏测试文件，聚焦业务改动</li>
+          <li data-i18n="diff2">左右 / 上下两种对比布局，色弱友好配色</li>
+          <li data-i18n="diff3">看到可疑处，直接跳到编辑器打开</li>
         </ul>
       </div>
-      <div class="shot reveal d2"><img src="./assets/diff.jpg" alt="差异窗口"></div>
+      <div class="shot reveal d2"><img src="./assets/diff.jpg" alt="差异窗口" data-i18n-alt="altDiff"></div>
     </div>
 
     <div class="feature">
       <div class="text reveal">
-        <h2>看完，<span class="grad-text">一键收尾</span></h2>
-        <p class="lead">所有项目一屏看完，有改动的排在最前面。Review 完点一下，剩下的杂事交给 Asurada。</p>
+        <h2 data-i18n="commitTitle">看完，<span class="grad-text">一键收尾</span></h2>
+        <p class="lead" data-i18n="commitLead">所有项目一屏看完，有改动的排在最前面。Review 完点一下，剩下的杂事交给 Asurada。</p>
         <ul>
-          <li>根据改动自动生成一行中文提交信息，比如 <code>feat: 新增深色模式</code></li>
-          <li>远端有新提交时自动同步后重试</li>
-          <li>遇到冲突就撤回并提示，不会弄乱仓库</li>
+          <li><span data-i18n="commit1">根据改动自动生成一行提交信息，语言跟随界面<code class="commit-sample">feat: 新增深色模式</code></span></li>
+          <li data-i18n="commit2">远端有新提交时自动同步后重试</li>
+          <li data-i18n="commit3">遇到冲突就撤回并提示，不会弄乱仓库</li>
         </ul>
       </div>
-      <div class="shot tall reveal d2"><img src="./assets/panel.png" alt="项目面板"></div>
+      <div class="shot tall reveal d2"><img src="./assets/panel.png" alt="项目面板" data-i18n-alt="altPanelShort"></div>
     </div>
 
     <div class="feature rev">
       <div class="text reveal">
-        <h2>不找它，<span class="grad-text">它就不打扰你</span></h2>
-        <p class="lead">平时只在屏幕边缘露出一个小标签，有待提交的改动时会亮起提示。在任何应用里按快捷键都能呼出面板。</p>
-        <div class="keys"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>G</kbd><span>&nbsp;展开 / 收起，可在设置中修改</span></div>
+        <h2 data-i18n="dockTitle">不找它，<span class="grad-text">它就不打扰你</span></h2>
+        <p class="lead" data-i18n="dockLead">平时只在屏幕边缘露出一个小标签，有待提交的改动时会亮起提示。在任何应用里按快捷键都能呼出面板。</p>
+        <div class="keys"><kbd>⌃</kbd><kbd>E</kbd><span data-i18n="dockKeys">&nbsp;展开 / 收起，可在设置中修改</span></div>
       </div>
-      <div class="shot reveal d2"><img src="./assets/desktop.jpg" alt="停靠在屏幕边缘的小标签"></div>
+      <div class="shot reveal d2"><img src="./assets/desktop.jpg" alt="停靠在屏幕边缘的小标签" data-i18n-alt="altDock"></div>
     </div>
 
+    <div class="grid-head">
+      <h2 class="reveal" data-i18n="gridTitle">每一处细节，<span class="grad-text">都在帮你减少噪音、聚焦核心</span></h2>
+    </div>
     <div class="grid">
-      <div class="card reveal"><div class="icon">🫧</div><h3>结果气泡</h3><p>面板收起时，用小气泡告诉你提交成功还是失败。</p></div>
-      <div class="card reveal d1"><div class="icon">📍</div><h3>想放哪就放哪</h3><p>小标签可以拖到屏幕边缘任意高度，位置会被记住。</p></div>
-      <div class="card reveal d2"><div class="icon">✅</div><h3>提交前确认</h3><p>想多一道保险？打开设置，提交前弹窗确认。</p></div>
-      <div class="card reveal"><div class="icon">🌗</div><h3>浅色 / 深色</h3><p>跟随系统，或手动指定外观。</p></div>
-      <div class="card reveal d1"><div class="icon">🚀</div><h3>开机自启动</h3><p>开机就待命，不用每次手动打开。</p></div>
-      <div class="card reveal d2"><div class="icon">🔄</div><h3>自动更新</h3><p>有新版本时应用内提示，一键安装重启。</p></div>
+      <div class="card reveal"><div class="icon">🧠</div><h3 data-i18n="g1Title">对话里没有噪音</h3><p data-i18n="g1Desc">提交用的 diff 和 git 输出不进主对话，Agent 的上下文只留给核心工作。</p></div>
+      <div class="card reveal d1"><div class="icon">🎯</div><h3 data-i18n="g2Title">一眼锁定待处理的项目</h3><p data-i18n="g2Desc">有改动的项目自动排在最前，没改动的自动变灰，不用在项目之间翻找。</p></div>
+      <div class="card reveal"><div class="icon">🛡️</div><h3 data-i18n="g3Title">Git 杂事不打扰你</h3><p data-i18n="g3Desc">同步、重试、冲突撤回自动处理，注意力不会被琐碎的 Git 操作分走。</p></div>
+      <div class="card reveal d1"><div class="icon">⚡</div><h3 data-i18n="g4Title">用完即走</h3><p data-i18n="g4Desc">平时只是屏幕边缘的小标签；按 ⌃E 呼出，Review 完就收起，不占你的屏幕和注意力。</p></div>
     </div>
   </div>
 </section>
@@ -457,19 +499,175 @@
 <section class="final">
   <div class="wrap">
     <img class="logo-big reveal" src="./assets/logo.png" alt="Asurada">
-    <h2 class="reveal d1" style="margin-top: 32px;">让 AI 写代码，<br><span class="grad-text">让你看懂项目</span></h2>
-    <p class="lead reveal d2">免费、开源，MIT 协议。</p>
+    <h2 class="reveal d1" style="margin-top: 32px;" data-i18n="finalTitle">让 AI 写代码，<br><span class="grad-text">让你看懂项目</span></h2>
+    <p class="lead reveal d2" data-i18n="finalLead">免费、开源，MIT 协议。</p>
     <div class="cta reveal d3">
-      <a class="btn primary" href="https://github.com/LuckyYunPeng/asurada/releases/latest">免费下载 macOS 版</a>
+      <a class="btn primary" href="https://github.com/LuckyYunPeng/asurada/releases/latest" data-i18n="ctaDownload">免费下载 macOS 版</a>
       <a class="btn ghost" href="https://github.com/LuckyYunPeng/asurada">⭐ Star on GitHub</a>
     </div>
-    <p class="req reveal d3">需要 Apple Silicon 的 Mac，并已安装 git 与 pi</p>
+    <p class="req reveal d3" data-i18n="req">需要 Apple Silicon 的 Mac，并已安装 git 与 pi</p>
   </div>
 </section>
 
 <footer>© Asurada · MIT License</footer>
 
 <script>
+  // 国际化：HTML 里的中文即默认文案，这里只存英文；切回中文时用启动时记下的原文
+  const EN = {
+    title: 'Asurada · AI writes the code. You still need to understand your project.',
+    description: 'Filter out the noise and review faster, with a smooth flow even when juggling multiple projects.',
+    navWhy: 'Why',
+    navFeatures: 'Features',
+    navDownload: 'Download',
+    badge: 'Built for code review in the Vibe Coding era · macOS',
+    heroTitle: 'AI writes the code,<br><span class="grad-text">but you still need to understand your project</span>',
+    heroSub: 'Review isn\'t about distrusting AI. It\'s about <mark>keeping humans in touch with their own project</mark>, especially the parts that matter most. Asurada <mark>filters out the noise</mark> to <mark>make your reviews faster</mark>, so <mark>working across multiple projects</mark> feels effortlessly smooth.',
+    ctaDownload: 'Download for macOS — Free',
+    ctaGithub: 'View on GitHub',
+    altDesk: 'Asurada docked as a small tab at the edge of the screen',
+    altPanel: 'The expanded project panel',
+    whyEyebrow: 'Why we built it',
+    whyTitle: 'Let AI write the code,<br><span class="grad-text">but architecture and core logic can\'t be understood by AI alone</span>',
+    whyLead: 'Vibe Coding makes writing code ten times faster. But stop reading the code, and your project slowly turns into a black box you no longer recognize. When something breaks, you don\'t know where to look. When you need to decide, you don\'t know what it looks like anymore.<br><br>On top of that, AI adds its own touches: logic you never asked for, like excessive defensive checks and fallback branches. Harmless today, but tomorrow they become baggage that makes your code harder to understand.',
+    manifesto: 'Review isn\'t about catching AI\'s mistakes.<br>It\'s about making sure <em>you</em> stay the person who knows this project best.',
+    pain1Title: 'Too many changes to read',
+    pain1Desc: 'AI touches dozens of files in one round. Reading every line isn\'t realistic, so you stop reading at all.',
+    pain2Title: 'Noise buries what matters',
+    pain2Desc: 'Tests and boilerplate mix with real changes, and the few lines that need your judgment get buried.',
+    pain3Title: 'Chores after every review',
+    pain3Desc: 'Writing commit messages, pushing, resolving conflicts — your focus gets chipped away.',
+    pain4Title: 'Don\'t be the bottleneck',
+    pain4Desc: 'With several projects in flight, AI is waiting on your review in each one. Every review should be quick in, quick out, so you never hold up the whole pipeline.',
+    focusEyebrow: 'Review what matters',
+    focusTitle: 'Filter out the noise,<br><span class="grad-text">keep what deserves your eyes</span>',
+    focusLead: 'In any change set, only a handful of files truly need your judgment. Asurada surfaces them and tucks the rest away, so your attention goes only where it affects the project.',
+    focus1: 'Tuck away the noise in one click, like test files — view only, they\'re still committed',
+    focus2: 'Browse a folder tree to see which modules were touched',
+    focus3: 'Word-level inline diff shows exactly what changed',
+    focus4: 'Filter by file name to jump straight to what you care about',
+    focus5: 'AI picks the key files: automatically surfaces what most deserves your review<span class="soon-tag">Coming soon</span>',
+    sieveTitle: 'Changes',
+    sieveUnit: 'files',
+    flowEyebrow: 'How it works',
+    flowTitle: 'You own the step that matters most: understanding',
+    step1Title: 'AI writes code',
+    step1Desc: 'With whatever agent and editor you like',
+    step2Title: 'You review the key parts',
+    step2Desc: 'Noise filtered, only key changes left',
+    step3Title: 'Commit & push in one click',
+    step3Desc: 'Commit message generated for you',
+    step4Title: 'On to the next round',
+    step4Desc: 'Push and conflict handling done for you',
+    featEyebrow: 'Features',
+    featTitle: 'Small, but just enough',
+    diffTitle: 'Before you commit,<br><span class="grad-text">understand the key changes</span>',
+    diffLead: 'The diff window is your review desk: changes laid out by folder, noise tucked away, key lines compared side by side.',
+    diff1: 'Hide test files and focus on business logic',
+    diff2: 'Split or unified layout, color-blind friendly palette',
+    diff3: 'Spot something odd? Jump straight to your editor',
+    altDiff: 'Diff window',
+    commitTitle: 'Done reviewing?<br><span class="grad-text">Wrap up in one click</span>',
+    commitLead: 'All your projects on one screen, the ones with changes first. Finish your review, click once, and let Asurada handle the rest.',
+    commit1: 'Generates a one-line Conventional Commit message in your UI language<code class="commit-sample">feat: add dark mode</code>',
+    commit2: 'Syncs and retries automatically when the remote has new commits',
+    commit3: 'Backs out and tells you on conflicts, so your repo stays clean',
+    altPanelShort: 'Project panel',
+    dockTitle: 'Out of sight,<br><span class="grad-text">out of your way</span>',
+    dockLead: 'Just a small tab at the edge of your screen that lights up when there are changes to commit. Summon the panel with a shortcut from any app.',
+    dockKeys: '&nbsp;to show / hide, customizable in Settings',
+    altDock: 'Small tab docked at the edge of the screen',
+    gridTitle: 'Every detail is built to<br><span class="grad-text">cut the noise and keep you on the core</span>',
+    g1Title: 'No noise in your agent chat',
+    g1Desc: 'Diffs and git output for commits never enter your main conversation. Your agent\'s context stays on the core work.',
+    g2Title: 'Spot what needs you at a glance',
+    g2Desc: 'Projects with changes float to the top, untouched ones are grayed out. No hunting across projects.',
+    g3Title: 'Git chores stay out of your way',
+    g3Desc: 'Syncing, retrying and backing out of conflicts happen automatically, so git busywork never steals your focus.',
+    g4Title: 'There when you need it, gone when you don\'t',
+    g4Desc: 'Just a small tab at the screen edge. Press ⌃E to open, tuck it away after review — no screen space, no distraction.',
+    finalTitle: 'Let AI write the code,<br><span class="grad-text">and you understand the project</span>',
+    finalLead: 'Free and open source under the MIT License.',
+    req: 'Requires an Apple Silicon Mac with git and pi installed',
+  };
+  const ZH = {
+    title: document.title,
+    description: document.querySelector('meta[name=description]').content,
+  };
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    ZH[el.dataset.i18n] = el.innerHTML;
+  });
+  document.querySelectorAll('[data-i18n-alt]').forEach((el) => {
+    ZH[el.dataset.i18nAlt] = el.alt;
+  });
+
+  const LANG_KEY = 'asurada.site.lang';
+  // 优先级：URL ?lang= > 上次选择 > 浏览器语言
+  let lang = new URLSearchParams(location.search).get('lang')
+    || localStorage.getItem(LANG_KEY)
+    || (navigator.language.startsWith('zh') ? 'zh' : 'en');
+  if (lang !== 'zh') {
+    lang = 'en';
+  }
+  let dict = lang === 'zh' ? ZH : EN;
+
+  function applyLanguage(next) {
+    lang = next;
+    dict = lang === 'zh' ? ZH : EN;
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+    document.title = dict.title;
+    document.querySelector('meta[name=description]').content = dict.description;
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
+      el.innerHTML = dict[el.dataset.i18n];
+    });
+    document.querySelectorAll('[data-i18n-alt]').forEach((el) => {
+      el.alt = dict[el.dataset.i18nAlt];
+    });
+    animateSub();
+    document.querySelectorAll('#langToggle span').forEach((el) => {
+      el.classList.toggle('is-active', el.dataset.lang === lang);
+    });
+  }
+  // 把副标题拆成逐字（中文）/ 逐词（英文）的 span，按顺序错开浮现
+  function animateSub() {
+    const sub = document.querySelector('.hero .sub');
+    const unit = lang === 'zh' ? /./gu : /\S+|\s+/g;
+    const step = lang === 'zh' ? 0.028 : 0.06;
+    let i = 0;
+    let k = 0;
+    function split(text) {
+      const frag = document.createDocumentFragment();
+      for (const piece of text.match(unit) ?? []) {
+        if (/^\s+$/.test(piece)) {
+          frag.append(piece);
+          continue;
+        }
+        const span = document.createElement('span');
+        span.className = 'ch';
+        span.style.setProperty('--i', i++);
+        span.textContent = piece;
+        frag.append(span);
+      }
+      return frag;
+    }
+    for (const node of [...sub.childNodes]) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        node.replaceWith(split(node.textContent));
+      } else {
+        node.style.setProperty('--k', k++);
+        node.replaceChildren(split(node.textContent));
+      }
+    }
+    sub.style.setProperty('--step', `${step}s`);
+    sub.style.setProperty('--done', `${i * step + 1}s`);
+  }
+  function onToggleLanguage() {
+    const next = lang === 'zh' ? 'en' : 'zh';
+    localStorage.setItem(LANG_KEY, next);
+    applyLanguage(next);
+  }
+  document.getElementById('langToggle').addEventListener('click', onToggleLanguage);
+  applyLanguage(lang);
+
   // 星空背景
   const canvas = document.getElementById('stars');
   const ctx = canvas.getContext('2d');
@@ -505,28 +703,6 @@
   onResize();
   draw();
 
-  // 打字机：循环展示生成的提交信息
-  const messages = [
-    'feat(payment): 结算时校验优惠券有效期',
-    'fix(auth): 修复会话过期后未跳转登录',
-    'feat(db): 订单表新增退款状态字段',
-  ];
-  const typed = document.getElementById('typed');
-  async function typeLoop() {
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-    for (let i = 0; ; i = (i + 1) % messages.length) {
-      for (const ch of messages[i]) {
-        typed.textContent += ch;
-        await sleep(55);
-      }
-      typed.innerHTML += ' <span class="ok">✓ 已推送</span>';
-      await sleep(1800);
-      typed.textContent = '';
-      await sleep(300);
-    }
-  }
-  typeLoop();
-
   // 滚动进入
   const observer = new IntersectionObserver((entries) => {
     for (const e of entries) {
@@ -554,6 +730,14 @@
       card.style.setProperty('--my', `${e.clientY - rect.top}px`);
     });
   });
+
+  // 导航栏：离开顶部后显示背景
+  const nav = document.querySelector('nav');
+  function onScrollNav() {
+    nav.classList.toggle('is-scrolled', scrollY > 8);
+  }
+  addEventListener('scroll', onScrollNav, { passive: true });
+  onScrollNav();
 
   // Hero 截图随滚动放平
   const desk = document.querySelector('.stage .desk');

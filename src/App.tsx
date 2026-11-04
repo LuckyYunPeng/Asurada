@@ -70,6 +70,11 @@ function summarizeCommitMessage(msg: string): string {
   return line.length > 80 ? `${line.slice(0, 77)}…` : line;
 }
 
+// 打开过一次 diff 窗口就算学会了，之后不再提示
+const DIFF_HINT_SEEN_KEY = "asurada.diffHintSeen";
+// 成功提交过一次就知道「一键会推送」了，顶部提示不再常驻
+const COMMIT_HINT_SEEN_KEY = "asurada.commitHintSeen";
+
 function readIntroComplete(): boolean {
   try {
     return localStorage.getItem(INTRO_STORAGE_KEY) === "1";
@@ -531,6 +536,12 @@ function App() {
   const [flashId, setFlashId] = useState<string | null>(null);
   // 启动后首次拿到列表也排一次
   const [isOrderPending, setIsOrderPending] = useState(true);
+  const [isDiffHintSeen, setIsDiffHintSeen] = useState(
+    () => localStorage.getItem(DIFF_HINT_SEEN_KEY) === "1",
+  );
+  const [isCommitHintSeen, setIsCommitHintSeen] = useState(
+    () => localStorage.getItem(COMMIT_HINT_SEEN_KEY) === "1",
+  );
   const [cloudBand, setCloudBand] = useState(0);
   const [isPanelClosing, setIsPanelClosing] = useState(false);
   const [isTagHot, setIsTagHot] = useState(false);
@@ -738,6 +749,10 @@ function App() {
       console.error("刷新项目状态失败", e);
     }
     const isSuccess = !!(result?.success && result.commitMessage);
+    if (isSuccess) {
+      localStorage.setItem(COMMIT_HINT_SEEN_KEY, "1");
+      setIsCommitHintSeen(true);
+    }
     const t = getMessages();
     const message = isSuccess
       ? summarizeCommitMessage(result?.commitMessage ?? "")
@@ -964,6 +979,28 @@ function App() {
     }
   }
 
+  // 按展开时定下的顺序；之后新加的项目排在末尾
+  const sortedRows = [...rows].sort(
+    (a, b) =>
+      (rowOrder.indexOf(a.project.id) + 1 || rowOrder.length + 1) -
+      (rowOrder.indexOf(b.project.id) + 1 || rowOrder.length + 1),
+  );
+  function onDiffOpened() {
+    if (!isDiffHintSeen) {
+      localStorage.setItem(DIFF_HINT_SEEN_KEY, "1");
+      setIsDiffHintSeen(true);
+    }
+    onCollapsePanel();
+  }
+
+  // 新手提示依次出现：先教「点击查看改动」，再提醒「一键会推送」，都学会后整行不显示
+  const topHint =
+    !isDiffHintSeen && rows.some((r) => !r.project.gitClean)
+      ? t.diffHint
+      : isCommitHintSeen
+        ? null
+        : t.commitHint;
+
   const projectCount = rows.length;
   const showHeaderAdd = inMain;
 
@@ -1105,13 +1142,13 @@ function App() {
             style={bodyHeight === null ? undefined : { height: bodyHeight }}
           >
             <div ref={bodyInnerRef} className="panel-body-inner">
-            {inMain && projectCount > 0 && !settingsOpen ? (
+            {inMain && projectCount > 0 && !settingsOpen && topHint ? (
               <div
                 role="status"
                 className="mb-3 flex items-center gap-1.5 px-1 text-xs leading-snug text-(--risk-fg)"
               >
                 <Info className="size-3.5 flex-none" aria-hidden />
-                {t.commitHint}
+                {topHint}
               </div>
             ) : null}
 
@@ -1183,14 +1220,7 @@ function App() {
               </div>
             ) : (
               <ul className="flex flex-col gap-2">
-                {/* 按展开时定下的顺序；之后新加的项目排在末尾 */}
-                {[...rows]
-                  .sort(
-                    (a, b) =>
-                      (rowOrder.indexOf(a.project.id) + 1 || rowOrder.length + 1) -
-                      (rowOrder.indexOf(b.project.id) + 1 || rowOrder.length + 1),
-                  )
-                  .map((row) => (
+                {sortedRows.map((row) => (
                   <ProjectRow
                     key={row.project.id}
                     row={row}
@@ -1199,7 +1229,7 @@ function App() {
                     onRemove={() => void handleRemove(row.project.id)}
                     isFlashing={flashId === row.project.id}
                     onFlashEnd={() => setFlashId(null)}
-                    onDiffOpened={onCollapsePanel}
+                    onDiffOpened={onDiffOpened}
                   />
                 ))}
               </ul>
