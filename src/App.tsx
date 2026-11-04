@@ -919,12 +919,10 @@ function App() {
             {inMain && projectCount > 0 && !settingsOpen ? (
               <div
                 role="status"
-                className="mb-3 flex items-center gap-2 rounded-[14px] border-[1.5px] border-dashed border-(--risk-border) bg-linear-135 from-(--risk-from) to-(--risk-to) px-[11px] py-[9px] leading-snug text-(--risk-fg)"
+                className="mb-3 flex items-center gap-1.5 px-1 text-xs leading-snug text-(--risk-fg)"
               >
-                <span className="grid size-[18px] flex-none place-items-center rounded-full bg-(--risk-ico) text-[11px] font-extrabold">
-                  !
-                </span>
-                一键会暂存、提交并推送到远端哦
+                <Info className="size-3.5 flex-none" aria-hidden />
+                一键会暂存全部变更、提交并推送到远端
               </div>
             ) : null}
 
@@ -1005,6 +1003,7 @@ function App() {
                     onRemove={() => void handleRemove(row.project.id)}
                     isFlashing={flashId === row.project.id}
                     onFlashEnd={() => setFlashId(null)}
+                    onDiffOpened={onCollapsePanel}
                   />
                 ))}
               </ul>
@@ -1176,8 +1175,8 @@ const CHECKS_CLASS = "mb-3.5 self-stretch rounded-xl border bg-card px-3 py-2.5 
 const STATUS_CLASS: Record<RowKind, { text: string; pip: string }> = {
   clean: { text: "text-(--ink-2)", pip: "mt-[7.5px] bg-(--pip-off)" },
   dirty: {
-    text: "w-fit rounded-full bg-(--warn-bg) py-0.5 pr-2 pl-1.5 text-(--warn-fg)",
-    pip: "size-2 bg-(--warn) shadow-[0_0_0_2px_rgba(239,138,58,0.35)]",
+    text: "text-(--ink-2)",
+    pip: "size-1.5 bg-(--warn)",
   },
   run: { text: "text-accent-foreground", pip: "bg-ring animate-pulse" },
   ok: { text: "text-(--ok)", pip: "mt-[7.5px] bg-(--ok)" },
@@ -1216,6 +1215,7 @@ function ProjectRow({
   onRemove,
   isFlashing,
   onFlashEnd,
+  onDiffOpened,
 }: {
   row: ProjectRowState;
   canCommit: boolean;
@@ -1223,6 +1223,7 @@ function ProjectRow({
   onRemove: () => void;
   isFlashing: boolean;
   onFlashEnd: () => void;
+  onDiffOpened: () => void;
 }) {
   const [isConfirming, setIsConfirming] = useState(false);
   const rowRef = useRef<HTMLLIElement>(null);
@@ -1253,6 +1254,7 @@ function ProjectRow({
     }
     try {
       await invoke("open_diff_window", { id: row.project.id });
+      onDiffOpened();
     } catch (error) {
       console.error("打开 diff 窗口失败", error);
     }
@@ -1261,9 +1263,9 @@ function ProjectRow({
   return (
     <li
       ref={rowRef}
-      className={`group/row relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2.5 gap-y-1.5 rounded-2xl border-[1.5px] bg-linear-to-b from-(--row-from) to-(--row-to) p-[11px] transition-[border-color,box-shadow] ${
+      className={`group/row relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2.5 gap-y-1.5 rounded-xl border bg-card p-3 transition-[border-color,box-shadow] ${
         isDiffable
-          ? "cursor-pointer hover:border-ring/75 hover:shadow-[0_4px_14px_rgba(94,200,212,0.18)]"
+          ? "cursor-pointer hover:border-ring/60 hover:bg-(--surface-2)"
           : ""
       }${isFlashing ? " animate-[row-flash_0.7s_ease-in-out_2]" : ""}`}
       title={isDiffable ? "查看变更" : undefined}
@@ -1275,7 +1277,7 @@ function ProjectRow({
       }}
     >
       <div
-        className="min-w-0 self-center truncate text-[15px] font-semibold text-(--ink-strong)"
+        className="min-w-0 self-center truncate text-sm font-semibold text-(--ink-strong)"
         title={row.project.path}
       >
         {row.project.displayName}

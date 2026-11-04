@@ -178,6 +178,15 @@ pub async fn open_diff_window(app: tauri::AppHandle, id: String) -> Result<(), S
         return window.set_focus().map_err(|e| format!("无法聚焦窗口: {e}"));
     }
 
+    // 同一时间只保留一个 diff 窗口：打开别的项目时关掉之前的
+    for (other_label, other) in app.webview_windows() {
+        if other_label.starts_with("diff-") {
+            if let Err(e) = other.close() {
+                eprintln!("Asurada: 关闭旧 diff 窗口失败 ({e})");
+            }
+        }
+    }
+
     let project = find_project(&app, &id)?;
     let url = tauri::WebviewUrl::App(format!("index.html?view=diff&id={id}").into());
     let (width, height) = load_diff_window_size(&app_data_dir(&app)?);

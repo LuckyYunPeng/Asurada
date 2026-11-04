@@ -19,7 +19,7 @@
 }
 
 .dark .dw {
-  --dw-code-bg: #1f1c29;
+  --dw-code-bg: #1f1f23;
   /* 用实色：库会把这些底色再和代码底色混一次，半透明会被冲淡到几乎看不见 */
   --dw-add-bg: #233d30;
   --dw-del-bg: #4a2630;
@@ -165,15 +165,15 @@
 }
 
 .dw-filter:focus {
-  border-color: var(--mint);
-  box-shadow: 0 0 0 3px rgba(94, 200, 212, 0.18);
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px rgba(128, 128, 140, 0.2);
 }
 
 .dw-files {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   overflow: auto;
   overscroll-behavior: none;
   margin: 0;
@@ -248,42 +248,72 @@
   color: var(--rename-fg);
 }
 
-.dw-file-text {
-  display: flex;
-  flex-direction: column;
+.dw-file-base {
   flex: 1;
   min-width: 0;
-}
-
-.dw-file-base,
-.dw-file-dir {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.dw-file-base {
   font-size: 13px;
   color: var(--ink);
 }
 
-.dw-file-dir {
-  font-size: 11px;
+/* 目录行：箭头 + 文件夹图标 + 名称，比文件行稍矮 */
+.dw-files button.dw-dir {
+  gap: 4px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.dw-dir-chevron {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--ink-3);
+  transition: transform 0.12s ease;
+}
+
+.dw-dir-chevron.is-open {
+  transform: rotate(90deg);
+}
+
+.dw-dir-icon {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-right: 2px;
   color: var(--ink-3);
 }
 
+/* 热区 8px 跨在分界线上，悬停/拖动时中间显示一条 2px 线 */
 .dw-resizer {
   position: absolute;
   top: 0;
-  right: -3px;
-  width: 6px;
+  right: -4px;
+  width: 8px;
   height: 100%;
   cursor: col-resize;
-  z-index: 1;
+  z-index: 10;
+  touch-action: none;
 }
 
-.dw-resizer:hover {
-  background: rgba(94, 200, 212, 0.35);
+.dw-resizer::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  transition: background-color 0.12s ease;
+}
+
+.dw-resizer:hover::after,
+body.is-resizing .dw-resizer::after {
+  background: var(--ring);
+}
+
+/* 拖动中全窗保持调宽光标，且不选中文字 */
+body.is-resizing,
+body.is-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 .dw-diff {
@@ -338,7 +368,7 @@
 }
 
 .dw-open:hover {
-  background: rgba(94, 200, 212, 0.14);
+  background: var(--accent);
 }
 
 .dw-binary {
@@ -362,7 +392,7 @@
   width: 56px;
   height: 56px;
   border-radius: 14px;
-  box-shadow: 0 8px 22px rgba(94, 200, 212, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .dw-state p {
@@ -394,10 +424,10 @@
   /* 透明边框 + padding-box 让滑块看起来是 4px 细条，且留出可点区域 */
   border: 3px solid transparent;
   border-radius: 999px;
-  background: rgba(94, 200, 212, 0.35) padding-box;
+  background: rgba(128, 128, 140, 0.3) padding-box;
 }
 
 .dw-scroll::-webkit-scrollbar-thumb:hover,
 .dw-files::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(94, 200, 212, 0.65);
+  background-color: rgba(128, 128, 140, 0.5);
 }

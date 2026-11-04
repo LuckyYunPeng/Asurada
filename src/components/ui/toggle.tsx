@@ -11,7 +11,9 @@ const toggleVariants = cva(
     variants: {
       variant: {
         default: "bg-transparent",
-        outline: "border border-input bg-transparent hover:bg-muted",
+        // 分段控件（参考 magpie）：灰轨道由 ToggleGroup 提供，选中项为白色凸起滑块
+        outline:
+          "h-6 rounded-md bg-transparent text-(--seg-fg) hover:bg-transparent hover:text-foreground data-[state=on]:bg-(--seg-thumb) data-[state=on]:text-foreground data-[state=on]:shadow-(--seg-edge)",
       },
       size: {
         default:

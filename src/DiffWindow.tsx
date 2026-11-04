@@ -7,7 +7,7 @@ import { FileDiff, Virtualizer, WorkerPoolContextProvider, useWorkerPool } from 
 import DiffsWorker from "@pierre/diffs/worker/worker-portable.js?worker";
 import logoUrl from "./assets/asurada-logo.png";
 import type { CommitPushResult, ICommitPushEvent } from "./types";
-import { RefreshCw, Loader2 } from "lucide-react";
+import { ChevronRight, Folder, RefreshCw, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -68,13 +68,13 @@ const DIFF_UNSAFE_CSS = `
   filter: saturate(0.55);
 }
 [data-code]::-webkit-scrollbar-thumb {
-  background-color: rgba(94, 200, 212, 0.35);
+  background-color: rgba(128, 128, 140, 0.3);
   border: 2px solid transparent;
   background-clip: padding-box;
   border-radius: 999px;
 }
 [data-code]::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(94, 200, 212, 0.65);
+  background-color: rgba(128, 128, 140, 0.5);
 }
 `;
 
@@ -132,10 +132,48 @@ function toEntries(diff: IProjectDiff): IDiffEntry[] {
     }));
 }
 
-function splitPath(name: string) {
-  const i = name.lastIndexOf("/");
-  return { base: name.slice(i + 1), dir: i < 0 ? "" : name.slice(0, i) };
+interface ITreeDir {
+  dirs: Map<string, ITreeDir>;
+  files: IDiffEntry[];
 }
+
+type TTreeRow =
+  | { kind: "dir"; path: string; name: string; depth: number }
+  | { kind: "file"; entry: IDiffEntry; name: string; depth: number };
+
+/** 按路径拼成目录树，再按「目录在前、同级按名称」展开成行；折叠的目录不展开子项 */
+function toTreeRows(entries: IDiffEntry[], collapsedDirs: Set<string>): TTreeRow[] {
+  const root: ITreeDir = { dirs: new Map(), files: [] };
+  for (const entry of entries) {
+    const parts = entry.file.name.split("/");
+    let node = root;
+    for (const part of parts.slice(0, -1)) {
+      if (!node.dirs.has(part)) {
+        node.dirs.set(part, { dirs: new Map(), files: [] });
+      }
+      node = node.dirs.get(part)!;
+    }
+    node.files.push(entry);
+  }
+  const rows: TTreeRow[] = [];
+  const walk = (node: ITreeDir, prefix: string, depth: number) => {
+    for (const [name, child] of [...node.dirs].sort(([a], [b]) => a.localeCompare(b))) {
+      const path = prefix + name;
+      rows.push({ kind: "dir", path, name, depth });
+      if (!collapsedDirs.has(path)) {
+        walk(child, `${path}/`, depth + 1);
+      }
+    }
+    for (const entry of [...node.files].sort((a, b) => a.file.name.localeCompare(b.file.name))) {
+      rows.push({ kind: "file", entry, name: entry.file.name.slice(prefix.length), depth });
+    }
+  };
+  walk(root, "", 0);
+  return rows;
+}
+
+// 每级缩进
+const TREE_INDENT = 14;
 
 /** 与主面板 LogoHero 同款：虚线光环慢转 + logo 悬浮（样式在 App.css） */
 function LogoLoading() {
@@ -159,36 +197,69 @@ function DiffCount({ additions, deletions }: { additions: number; deletions: num
 // 文件多时每次切换都会重渲染整个列表；只有选中态变化的两行需要更新
 const FileItem = memo(function FileItem({
   entry,
+  name,
+  depth,
   isActive,
   onSelect,
   onPrefetch,
 }: {
   entry: IDiffEntry;
+  name: string;
+  depth: number;
   isActive: boolean;
   onSelect: (name: string) => void;
   onPrefetch: (entry: IDiffEntry) => void;
 }) {
-  const { base, dir } = splitPath(entry.file.name);
   return (
     <li>
       <button
         type="button"
         className={isActive ? "is-active" : undefined}
+        // 文件比同级目录多缩进一个箭头的宽度，和目录名对齐
+        style={{ paddingLeft: 8 + depth * TREE_INDENT + 18 }}
         data-name={entry.file.name}
         title={entry.file.name}
         onClick={() => onSelect(entry.file.name)}
         onPointerEnter={() => onPrefetch(entry)}
       >
         <span className={`dw-status is-${entry.status}`}>{entry.status}</span>
-        <span className="dw-file-text">
-          <span className="dw-file-base">{base}</span>
-          {dir ? <span className="dw-file-dir">{dir}</span> : null}
-        </span>
+        <span className="dw-file-base">{name}</span>
         <DiffCount additions={entry.additions} deletions={entry.deletions} />
       </button>
     </li>
   );
 });
+
+function DirItem({
+  path,
+  name,
+  depth,
+  isCollapsed,
+  onToggle,
+}: {
+  path: string;
+  name: string;
+  depth: number;
+  isCollapsed: boolean;
+  onToggle: (path: string) => void;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        className="dw-dir"
+        style={{ paddingLeft: 8 + depth * TREE_INDENT }}
+        title={path}
+        aria-expanded={!isCollapsed}
+        onClick={() => onToggle(path)}
+      >
+        <ChevronRight className={`dw-dir-chevron${isCollapsed ? "" : " is-open"}`} aria-hidden />
+        <Folder className="dw-dir-icon" aria-hidden />
+        <span className="dw-file-base">{name}</span>
+      </button>
+    </li>
+  );
+}
 
 function DiffView({ projectId }: { projectId: string }) {
   const workerPool = useWorkerPool();
@@ -210,6 +281,7 @@ function DiffView({ projectId }: { projectId: string }) {
     () => localStorage.getItem(SHOW_TESTS_KEY) === "1",
   );
   const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(() => new Set());
   // 首次语法高亮完成前，库会画灰色骨架线；用 logo 动画盖住
   const [isRendered, setIsRendered] = useState(false);
 
@@ -272,21 +344,30 @@ function DiffView({ projectId }: { projectId: string }) {
     localStorage.setItem(DIFF_STYLE_KEY, style);
   }
 
-  function onResizeStart(event: React.PointerEvent) {
+  function onResizeStart(event: React.PointerEvent<HTMLDivElement>) {
+    // 不阻止默认行为会开始选中文字；捕获指针后拖过 diff 区或窗口外也不会丢事件
+    event.preventDefault();
+    const handle = event.currentTarget;
+    handle.setPointerCapture(event.pointerId);
     const startX = event.clientX;
     const startWidth = sidebarWidth;
     let width = startWidth;
+    document.body.classList.add("is-resizing");
     const onMove = (e: PointerEvent) => {
-      width = Math.min(480, Math.max(180, startWidth + e.clientX - startX));
+      // 右侧 diff 至少留 360px
+      width = Math.min(window.innerWidth - 360, Math.max(180, startWidth + e.clientX - startX));
       setSidebarWidth(width);
     };
     const onUp = () => {
       localStorage.setItem(SIDEBAR_WIDTH_KEY, String(width));
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
+      document.body.classList.remove("is-resizing");
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onUp);
+      handle.removeEventListener("pointercancel", onUp);
     };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onUp);
+    handle.addEventListener("pointercancel", onUp);
   }
 
   async function onOpenInEditor(name: string) {
@@ -352,9 +433,30 @@ function DiffView({ projectId }: { projectId: string }) {
       ),
     [countedEntries, filter],
   );
-  // 只渲染选中的一个文件；选中的被筛掉或刷新后已不在变更里时回到第一个
+  const treeRows = useMemo(
+    () => toTreeRows(visibleEntries, collapsedDirs),
+    [visibleEntries, collapsedDirs],
+  );
+  // 键盘切换按目录树里看得到的文件顺序走，折叠目录里的跳过
+  const treeFiles = useMemo(
+    () => treeRows.flatMap((row) => (row.kind === "file" ? [row.entry] : [])),
+    [treeRows],
+  );
+  // 只渲染选中的一个文件；选中的被筛掉或刷新后已不在变更里时回到树里第一个
   const selected =
-    visibleEntries.find((e) => e.file.name === selectedName) ?? visibleEntries[0];
+    visibleEntries.find((e) => e.file.name === selectedName) ?? treeFiles[0] ?? visibleEntries[0];
+
+  const onToggleDir = useCallback((path: string) => {
+    setCollapsedDirs((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  }, []);
   // 悬停时就在 worker 里预先高亮，点下去直接命中缓存；失败了点击时会正常再高亮一次，不影响查看
   const onPrefetch = useCallback(
     (entry: IDiffEntry) => {
@@ -398,16 +500,16 @@ function DiffView({ projectId }: { projectId: string }) {
         event.metaKey ||
         event.ctrlKey ||
         event.altKey ||
-        !visibleEntries.length
+        !treeFiles.length
       ) {
         return;
       }
       event.preventDefault();
-      const index = visibleEntries.findIndex((e) => e === selected);
+      const index = treeFiles.findIndex((e) => e === selected);
       const next =
-        visibleEntries[
+        treeFiles[
           event.key === "ArrowDown"
-            ? Math.min(index + 1, visibleEntries.length - 1)
+            ? Math.min(index + 1, treeFiles.length - 1)
             : Math.max(index - 1, 0)
         ];
       setSelectedName(next.file.name);
@@ -417,7 +519,7 @@ function DiffView({ projectId }: { projectId: string }) {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [visibleEntries, selected]);
+  }, [treeFiles, selected]);
 
   return (
     <div className="dw">
@@ -539,15 +641,28 @@ function DiffView({ projectId }: { projectId: string }) {
               onChange={(e) => setFilter(e.target.value)}
             />
             <ul className="dw-files">
-              {visibleEntries.map((entry) => (
-                <FileItem
-                  key={entry.file.name}
-                  entry={entry}
-                  isActive={entry === selected}
-                  onSelect={setSelectedName}
-                  onPrefetch={onPrefetch}
-                />
-              ))}
+              {treeRows.map((row) =>
+                row.kind === "dir" ? (
+                  <DirItem
+                    key={`d:${row.path}`}
+                    path={row.path}
+                    name={row.name}
+                    depth={row.depth}
+                    isCollapsed={collapsedDirs.has(row.path)}
+                    onToggle={onToggleDir}
+                  />
+                ) : (
+                  <FileItem
+                    key={row.entry.file.name}
+                    entry={row.entry}
+                    name={row.name}
+                    depth={row.depth}
+                    isActive={row.entry === selected}
+                    onSelect={setSelectedName}
+                    onPrefetch={onPrefetch}
+                  />
+                ),
+              )}
             </ul>
             <div className="dw-resizer" onPointerDown={onResizeStart} />
           </aside>

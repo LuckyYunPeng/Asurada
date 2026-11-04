@@ -10,66 +10,71 @@
   --bg2: #fff8f1;
   --bg3: #eef9fc;
   --panel: rgba(255, 255, 255, 0.9);
-  --panel-border: rgba(94, 200, 212, 0.38);
-  --ink: #3d3a4a;
-  --ink-2: #6d687a;
-  --ink-3: #9a94a8;
-  --mint: #5ec8d4;
-  --mint-soft: #d4f4f7;
-  --peach: #f0b89a;
-  --peach-soft: #ffe8d9;
-  --pink: #e8a8bc;
-  --ok: #4ecb8b;
-  --err: #ff6b8a;
+  --panel-border: rgba(0, 0, 0, 0.08);
+  --ink: #1c1c21;
+  --ink-2: #4b4b53;
+  --ink-3: #85858d;
+  --mint: #85858d;
+  --mint-soft: #f1f1f4;
+  --peach: #c4c4cc;
+  --peach-soft: #f1f1f4;
+  --pink: #ec4899;
+  --ok: #189a58;
+  --err: #d64545;
   /* 主题语义色：深色值在下方 .dark 里，浅色值保持原设计 */
   --surface: #ffffff;
-  --surface-2: #fbfdfd;
-  --hairline: rgba(61, 58, 74, 0.08);
-  --ink-strong: #4a4458;
-  --row-from: rgba(255, 255, 255, 0.8);
-  --row-to: rgba(255, 247, 251, 0.8);
-  --accent-strong: #e0f3f2;
-  --ok-fg: #2f9e6a;
-  --ok-bg: #e7f8ef;
-  --ok-border: #c7efda;
-  --err-fg: #c43d5a;
-  --err-bg: #ffe8ef;
-  --err-border: #ffc9d8;
-  --warn: #ef8a3a;
-  --warn-fg: #c45e22;
-  --warn-bg: #ffe8d9;
-  --risk-from: #fff5eb;
-  --risk-to: #ffe8d9;
-  --risk-border: #f0b89a;
-  --risk-fg: #b07848;
-  --risk-ico: #ffe0c8;
-  --rename-fg: #3b6fd1;
-  --rename-bg: #e6f0ff;
-  --dot-off: #d4ebe8;
-  --pip-off: #cfc8d8;
+  --surface-2: #f2f2f5;
+  --hairline: rgba(0, 0, 0, 0.07);
+  --ink-strong: #1c1c21;
+  --row-from: #ffffff;
+  --row-to: #ffffff;
+  --accent-strong: #e3e3e8;
+  --ok-fg: #189a58;
+  --ok-bg: #e4f6ec;
+  --ok-border: #c6ead5;
+  --err-fg: #d64545;
+  --err-bg: #fbe9e9;
+  --err-border: #f3cccc;
+  --warn: #f59e0b;
+  --warn-fg: #b45309;
+  --warn-bg: #fbf0df;
+  --risk-from: #f7f7f9;
+  --risk-to: #f7f7f9;
+  --risk-border: rgba(0, 0, 0, 0.06);
+  --risk-fg: #63636b;
+  --risk-ico: #e6e6eb;
+  --rename-fg: #4b4b53;
+  --rename-bg: #f1f1f4;
+  /* 分段控件（参考 magpie）：灰轨道 + 白色凸起滑块 */
+  --seg-track: #e6e6eb;
+  --seg-thumb: #ffffff;
+  --seg-edge: 0 1px 2px rgba(0, 0, 0, 0.14), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+  --seg-fg: #63636b;
+  --dot-off: #e3e3e8;
+  --pip-off: #d4d4da;
   --font:
     "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", -apple-system,
     BlinkMacSystemFont, sans-serif;
   font-family: var(--font);
   --background: oklch(1 0 0);
-  --foreground: #3d3a4a;
+  --foreground: #1c1c21;
   --card: oklch(1 0 0);
-  --card-foreground: #3d3a4a;
+  --card-foreground: #1c1c21;
   --popover: oklch(1 0 0);
-  --popover-foreground: #3d3a4a;
-  /* shadcn 主色映射到品牌青色 */
-  --primary: #3fb6c6;
+  --popover-foreground: #1c1c21;
+  /* 配色参考 yetone/magpie：中性灰 + 靛蓝主色 */
+  --primary: #1c1c21;
   --primary-foreground: #ffffff;
-  --secondary: #eef8f7;
-  --secondary-foreground: #1f7f8c;
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: #9a94a8;
-  --accent: #eef8f7;
-  --accent-foreground: #1f7f8c;
-  --destructive: #e5486a;
-  --border: #d6ecec;
-  --input: #dfe3ea;
-  --ring: #5ec8d4;
+  --secondary: #f1f1f4;
+  --secondary-foreground: #1c1c21;
+  --muted: #f1f1f4;
+  --muted-foreground: #85858d;
+  --accent: #f1f1f4;
+  --accent-foreground: #1c1c21;
+  --destructive: #d64545;
+  --border: #e3e3e8;
+  --input: #e3e3e8;
+  --ring: #a1a1aa;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -210,8 +215,8 @@ body {
   background: conic-gradient(
     from 0deg,
     transparent 0deg,
-    var(--peach) 120deg,
-    var(--mint) 260deg,
+    rgba(255, 255, 255, 0.2) 120deg,
+    rgba(255, 255, 255, 0.85) 260deg,
     transparent 360deg
   );
   mask: radial-gradient(circle, transparent 12px, #000 12.5px);
@@ -222,13 +227,13 @@ body {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #ef8a3a;
-  box-shadow: 0 0 0 2px rgba(239, 138, 58, 0.25);
+  background: var(--warn);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
 }
 
 .tag-pending.is-failed {
   background: var(--err);
-  box-shadow: 0 0 0 2px rgba(255, 107, 138, 0.25);
+  box-shadow: 0 0 0 2px rgba(214, 69, 69, 0.25);
 }
 
 .tag-logo {
@@ -240,10 +245,10 @@ body {
 
 /* 收起态结果气泡：状态图标 + 标题/摘要 + 底部倒计时条，从 Tag 方向弹出 */
 .cloud {
-  --cloud-c1: #5ec8d4;
-  --cloud-c2: #4ecb8b;
-  --cloud-ink: #1c9a78;
-  --cloud-tint: #effbf7;
+  --cloud-c1: #34c77b;
+  --cloud-c2: #189a58;
+  --cloud-ink: #189a58;
+  --cloud-tint: #e4f6ec;
   position: absolute;
   z-index: 3;
   /* 高度随文案变化，窗口按实际高度留位（App.tsx cloudBand） */
@@ -255,26 +260,26 @@ body {
   gap: 10px;
   padding: 9px 12px 11px 10px;
   border-radius: 16px;
-  background: linear-gradient(135deg, var(--surface) 40%, var(--cloud-tint));
+  background: var(--surface);
   border: 1px solid var(--hairline);
   box-shadow:
     0 10px 24px rgba(23, 18, 42, 0.16),
     0 2px 6px rgba(23, 18, 42, 0.08),
-    inset 0 0 0 1px rgba(94, 200, 212, 0.18);
+    0 0 0 0.5px rgba(0, 0, 0, 0.06);
   pointer-events: none;
   transform-origin: 85% 100%;
   animation: cloud-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .cloud--err {
-  --cloud-c1: #ff8aa3;
-  --cloud-c2: #f06a6a;
-  --cloud-ink: #d4405f;
-  --cloud-tint: #fff1f4;
+  --cloud-c1: #ef6b6b;
+  --cloud-c2: #d64545;
+  --cloud-ink: #d64545;
+  --cloud-tint: #fbe9e9;
   box-shadow:
     0 10px 24px rgba(23, 18, 42, 0.16),
     0 2px 6px rgba(23, 18, 42, 0.08),
-    inset 0 0 0 1px rgba(255, 107, 138, 0.2);
+    0 0 0 0.5px rgba(0, 0, 0, 0.06);
 }
 
 /* 指向下方 Tag 的小尾巴 */
@@ -286,9 +291,9 @@ body {
   bottom: -6px;
   width: 11px;
   height: 11px;
-  background: var(--cloud-tint);
-  border-right: 2px solid var(--cloud-c2);
-  border-bottom: 2px solid var(--cloud-c2);
+  background: var(--surface);
+  border-right: 1px solid var(--hairline);
+  border-bottom: 1px solid var(--hairline);
   border-radius: 0 0 3px 0;
   transform: rotate(45deg);
   box-shadow: 3px 3px 6px rgba(23, 18, 42, 0.08);
@@ -302,8 +307,7 @@ body {
   display: grid;
   place-items: center;
   color: #fff;
-  background: linear-gradient(135deg, var(--cloud-c1), var(--cloud-c2));
-  box-shadow: 0 3px 8px color-mix(in srgb, var(--cloud-c2) 45%, transparent);
+  background: var(--cloud-c2);
   animation: cloud-icon-pop 0.5s 0.12s cubic-bezier(0.34, 1.8, 0.64, 1) both;
 }
 
@@ -493,24 +497,12 @@ body {
   display: block;
 }
 
-/* 艺术字标题：圆体粗字 + 白边 + 蜜桃错位投影（贴纸感） */
 .title {
   margin: 0;
-  font-family: "Arial Rounded MT Bold", ui-rounded, var(--font);
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: #3fb6c6;
-  text-shadow:
-    1.5px 1.5px 0 #fff,
-    3px 3px 0 var(--peach),
-    4px 5px 8px rgba(240, 160, 126, 0.3);
-}
-
-/* 深色底上白边、蜜桃投影和柔光会糊成一团：只留一层同色系深青投影，保持立体感 */
-.dark .title {
-  color: #5ed3e0;
-  text-shadow: 2px 2px 0 #1f6f7a;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--ink-strong);
 }
 
 .panel-body {
@@ -534,12 +526,12 @@ body {
 }
 
 .panel-body::-webkit-scrollbar-thumb {
-  background: rgba(94, 200, 212, 0.35);
+  background: rgba(128, 128, 140, 0.3);
   border-radius: 999px;
 }
 
 .panel-body::-webkit-scrollbar-thumb:hover {
-  background: rgba(94, 200, 212, 0.6);
+  background: rgba(128, 128, 140, 0.5);
 }
 
 
@@ -557,7 +549,7 @@ body {
   width: 48px;
   height: 48px;
   border-radius: 13px;
-  box-shadow: 0 6px 20px rgba(94, 200, 212, 0.45);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   animation: logo-breathe 1.6s ease-in-out infinite;
 }
 
@@ -588,14 +580,12 @@ body {
   height: 8px;
   border-radius: 50%;
   background: var(--mint);
-  box-shadow: 0 0 10px var(--mint);
   top: 0;
   left: calc(50% - 4px);
 }
 
 .logo-loader-orbit i + i {
   background: var(--peach);
-  box-shadow: 0 0 10px var(--peach);
   top: auto;
   bottom: 0;
 }
@@ -615,19 +605,13 @@ body {
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    rgba(94, 200, 212, 0.18) 0%,
-    rgba(240, 184, 154, 0.12) 55%,
-    transparent 70%
-  );
 }
 
 .logo-idle img {
   width: 52px;
   height: 52px;
   border-radius: 14px;
-  box-shadow: 0 8px 22px rgba(94, 200, 212, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   animation: logo-float 3s ease-in-out infinite;
 }
 
@@ -635,7 +619,7 @@ body {
   position: absolute;
   inset: 6px;
   border-radius: 50%;
-  border: 2px dashed rgba(94, 200, 212, 0.55);
+  border: 1.5px dashed var(--accent-strong);
   animation: spin 14s linear infinite;
 }
 
@@ -648,18 +632,18 @@ body {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, var(--peach), #f5a483);
-  color: #fff;
+  background: var(--primary);
+  color: var(--primary-foreground);
   font-size: 15px;
   font-weight: 800;
   line-height: 1;
-  box-shadow: 0 0 0 3px var(--surface), 0 4px 10px rgba(240, 184, 154, 0.5);
+  box-shadow: 0 0 0 3px var(--surface);
   animation: logo-float 3s ease-in-out infinite;
 }
 
 .logo-idle-badge.is-warn {
-  background: linear-gradient(135deg, #ff8fa6, var(--err));
-  box-shadow: 0 0 0 3px var(--surface), 0 4px 10px rgba(255, 107, 138, 0.45);
+  background: var(--err);
+  color: #fff;
 }
 
 @keyframes logo-float {
@@ -685,8 +669,8 @@ body {
 /* 重复添加时项目行闪两下，告诉用户已有的项目在哪 */
 @keyframes row-flash {
   50% {
-    border-color: var(--mint);
-    box-shadow: 0 0 0 3px rgba(94, 200, 212, 0.35);
+    border-color: var(--ring);
+    box-shadow: 0 0 0 3px rgba(128, 128, 140, 0.25);
   }
 }
 
@@ -733,68 +717,73 @@ body {
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* 深色：夜空紫底，与收起态 Tag 同色系；品牌青/桃色保留 */
+/* 深色：magpie 深色面板配色 */
 .dark {
   color-scheme: dark;
-  --ink: #e8e5f0;
-  --ink-2: #b4aec2;
-  --ink-3: #8a849a;
-  --mint-soft: rgba(94, 200, 212, 0.16);
-  --peach-soft: rgba(240, 184, 154, 0.16);
-  --surface: #1f1c29;
-  --surface-2: #17151f;
-  --hairline: rgba(255, 255, 255, 0.08);
-  --ink-strong: #f2effa;
-  --row-from: rgba(44, 40, 56, 0.8);
-  --row-to: rgba(48, 38, 54, 0.8);
-  --accent-strong: rgba(94, 200, 212, 0.24);
-  --ok-fg: #6fdca3;
-  --ok-bg: rgba(78, 203, 139, 0.14);
-  --ok-border: rgba(78, 203, 139, 0.3);
-  --err-fg: #ff8fa6;
-  --err-bg: rgba(255, 107, 138, 0.14);
-  --err-border: rgba(255, 107, 138, 0.3);
-  --warn-fg: #f5a46a;
-  --warn-bg: rgba(239, 138, 58, 0.16);
-  --risk-from: rgba(240, 184, 154, 0.1);
-  --risk-to: rgba(240, 184, 154, 0.16);
-  --risk-border: rgba(240, 184, 154, 0.5);
-  --risk-fg: #f0b89a;
-  --risk-ico: rgba(240, 184, 154, 0.22);
-  --rename-fg: #8fb3ff;
-  --rename-bg: rgba(91, 141, 239, 0.18);
+  --ink: #ededf1;
+  --ink-2: #b9b9c1;
+  --ink-3: #8b8b94;
+  --mint-soft: #2d2d33;
+  --peach-soft: #2d2d33;
+  --surface: #1b1c20;
+  --surface-2: #1a1a1e;
+  --hairline: rgba(255, 255, 255, 0.07);
+  --ink-strong: #ededf1;
+  --row-from: #25262c;
+  --row-to: #25262c;
+  --accent-strong: #333339;
+  --ok-fg: #6fd99b;
+  --ok-bg: #1e3a2b;
+  --ok-border: rgba(111, 217, 155, 0.3);
+  --err-fg: #f28b82;
+  --err-bg: #45272a;
+  --err-border: rgba(242, 139, 130, 0.3);
+  --warn-fg: #f2b544;
+  --warn-bg: #3f3220;
+  --risk-from: #202024;
+  --risk-to: #202024;
+  --risk-border: rgba(255, 255, 255, 0.06);
+  --risk-fg: #a1a1aa;
+  --risk-ico: #333339;
+  --rename-fg: #b9b9c1;
+  --rename-bg: #2d2d33;
   --dot-off: rgba(255, 255, 255, 0.14);
-  --pip-off: #5a5468;
+  --pip-off: #56565f;
 
-  --background: #17151f;
-  --foreground: #e8e5f0;
-  --card: #24212e;
-  --card-foreground: #e8e5f0;
-  --popover: #2a2735;
-  --popover-foreground: #e8e5f0;
-  /* 比浅色主色略深，白字对比度更高；配合按钮在深色下去掉青色光晕 */
-  --primary: #2a9fae;
-  --primary-foreground: #ffffff;
-  --secondary: rgba(94, 200, 212, 0.14);
-  --secondary-foreground: #7fd8e2;
-  --muted: #2c2937;
-  --muted-foreground: #8a849a;
-  --accent: rgba(94, 200, 212, 0.14);
-  --accent-foreground: #7fd8e2;
-  --destructive: #ff6b8a;
-  --border: #34313f;
-  --input: #3d3a4a;
-  --ring: #5ec8d4;
+  --background: #1a1a1e;
+  --foreground: #ededf1;
+  --card: #25262c;
+  --card-foreground: #ededf1;
+  --popover: #26262b;
+  --popover-foreground: #ededf1;
+  --primary: #ededf1;
+  --primary-foreground: #1a1a1e;
+  --secondary: #2e2f36;
+  --secondary-foreground: #ededf1;
+  --muted: #2d2d33;
+  --muted-foreground: #8b8b94;
+  --accent: #2d2d33;
+  --accent-foreground: #ededf1;
+  --destructive: #f28b82;
+  --border: #333339;
+  --input: #333339;
+  --ring: #71717a;
+  --mint: #8b8b94;
+  --peach: #56565f;
+  --seg-track: rgba(255, 255, 255, 0.05);
+  --seg-thumb: rgba(255, 255, 255, 0.15);
+  --seg-edge: inset 0 0.5px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --seg-fg: #a1a1aa;
 }
 
 .dark .cloud {
-  --cloud-ink: #6fdca3;
-  --cloud-tint: #1f2c2a;
+  --cloud-ink: #6fd99b;
+  --cloud-tint: #1e3a2b;
 }
 
 .dark .cloud--err {
-  --cloud-ink: #ff8fa6;
-  --cloud-tint: #2e1f27;
+  --cloud-ink: #f28b82;
+  --cloud-tint: #45272a;
 }
 
 @layer base {

@@ -8,9 +8,8 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // 品牌可爱风：胶囊 + 青色投影，禁用时去掉投影
         default:
-          "bg-primary font-semibold text-primary-foreground shadow-[0_4px_12px_rgba(63,182,198,0.35)] hover:brightness-110 disabled:shadow-none dark:shadow-none",
+          "bg-primary font-semibold text-primary-foreground hover:bg-primary/85",
         outline:
           "border-border bg-background hover:bg-accent hover:text-accent-foreground aria-expanded:bg-accent aria-expanded:text-accent-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         secondary:
