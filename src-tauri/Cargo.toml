@@ -1,6 +1,6 @@
 [package]
 name = "asurada"
-version = "0.1.0"
+version = "0.1.1"
 description = "Asurada — edge-docked git commit & push helper for macOS"
 authors = ["Asurada Contributors"]
 license = "MIT"
