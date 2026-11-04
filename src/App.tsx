@@ -181,7 +181,7 @@ function SettingsShortcutRow({
         className={
           recording
             ? "h-6 border border-dashed border-border bg-transparent px-2 font-normal"
-            : "h-6 bg-accent px-2 font-semibold text-accent-foreground"
+            : "h-6 bg-accent px-2 font-mono font-semibold text-accent-foreground"
         }
       >
         {recording ? "按下新组合…" : display}
@@ -1173,13 +1173,14 @@ const CHECKS_CLASS = "mb-3.5 self-stretch rounded-xl border bg-card px-3 py-2.5 
 
 /** 项目行状态文字与圆点的颜色 */
 const STATUS_CLASS: Record<RowKind, { text: string; pip: string }> = {
-  clean: { text: "text-(--ink-2)", pip: "mt-[7.5px] bg-(--pip-off)" },
+  // 提交信息用等宽，更像开发工具里的 commit 列表
+  clean: { text: "font-mono text-[12.5px] text-(--ink-2)", pip: "mt-[7.5px] bg-(--pip-off)" },
   dirty: {
     text: "text-(--ink-2)",
     pip: "size-1.5 bg-(--warn)",
   },
   run: { text: "text-accent-foreground", pip: "bg-ring animate-pulse" },
-  ok: { text: "text-(--ok)", pip: "mt-[7.5px] bg-(--ok)" },
+  ok: { text: "font-mono text-[12.5px] text-(--ok)", pip: "mt-[7.5px] bg-(--ok)" },
   err: { text: "text-(--err)", pip: "mt-[7.5px] bg-(--err)" },
 };
 

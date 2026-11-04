@@ -57,6 +57,7 @@ pub fn run() {
             commands::get_committing_ids,
             commands::get_project_diff,
             commands::open_diff_window,
+            commands::get_diff_project_id,
             commands::get_diff_window_size,
             commands::set_diff_window_size,
             #[cfg(target_os = "macos")]
@@ -80,6 +81,9 @@ pub fn run() {
                 if let Err(e) = macos_panel::setup_tray(app) {
                     eprintln!("Asurada: 菜单栏图标创建失败 ({e})");
                 }
+            }
+            if let Err(e) = commands::build_diff_window(app.handle()) {
+                eprintln!("Asurada: 预热 diff 窗口失败 ({e})，打开时再创建");
             }
             Ok(())
         })

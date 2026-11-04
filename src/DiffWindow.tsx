@@ -2,12 +2,18 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { isHighlighterLoaded, parsePatchFiles, type FileDiffMetadata } from "@pierre/diffs";
+import {
+  isHighlighterLoaded,
+  parsePatchFiles,
+  preloadHighlighter,
+  type FileDiffMetadata,
+  type SupportedLanguages,
+} from "@pierre/diffs";
 import { FileDiff, Virtualizer, WorkerPoolContextProvider, useWorkerPool } from "@pierre/diffs/react";
 import DiffsWorker from "@pierre/diffs/worker/worker-portable.js?worker";
 import logoUrl from "./assets/asurada-logo.png";
 import type { CommitPushResult, ICommitPushEvent } from "./types";
-import { ChevronRight, Folder, RefreshCw, Loader2 } from "lucide-react";
+import { ChevronRight, Folder, Loader2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -107,13 +113,37 @@ function isTestFile(name: string) {
 }
 const SIDEBAR_WIDTH_KEY = "asurada.diffSidebarWidth";
 
-// 每次拉取 diff 换一个前缀：文件内容可能变了，不能复用上一轮的高亮缓存
-let fetchSeq = 0;
+// 预热时先加载的语法，其余语言打开文件时按需加载
+const PRELOAD_LANGS: SupportedLanguages[] = ["typescript", "tsx", "javascript", "json", "css", "rust"];
+
+/** 53 位字符串哈希（cyrb53），给 patch 生成稳定的缓存前缀 */
+function hashText(text: string) {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+function isSameDiff(a: IProjectDiff, b: IProjectDiff) {
+  return (
+    a.patch === b.patch &&
+    a.path === b.path &&
+    a.displayName === b.displayName &&
+    a.untracked.join("\0") === b.untracked.join("\0")
+  );
+}
 
 function toEntries(diff: IProjectDiff): IDiffEntry[] {
   const untracked = new Set(diff.untracked);
-  // 带 cacheKey 才能预高亮并命中 worker 池的高亮缓存
-  return parsePatchFiles(diff.patch, `f${++fetchSeq}`)
+  // 带 cacheKey 才能预高亮并命中 worker 池的高亮缓存。前缀取 patch 的哈希：内容不变（重新聚焦、
+  // 关掉再打开同一项目）就命中上次的高亮结果，内容变了自然换新 key，不会用到旧结果
+  return parsePatchFiles(diff.patch, `p${hashText(diff.patch)}`)
     .flatMap((p) => p.files)
     .map((file) => ({
       file,
@@ -223,7 +253,10 @@ const FileItem = memo(function FileItem({
         onPointerEnter={() => onPrefetch(entry)}
       >
         <span className={`dw-status is-${entry.status}`}>{entry.status}</span>
-        <span className="dw-file-base">{name}</span>
+        {/* 开头省略：保留结尾的文件名和扩展名。外层 rtl 让省略号落在左边，bdi 保证文字本身仍按从左到右排 */}
+        <span className="dw-file-base is-head-ellipsis">
+          <bdi>{name}</bdi>
+        </span>
         <DiffCount additions={entry.additions} deletions={entry.deletions} />
       </button>
     </li>
@@ -282,13 +315,15 @@ function DiffView({ projectId }: { projectId: string }) {
   );
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(() => new Set());
-  // 首次语法高亮完成前，库会画灰色骨架线；用 logo 动画盖住
-  const [isRendered, setIsRendered] = useState(false);
+  // 首次语法高亮完成前，库会画灰色骨架线；用 logo 动画盖住。窗口已预热时高亮器早就加载好了
+  const [isRendered, setIsRendered] = useState(isHighlighterLoaded);
 
   const fetchDiff = useCallback(async () => {
     setIsLoading(true);
     try {
-      setDiff(await invoke<IProjectDiff>("get_project_diff", { id: projectId }));
+      const next = await invoke<IProjectDiff>("get_project_diff", { id: projectId });
+      // 内容没变就保留原对象：文件列表、选中项、已渲染的 diff 都不动
+      setDiff((prev) => (prev && isSameDiff(prev, next) ? prev : next));
       setError(null);
     } catch (e) {
       console.error("读取 diff 失败", e);
@@ -721,14 +756,38 @@ function DiffView({ projectId }: { projectId: string }) {
   );
 }
 
-/** worker 池要包在外层，DiffView 里才能用 useWorkerPool 预高亮 */
-export default function DiffWindow({ projectId }: { projectId: string }) {
+/**
+ * 窗口常驻：启动时隐藏创建，worker 池和高亮器提前加载好；后端发 diff-open 切换项目，
+ * 关闭时只是隐藏并发 diff-hidden，清掉内容，下次打开不会先闪一下上一个项目。
+ * worker 池要包在外层，DiffView 里才能用 useWorkerPool 预高亮
+ */
+export default function DiffWindow() {
+  const [projectId, setProjectId] = useState<string | null>(null);
+
+  useEffect(() => {
+    void preloadHighlighter({
+      themes: [DIFF_THEME.light, DIFF_THEME.dark],
+      langs: PRELOAD_LANGS,
+    }).catch((e) => console.error("预加载高亮器失败", e));
+    // 后端先记下项目再发事件；窗口还在加载时事件会丢，从这里补拿
+    void invoke<string | null>("get_diff_project_id")
+      .then((id) => setProjectId((current) => current ?? id))
+      .catch((e) => console.error("读取 diff 项目失败", e));
+    const pendingOpen = listen<string>("diff-open", ({ payload }) => setProjectId(payload));
+    const pendingHidden = listen("diff-hidden", () => setProjectId(null));
+    return () => {
+      void pendingOpen.then((stop) => stop());
+      void pendingHidden.then((stop) => stop());
+    };
+  }, []);
+
   return (
     <WorkerPoolContextProvider
       poolOptions={WORKER_POOL_OPTIONS}
       highlighterOptions={HIGHLIGHTER_OPTIONS}
     >
-      <DiffView projectId={projectId} />
+      {/* key 随项目变化：切项目时筛选、选中、折叠等状态都重置 */}
+      {projectId ? <DiffView key={projectId} projectId={projectId} /> : null}
     </WorkerPoolContextProvider>
   );
 }

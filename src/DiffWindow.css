@@ -8,6 +8,12 @@
   display: flex;
   flex-direction: column;
   color: var(--ink);
+  /* 代码字体：打包的 Geist Mono；中文注释按字逐个回退到苹方。自定义属性会继承进 diff 库的 shadow DOM。
+     行高保持库默认 20px，虚拟滚动按这个值算位置 */
+  --diffs-font-family: var(--font-code);
+  /* 文件头的路径也用等宽 */
+  --diffs-header-font-family: var(--font-code);
+  --diffs-font-features: "liga" 0, "calt" 0;
   /* diff 增删底色：库默认只混入 12%，加深到一眼能看出改动；注入 shadow DOM 的样式引用这些变量 */
   --dw-code-bg: #ffffff;
   --dw-add-bg: #dbf6e3;
@@ -82,6 +88,7 @@
 }
 
 .dw-count {
+  font-family: var(--font-code);
   display: inline-flex;
   gap: 6px;
   font-size: 12px;
@@ -213,7 +220,8 @@
 }
 
 .dw-files button.is-active .dw-file-base {
-  font-weight: 600;
+  /* 600 在小字号下字母会粘在一起，500 就够区分选中项 */
+  font-weight: 500;
 }
 
 .dw-status {
@@ -248,6 +256,12 @@
   color: var(--rename-fg);
 }
 
+/* 文件名太长时省略开头 */
+.dw-file-base.is-head-ellipsis {
+  direction: rtl;
+  text-align: left;
+}
+
 .dw-file-base {
   flex: 1;
   min-width: 0;
@@ -255,6 +269,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 13px;
+  /* Geist 字距偏紧，13px 下稍微拉开 */
+  letter-spacing: 0.015em;
   color: var(--ink);
 }
 

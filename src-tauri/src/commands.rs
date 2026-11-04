@@ -168,75 +168,171 @@ pub async fn get_project_diff(app: tauri::AppHandle, id: String) -> Result<Proje
     })
 }
 
-/// 每个项目只开一个 diff 窗口，已开则带到前台。
-#[tauri::command]
-pub async fn open_diff_window(app: tauri::AppHandle, id: String) -> Result<(), String> {
-    let label = format!("diff-{id}");
-    if let Some(window) = app.get_webview_window(&label) {
-        let _ = window.unminimize();
-        let _ = window.show();
-        return window.set_focus().map_err(|e| format!("无法聚焦窗口: {e}"));
-    }
+pub const DIFF_WINDOW_LABEL: &str = "diff";
 
-    // 同一时间只保留一个 diff 窗口：打开别的项目时关掉之前的
-    for (other_label, other) in app.webview_windows() {
-        if other_label.starts_with("diff-") {
-            if let Err(e) = other.close() {
-                eprintln!("Asurada: 关闭旧 diff 窗口失败 ({e})");
-            }
-        }
-    }
+/// 当前 diff 窗口显示的项目。窗口还在加载时收不到 diff-open 事件，加载完靠它补上
+static DIFF_PROJECT_ID: Mutex<Option<String>> = Mutex::new(None);
 
-    let project = find_project(&app, &id)?;
-    let url = tauri::WebviewUrl::App(format!("index.html?view=diff&id={id}").into());
-    let (width, height) = load_diff_window_size(&app_data_dir(&app)?);
-    let mut initial_size = (width, height);
-    let mut builder = tauri::WebviewWindowBuilder::new(&app, &label, url)
-        .title(format!("{} 的变更", project.display_name))
+/// 程序改窗口尺寸时记下目标值，Resized 回调据此跳过，只保存用户拖出来的尺寸
+static PROGRAMMATIC_DIFF_SIZE: Mutex<(f64, f64)> = Mutex::new((0.0, 0.0));
+
+/// 全局只有一个 diff 窗口：启动时建好并隐藏待命（WebView、高亮器、worker 都提前加载），
+/// 打开时只切换项目再显示；关闭只是隐藏
+pub fn build_diff_window(app: &tauri::AppHandle) -> Result<tauri::WebviewWindow, String> {
+    let url = tauri::WebviewUrl::App("index.html?view=diff".into());
+    let (width, height) = load_diff_window_size(&app_data_dir(app)?);
+    *PROGRAMMATIC_DIFF_SIZE.lock().unwrap_or_else(|e| e.into_inner()) = (width, height);
+    let builder = tauri::WebviewWindowBuilder::new(app, DIFF_WINDOW_LABEL, url)
+        .title("变更")
         .inner_size(width, height)
-        .min_inner_size(MIN_DIFF_WINDOW_SIZE.0, MIN_DIFF_WINDOW_SIZE.1);
-    // 放到面板所在的显示器（用户刚在那里点过）。.center() 只会放主显示器；
-    // 也不用 cursor_position + monitor_from_point：tao 在 macOS 上按主屏缩放给物理坐标，
-    // 而 monitor_from_point 按逻辑坐标匹配，Retina 主屏下会匹配到别的显示器
-    let panel_monitor = app
-        .get_webview_window("main")
-        .and_then(|w| w.current_monitor().ok().flatten());
-    if let Some(monitor) = panel_monitor {
-        let scale = monitor.scale_factor();
-        let area = monitor.work_area();
-        let (x, y) = (area.position.x as f64 / scale, area.position.y as f64 / scale);
-        let (w, h) = (area.size.width as f64 / scale, area.size.height as f64 / scale);
-        // 屏幕放不下时只缩显示尺寸，不改用户保存的尺寸
-        let (fit_w, fit_h) = (width.min(w - 40.0), height.min(h - 40.0));
-        initial_size = (fit_w, fit_h);
-        builder = builder
-            .inner_size(fit_w, fit_h)
-            .position(x + (w - fit_w) / 2.0, y + (h - fit_h) / 2.0);
-    } else {
-        builder = builder.center();
-    }
+        .min_inner_size(MIN_DIFF_WINDOW_SIZE.0, MIN_DIFF_WINDOW_SIZE.1)
+        .visible(false);
     #[cfg(target_os = "macos")]
     let builder = builder
         .title_bar_style(tauri::TitleBarStyle::Overlay)
         .hidden_title(true)
-        // 红绿灯对齐 DiffWindow.css 里 52px 高顶栏的中线（26px）。
-        // y 不是按钮顶边：tao 把标题栏容器高度设为 16 + y，按钮离容器底部约 6px，
-        // 实测 y=19 时按钮顶边在 13px，所以按钮顶边 18px（中心 26px）要用 y=24
-        .traffic_light_position(tauri::LogicalPosition::new(18.0, 24.0));
+        .traffic_light_position(tauri::LogicalPosition::new(
+            TRAFFIC_LIGHT_INSET.0,
+            TRAFFIC_LIGHT_INSET.1,
+        ));
     let window = builder
         .build()
-        .map_err(|e| format!("无法打开 diff 窗口: {e}"))?;
-    remember_diff_window_size(&app, &window, initial_size);
-    Ok(())
+        .map_err(|e| format!("无法创建 diff 窗口: {e}"))?;
+    remember_diff_window_size(app, &window);
+    let win = window.clone();
+    window.on_window_event(move |event| {
+        #[cfg(target_os = "macos")]
+        if matches!(event, tauri::WindowEvent::Focused(true) | tauri::WindowEvent::Resized(_)) {
+            inset_traffic_lights(&win);
+        }
+        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            api.prevent_close();
+            if let Err(e) = win.hide() {
+                eprintln!("Asurada: 隐藏 diff 窗口失败 ({e})");
+            }
+            *DIFF_PROJECT_ID.lock().unwrap_or_else(|e| e.into_inner()) = None;
+            let _ = win.emit_to(DIFF_WINDOW_LABEL, "diff-hidden", ());
+        }
+    });
+    Ok(window)
 }
 
-/// 用户拖拽调整 diff 窗口后记下尺寸，之后新开的窗口都用它。
+/// 红绿灯对齐 DiffWindow.css 里 52px 高顶栏的中线（26px）。
+/// y 不是按钮顶边：标题栏容器高度设为按钮高 + y，按钮离容器底部约 6px，
+/// 实测 y=19 时按钮顶边在 13px，所以按钮顶边 18px（中心 26px）要用 y=24
+#[cfg(target_os = "macos")]
+const TRAFFIC_LIGHT_INSET: (f64, f64) = (18.0, 24.0);
+
+/// 手动摆红绿灯。tao 只在自己的 view 重绘、改标题时套用 traffic_light_position，
+/// 而 view 被 WebView 盖住几乎不重绘；隐藏创建的窗口显示、获得焦点、改尺寸时 AppKit 又会把按钮摆回默认位置。
+/// 算法与 tao 的 inset_traffic_lights 相同
+#[cfg(target_os = "macos")]
+fn inset_traffic_lights(window: &tauri::WebviewWindow) {
+    use objc2_app_kit::{NSWindow, NSWindowButton};
+
+    let win = window.clone();
+    let result = window.run_on_main_thread(move || {
+        let Ok(ptr) = win.ns_window() else {
+            return;
+        };
+        let ns_window = unsafe { &*ptr.cast::<NSWindow>() };
+        let (Some(close), Some(mini), Some(zoom)) = (
+            ns_window.standardWindowButton(NSWindowButton::CloseButton),
+            ns_window.standardWindowButton(NSWindowButton::MiniaturizeButton),
+            ns_window.standardWindowButton(NSWindowButton::ZoomButton),
+        ) else {
+            return;
+        };
+        let Some(container) = (unsafe { close.superview() }).and_then(|v| unsafe { v.superview() })
+        else {
+            return;
+        };
+        // 先让标题栏把系统的那次布局做完（显示窗口、改标题都会排一次），否则摆好的位置会在下一轮布局里被冲掉
+        if let Some(theme_frame) = unsafe { container.superview() } {
+            theme_frame.layoutSubtreeIfNeeded();
+        }
+        let close_rect = close.frame();
+        let height = close_rect.size.height + TRAFFIC_LIGHT_INSET.1;
+        let mut container_rect = container.frame();
+        container_rect.size.height = height;
+        container_rect.origin.y = ns_window.frame().size.height - height;
+        container.setFrame(container_rect);
+        let spacing = mini.frame().origin.x - close_rect.origin.x;
+        for (i, button) in [close, mini, zoom].iter().enumerate() {
+            let mut origin = button.frame().origin;
+            origin.x = TRAFFIC_LIGHT_INSET.0 + i as f64 * spacing;
+            button.setFrameOrigin(origin);
+        }
+    });
+    if let Err(e) = result {
+        eprintln!("Asurada: 调整红绿灯位置失败 ({e})");
+    }
+}
+
+/// 放到面板所在的显示器（用户刚在那里点过）并居中，屏幕放不下时只缩显示尺寸，不改用户保存的尺寸。
+/// 不用 cursor_position + monitor_from_point：tao 在 macOS 上按主屏缩放给物理坐标，
+/// 而 monitor_from_point 按逻辑坐标匹配，Retina 主屏下会匹配到别的显示器
+fn place_diff_window(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> Result<(), String> {
+    let (width, height) = load_diff_window_size(&app_data_dir(app)?);
+    let Some(monitor) = app
+        .get_webview_window("main")
+        .and_then(|w| w.current_monitor().ok().flatten())
+    else {
+        return window.center().map_err(|e| format!("无法居中 diff 窗口: {e}"));
+    };
+    let scale = monitor.scale_factor();
+    let area = monitor.work_area();
+    let (x, y) = (area.position.x as f64 / scale, area.position.y as f64 / scale);
+    let (w, h) = (area.size.width as f64 / scale, area.size.height as f64 / scale);
+    let (fit_w, fit_h) = (width.min(w - 40.0), height.min(h - 40.0));
+    *PROGRAMMATIC_DIFF_SIZE.lock().unwrap_or_else(|e| e.into_inner()) = (fit_w, fit_h);
+    window
+        .set_size(tauri::LogicalSize::new(fit_w, fit_h))
+        .map_err(|e| format!("无法调整 diff 窗口尺寸: {e}"))?;
+    window
+        .set_position(tauri::LogicalPosition::new(x + (w - fit_w) / 2.0, y + (h - fit_h) / 2.0))
+        .map_err(|e| format!("无法移动 diff 窗口: {e}"))
+}
+
+#[tauri::command]
+pub fn get_diff_project_id() -> Option<String> {
+    DIFF_PROJECT_ID.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
+#[tauri::command]
+pub async fn open_diff_window(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    let project = find_project(&app, &id)?;
+    *DIFF_PROJECT_ID.lock().unwrap_or_else(|e| e.into_inner()) = Some(id.clone());
+    // 预热失败或被意外销毁时现建一个，加载完会通过 get_diff_project_id 拿到项目
+    let window = match app.get_webview_window(DIFF_WINDOW_LABEL) {
+        Some(window) => window,
+        None => build_diff_window(&app)?,
+    };
+    app.emit_to(DIFF_WINDOW_LABEL, "diff-open", &id)
+        .map_err(|e| format!("无法切换 diff 项目: {e}"))?;
+    // 已经显示着就留在原位，只切项目
+    if !window.is_visible().unwrap_or(false) {
+        place_diff_window(&app, &window)?;
+    }
+    let _ = window.unminimize();
+    window.show().map_err(|e| format!("无法显示 diff 窗口: {e}"))?;
+    let _ = window.set_title(&format!("{} 的变更", project.display_name));
+    #[cfg(target_os = "macos")]
+    {
+        inset_traffic_lights(&window);
+        // shortcut: 显示后系统可能还会再排一次标题栏布局，延迟 120ms 再摆一次兜底；若仍偶发错位再改为监听 AppKit 布局通知
+        let win = window.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(120));
+            inset_traffic_lights(&win);
+        });
+    }
+    window.set_focus().map_err(|e| format!("无法聚焦窗口: {e}"))
+}
+
+/// 用户拖拽调整 diff 窗口后记下尺寸，之后打开都用它。
 /// 只在松手停顿 400ms 后写一次，避免拖动过程中频繁写文件
-fn remember_diff_window_size(
-    app: &tauri::AppHandle,
-    window: &tauri::WebviewWindow,
-    initial_size: (f64, f64),
-) {
+fn remember_diff_window_size(app: &tauri::AppHandle, window: &tauri::WebviewWindow) {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
 
@@ -258,10 +354,9 @@ fn remember_diff_window_size(
             return;
         };
         let logical = size.to_logical::<f64>(scale);
-        // 创建窗口时系统也会发 Resized（如按屏幕缩小后的尺寸），那不是用户拖的
-        if (logical.width - initial_size.0).abs() < 1.0
-            && (logical.height - initial_size.1).abs() < 1.0
-        {
+        // 创建窗口和按屏幕放置时程序自己改的尺寸，不是用户拖的
+        let expected = *PROGRAMMATIC_DIFF_SIZE.lock().unwrap_or_else(|e| e.into_inner());
+        if (logical.width - expected.0).abs() < 1.0 && (logical.height - expected.1).abs() < 1.0 {
             return;
         }
         let current = generation.fetch_add(1, Ordering::SeqCst) + 1;
