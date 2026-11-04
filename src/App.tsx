@@ -321,7 +321,7 @@ function SettingsUpdateRow({
   onFoundUpdate: (update: Update | null) => void;
 }) {
   const [version, setVersion] = useState("");
-  const [status, setStatus] = useState<"idle" | "checking" | "latest" | "installing" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "checking" | "latest" | "installing" | "checkError" | "error">("idle");
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
@@ -341,7 +341,7 @@ function SettingsUpdateRow({
       setStatus(update ? "idle" : "latest");
     } catch (e) {
       console.error("检查更新失败", e);
-      setStatus("error");
+      setStatus("checkError");
     }
   }
 
@@ -373,6 +373,7 @@ function SettingsUpdateRow({
     checking: "检查中…",
     latest: "已是最新",
     installing: progress ? `下载中 ${progress}%` : "下载中…",
+    checkError: "检查失败，稍后再试",
     error: "更新失败，稍后再试",
   }[status];
 
