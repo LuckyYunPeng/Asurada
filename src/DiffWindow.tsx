@@ -890,6 +890,9 @@ export default function DiffWindow() {
   const [projectId, setProjectId] = useState<string | null>(null);
 
   useEffect(() => {
+    // diff 窗口本身不透明，html/body 透明（App.css）时露出 WKWebView 默认的白底。
+    // 关窗时内容会清空，下次显示的头一帧就只有这层白底，暗色下看起来像闪白；给根节点铺上主题底色
+    document.documentElement.style.background = "var(--surface-2)";
     void preloadHighlighter({
       themes: [DIFF_THEME.light, DIFF_THEME.dark],
       langs: PRELOAD_LANGS,

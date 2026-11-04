@@ -170,11 +170,11 @@
     box-shadow: 0 30px 80px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .08), 0 0 60px -10px rgba(236, 72, 153, .5);
     animation: panel-demo var(--demo) cubic-bezier(.2, .9, .2, 1) var(--demo-delay) infinite backwards;
   }
-  /* 面板 right: 3%，宽 25%：平移 115% 即整块退到屏幕右边缘之外 */
+  /* 面板 right: 3%，宽 25%：平移 115% 即退出屏幕右边缘，这里取 130% 留余量 */
   @keyframes panel-demo {
-    0%, 30% { transform: translateX(115%); }
+    0%, 30% { transform: translateX(130%); }
     40%, 88% { transform: none; }
-    96%, 100% { transform: translateX(115%); }
+    96%, 100% { transform: translateX(130%); }
   }
   .hotkey {
     position: absolute; left: 50%; top: 45%; translate: -50% -50%;
