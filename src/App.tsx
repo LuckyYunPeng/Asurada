@@ -45,6 +45,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ThemeModeEnum, useThemeMode } from "./theme";
+import { CONFIRM_COMMIT_KEY, isConfirmCommitEnabled } from "./commitConfirm";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Select,
@@ -286,6 +287,22 @@ function SettingsAutostartRow({ skipInvoke }: { skipInvoke?: boolean }) {
     <label className={`${SETTINGS_ROW_CLASS} cursor-pointer`}>
       <span>开机自动启动</span>
       <Switch checked={isEnabled} onCheckedChange={() => void onToggleAutostart()} />
+    </label>
+  );
+}
+
+function SettingsConfirmCommitRow() {
+  const [isEnabled, setIsEnabled] = useState(isConfirmCommitEnabled);
+
+  function onToggleConfirmCommit() {
+    localStorage.setItem(CONFIRM_COMMIT_KEY, isEnabled ? "0" : "1");
+    setIsEnabled(!isEnabled);
+  }
+
+  return (
+    <label className={`${SETTINGS_ROW_CLASS} cursor-pointer`}>
+      <span>提交前确认</span>
+      <Switch checked={isEnabled} onCheckedChange={onToggleConfirmCommit} />
     </label>
   );
 }
@@ -952,6 +969,7 @@ function App() {
                     active={settingsOpen}
                     skipInvoke={captureBoot?.skipInvoke}
                   />
+                  <SettingsConfirmCommitRow />
                   <SettingsAutostartRow skipInvoke={captureBoot?.skipInvoke} />
                   <button type="button" className={SETTINGS_ROW_CLASS} onClick={replayIntro}>
                     <span>查看引导</span>
@@ -1226,7 +1244,9 @@ function ProjectRow({
   onFlashEnd: () => void;
   onDiffOpened: () => void;
 }) {
-  const [isConfirming, setIsConfirming] = useState(false);
+  // 行内确认浮层：移除项目，或开了「提交前确认」时的提交
+  const [confirmAction, setConfirmAction] = useState<"remove" | "commit" | null>(null);
+  const isConfirming = confirmAction !== null;
   const rowRef = useRef<HTMLLIElement>(null);
 
   useEffect(() => {
@@ -1292,7 +1312,13 @@ function ProjectRow({
         }
         disabled={primaryDisabled}
         title={pres.btnTitle}
-        onClick={onCommit}
+        onClick={() => {
+          if (isConfirmCommitEnabled()) {
+            setConfirmAction("commit");
+          } else {
+            onCommit();
+          }
+        }}
       >
         {pres.btnBusy ? <Loader2 className="animate-spin" /> : null}
         {pres.btnBusy ? "提交中…" : "提交并推送"}
@@ -1327,7 +1353,7 @@ function ProjectRow({
           className="opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 hover:bg-destructive/10 hover:text-destructive"
           aria-label="移除项目"
           title="移除项目"
-          onClick={() => setIsConfirming(true)}
+          onClick={() => setConfirmAction("remove")}
         >
           <Trash2 />
         </Button>
@@ -1337,19 +1363,35 @@ function ProjectRow({
         <div
           className="absolute inset-0 z-2 flex items-center justify-end gap-2 rounded-[inherit] bg-(--surface)/95 px-3 text-xs text-(--ink-strong)"
           role="alertdialog"
-          aria-label="确认移除"
+          aria-label={confirmAction === "commit" ? "确认提交" : "确认移除"}
         >
-          <span>从列表移除？本地仓库还在</span>
-          <Button variant="outline" size="sm" onClick={() => setIsConfirming(false)}>
+          <span>
+            {confirmAction === "commit"
+              ? "暂存全部变更、提交并推送？"
+              : "从列表移除？本地仓库还在"}
+          </span>
+          <Button variant="outline" size="sm" onClick={() => setConfirmAction(null)}>
             取消
           </Button>
-          <Button
-            size="sm"
-            className="bg-destructive text-white hover:bg-destructive/85"
-            onClick={onRemove}
-          >
-            移除
-          </Button>
+          {confirmAction === "commit" ? (
+            <Button
+              size="sm"
+              onClick={() => {
+                setConfirmAction(null);
+                onCommit();
+              }}
+            >
+              提交
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              className="bg-destructive text-white hover:bg-destructive/85"
+              onClick={onRemove}
+            >
+              移除
+            </Button>
+          )}
         </div>
       ) : null}
     </li>

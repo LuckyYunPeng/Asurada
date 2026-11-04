@@ -2,6 +2,8 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openPath } from "@tauri-apps/plugin-opener";
+import { ask } from "@tauri-apps/plugin-dialog";
+import { isConfirmCommitEnabled } from "./commitConfirm";
 import {
   isHighlighterLoaded,
   parsePatchFiles,
@@ -455,6 +457,18 @@ function DiffView({ projectId }: { projectId: string }) {
 
   async function onCommit() {
     try {
+      // diff 窗口是普通窗口，用系统确认框；附在本窗口上，不会抢走主面板
+      if (
+        isConfirmCommitEnabled() &&
+        !(await ask("会暂存全部变更（含隐藏的测试文件）、提交并推送到远端。", {
+          title: "确认提交并推送？",
+          kind: "warning",
+          okLabel: "提交",
+          cancelLabel: "取消",
+        }))
+      ) {
+        return;
+      }
       await invoke<CommitPushResult>("run_commit_push", { id: projectId });
     } catch (e) {
       console.error("提交并推送失败", e);
