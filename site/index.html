@@ -156,16 +156,52 @@
   @keyframes tilt-in {
     from { opacity: 0; transform: rotateX(35deg) translateY(80px); }
   }
+  /*
+   * 演示循环（8s，桌面落定后开始）：屏幕中央出现 ⌃E 提示 → 依次按下 → 提示消失 → 面板从右侧滑入 → 停留 → 滑出。
+   * 所有元素共用同一时长与延迟，百分比即时间轴；减少动态效果时 .hotkey 默认隐藏、面板默认可见。
+   */
+  .stage { --demo: 8s; --demo-delay: 1.4s; }
   .stage .panel {
     position: absolute; right: 3%; top: 8%; width: 25%;
     border-radius: 14px;
     box-shadow: 0 30px 80px rgba(0, 0, 0, .7), 0 0 0 1px rgba(255, 255, 255, .08), 0 0 60px -10px rgba(236, 72, 153, .5);
-    animation: slide-in 1s cubic-bezier(.2, .9, .2, 1.1) 1.5s both, float 6s ease-in-out 2.6s infinite;
+    animation: panel-demo var(--demo) cubic-bezier(.2, .9, .2, 1) var(--demo-delay) infinite backwards;
   }
-  @keyframes slide-in {
-    from { opacity: 0; transform: translateX(120%) scale(.9); }
+  @keyframes panel-demo {
+    0%, 30% { opacity: 0; transform: translateX(120%) scale(.92); }
+    40%, 88% { opacity: 1; transform: none; }
+    96%, 100% { opacity: 0; transform: translateX(120%) scale(.92); }
   }
-  @keyframes float { 50% { transform: translateY(-12px); } }
+  .hotkey {
+    position: absolute; left: 50%; top: 45%; translate: -50% -50%;
+    display: flex; gap: clamp(8px, 1.2vw, 16px); padding: clamp(14px, 2vw, 26px);
+    border-radius: clamp(16px, 2vw, 24px); opacity: 0; pointer-events: none;
+    background: rgba(30, 30, 38, .55); border: 1px solid rgba(255, 255, 255, .12);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, .6);
+    animation: hotkey-demo var(--demo) cubic-bezier(.2, .8, .2, 1) var(--demo-delay) infinite backwards;
+  }
+  @keyframes hotkey-demo {
+    0% { opacity: 0; transform: scale(.85); }
+    6%, 26% { opacity: 1; transform: none; }
+    32%, 100% { opacity: 0; transform: scale(1.06); }
+  }
+  .hotkey kbd {
+    min-width: clamp(44px, 6vw, 84px); padding: clamp(8px, 1.2vw, 16px) clamp(10px, 1.4vw, 20px); margin: 0;
+    font-size: clamp(20px, 3vw, 40px); border-radius: clamp(10px, 1.2vw, 16px);
+    box-shadow: 0 6px 0 #0d0d11, 0 0 0 1px rgba(0, 0, 0, .3);
+    animation: hotkey-press var(--demo) ease-in-out var(--demo-delay) infinite backwards;
+  }
+  /* 先按 ⌃，再按 E，一起松开 */
+  .hotkey kbd:nth-child(2) { animation-name: hotkey-press-2; }
+  @keyframes hotkey-press {
+    0%, 11%, 25%, 100% { transform: none; box-shadow: 0 6px 0 #0d0d11; }
+    13%, 23% { transform: translateY(5px); box-shadow: 0 1px 0 #0d0d11, 0 0 40px rgba(139, 92, 246, .8); }
+  }
+  @keyframes hotkey-press-2 {
+    0%, 16%, 25%, 100% { transform: none; box-shadow: 0 6px 0 #0d0d11; }
+    18%, 23% { transform: translateY(5px); box-shadow: 0 1px 0 #0d0d11, 0 0 40px rgba(236, 72, 153, .8); }
+  }
   .stage .glow {
     position: absolute; inset: 10% 10% -10%; z-index: -1;
     background: var(--grad); filter: blur(100px); opacity: .25;
@@ -369,6 +405,7 @@
     <div class="glow"></div>
     <img class="desk" src="./assets/desktop.jpg" alt="Asurada 平时停靠在屏幕边缘的小标签" data-i18n-alt="altDesk">
     <img class="panel" src="./assets/panel.png" alt="展开后的项目面板" data-i18n-alt="altPanel">
+    <div class="hotkey" aria-hidden="true"><kbd>⌃</kbd><kbd>E</kbd></div>
   </div>
 </header>
 
