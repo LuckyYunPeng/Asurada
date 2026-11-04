@@ -103,6 +103,7 @@ const HIGHLIGHTER_OPTIONS = { theme: DIFF_THEME, lineDiffType: LINE_DIFF_TYPE } 
 
 const DIFF_STYLE_KEY = "asurada.diffStyle";
 const SHOW_TESTS_KEY = "asurada.diffShowTests";
+const COLORBLIND_KEY = "asurada.diffColorblind";
 
 // 测试目录（tests/、__tests__/、spec/、e2e/ 等）和常见测试文件命名（*.test.ts、*_test.go、test_*.py、FooTest.java）
 const TEST_FILE_RE =
@@ -310,6 +311,10 @@ function DiffView({ projectId }: { projectId: string }) {
   );
   const [filter, setFilter] = useState("");
   // 默认不看测试文件；只影响查看，提交时仍会一起提交
+  // 色弱模式：增删从红/绿换成蓝/橙，红绿色弱也能分清
+  const [isColorblind, setIsColorblind] = useState(
+    () => localStorage.getItem(COLORBLIND_KEY) === "1",
+  );
   const [isShowTests, setIsShowTests] = useState(
     () => localStorage.getItem(SHOW_TESTS_KEY) === "1",
   );
@@ -372,6 +377,11 @@ function DiffView({ projectId }: { projectId: string }) {
   function onToggleShowTests() {
     setIsShowTests(!isShowTests);
     localStorage.setItem(SHOW_TESTS_KEY, isShowTests ? "0" : "1");
+  }
+
+  function onToggleColorblind() {
+    setIsColorblind(!isColorblind);
+    localStorage.setItem(COLORBLIND_KEY, isColorblind ? "0" : "1");
   }
 
   function onChangeDiffStyle(style: TDiffStyle) {
@@ -557,7 +567,7 @@ function DiffView({ projectId }: { projectId: string }) {
   }, [treeFiles, selected]);
 
   return (
-    <div className="dw">
+    <div className={isColorblind ? "dw is-colorblind" : "dw"}>
       <header className="dw-top" data-tauri-drag-region>
         <div className="dw-title" data-tauri-drag-region>
           <div className="dw-brand" data-tauri-drag-region>
@@ -579,9 +589,19 @@ function DiffView({ projectId }: { projectId: string }) {
           <Tooltip>
             <TooltipTrigger asChild>
               <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground select-none">
-                <Switch checked={isShowTests} onCheckedChange={onToggleShowTests} />
+                <Switch checked={isColorblind} onCheckedChange={onToggleColorblind} />
+                <span>色弱模式</span>
+              </label>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">增删改用蓝色 / 橙色，红绿色弱也能分清</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground select-none">
+                {/* 存储仍沿用 asurada.diffShowTests，旧的选择不丢；开关表示「正在隐藏」 */}
+                <Switch checked={!isShowTests} onCheckedChange={onToggleShowTests} />
                 <span>
-                  显示测试文件
+                  隐藏测试文件
                   {!isShowTests && testCount ? (
                     <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[11px] font-normal">
                       已隐藏 {testCount}
@@ -591,7 +611,7 @@ function DiffView({ projectId }: { projectId: string }) {
               </label>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              只影响查看，隐藏的测试文件提交时仍会一起提交
+              只影响列表显示，提交时测试文件仍会一起提交
             </TooltipContent>
           </Tooltip>
           <ToggleGroup
@@ -746,7 +766,7 @@ function DiffView({ projectId }: { projectId: string }) {
             </Virtualizer>
             ) : (
               <div className="dw-state">
-                <p>{filter.trim() ? "没有匹配的文件" : "只有测试文件有变更，打开右上角开关查看"}</p>
+                <p>{filter.trim() ? "没有匹配的文件" : "只有测试文件有变更，关闭右上角「隐藏测试文件」查看"}</p>
               </div>
             )}
           </div>

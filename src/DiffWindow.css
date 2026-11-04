@@ -35,6 +35,52 @@
   --dw-del-number: #62303a;
 }
 
+/* 色弱模式：增删从红/绿换成蓝/橙（Okabe-Ito 色板思路），红绿色弱下明度和色相都拉得开。
+   --diffs-*-color-override 是库里 +/- 号和行号文字的颜色 */
+.dw.is-colorblind {
+  --dw-add-fg: #1d4ed8;
+  --dw-del-fg: #c2410c;
+  --dw-add-bg: #dbeafe;
+  --dw-del-bg: #ffedd5;
+  --dw-add-emphasis: rgba(37, 99, 235, 0.28);
+  --dw-del-emphasis: rgba(234, 88, 12, 0.3);
+  --dw-add-number: #bfdbfe;
+  --dw-del-number: #fed7aa;
+  --diffs-addition-color-override: var(--dw-add-fg);
+  --diffs-deletion-color-override: var(--dw-del-fg);
+}
+
+.dark .dw.is-colorblind {
+  --dw-add-fg: #93c5fd;
+  --dw-del-fg: #fdba74;
+  --dw-add-bg: #1e3a5f;
+  --dw-del-bg: #4a2f1a;
+  --dw-add-emphasis: rgba(96, 165, 250, 0.4);
+  --dw-del-emphasis: rgba(251, 146, 60, 0.4);
+  --dw-add-number: #274b75;
+  --dw-del-number: #5e3a1f;
+}
+
+.dw.is-colorblind .dw-count .is-add,
+.dw.is-colorblind .dw-status.is-A,
+.dw.is-colorblind .dw-status.is-U {
+  color: var(--dw-add-fg);
+}
+
+.dw.is-colorblind .dw-count .is-del,
+.dw.is-colorblind .dw-status.is-D {
+  color: var(--dw-del-fg);
+}
+
+.dw.is-colorblind .dw-status.is-A,
+.dw.is-colorblind .dw-status.is-U {
+  background: var(--dw-add-bg);
+}
+
+.dw.is-colorblind .dw-status.is-D {
+  background: var(--dw-del-bg);
+}
+
 .dw-top {
   display: flex;
   align-items: center;
