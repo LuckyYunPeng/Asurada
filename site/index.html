@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Asurada · 写完代码，一键提交推送</title>
+<title>Asurada · AI 写代码，但你得看懂自己的项目</title>
 <meta name="description" content="停靠在 macOS 屏幕边缘的小工具：帮你滤掉噪音，提高 Review 效率，在多个项目之间穿插时开发体验更丝滑。">
 <link rel="icon" href="./assets/logo.png">
 <style>
@@ -101,8 +101,13 @@
 
   /* Hero */
   .hero {
-    min-height: 100vh; padding: 140px 24px 80px;
+    padding: 0 24px 80px;
     display: flex; flex-direction: column; align-items: center; text-align: center;
+  }
+  /* 首屏只放文案和按钮，垂直居中占满一屏；电脑屏幕截图留到往下滚动才出现 */
+  .hero-intro {
+    min-height: 100vh; min-height: 100svh; padding: 100px 0 60px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
   }
   .badge {
     display: inline-flex; align-items: center; gap: 8px;
@@ -112,7 +117,8 @@
   .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 12px #f59e0b; animation: pulse 1.6s infinite; }
   @keyframes pulse { 50% { opacity: .3; } }
   h1 {
-    margin-top: 24px; font-size: clamp(40px, 7vw, 84px); line-height: 1.08; font-weight: 800; letter-spacing: -.02em;
+    margin-top: 24px; max-width: 15em; font-size: clamp(40px, 6vw, 76px); line-height: 1.1; font-weight: 800; letter-spacing: -.02em;
+    text-wrap: balance;
   }
   .grad-text {
     background: var(--grad-loop); background-size: 200% 100%;
@@ -143,27 +149,29 @@
 
   /* Hero 截图舞台：桌面 + 从右侧滑入的面板 */
   .stage {
-    position: relative; margin-top: 70px; width: min(1100px, 100%);
-    perspective: 1800px;
+    position: relative; width: min(1200px, 100%);
+    /* --zoom 由滚动驱动：进入视口时偏小，滚到视口中部时放到最大 */
+    transform: scale(var(--zoom, 1)); transform-origin: center top; will-change: transform;
   }
-  /* 电脑屏幕：截图、面板、快捷键提示同在其中，一起倾斜；overflow 裁切让面板从屏幕右边缘滑进滑出 */
+  /* 电脑屏幕：截图、面板、快捷键提示同在其中；overflow 裁切让面板从屏幕右边缘滑进滑出 */
   .stage .screen {
     position: relative; overflow: hidden;
     border-radius: 16px; border: 1px solid var(--line);
     box-shadow: 0 40px 120px -30px rgba(139, 92, 246, .55);
-    transform: rotateX(14deg); transform-origin: top center;
-    /* backwards：结束后不保留关键帧，否则会压过滚动时设的 transform */
-    animation: tilt-in 1.4s cubic-bezier(.2, .8, .2, 1) .2s backwards;
   }
+  /* 滚动到可见时（.is-playing）才入场并开始演示，用户看到的总是从头播放 */
+  .stage:not(.is-playing) .screen { opacity: 0; transform: translateY(60px) scale(.96); }
+  .stage:not(.is-playing) .panel, .stage:not(.is-playing) .hotkey, .stage:not(.is-playing) .hotkey kbd { animation-play-state: paused; }
+  .stage.is-playing .screen { animation: tilt-in 1.2s cubic-bezier(.2, .8, .2, 1) backwards; }
   .stage .desk { display: block; width: 100%; }
   @keyframes tilt-in {
-    from { opacity: 0; transform: rotateX(35deg) translateY(80px); }
+    from { opacity: 0; transform: translateY(60px) scale(.96); }
   }
   /*
    * 演示循环（8s，桌面落定后开始）：屏幕中央出现 ⌃E 提示 → 依次按下 → 提示消失 → 面板从右侧滑入 → 停留 → 滑出。
    * 所有元素共用同一时长与延迟，百分比即时间轴；减少动态效果时 .hotkey 默认隐藏、面板默认可见。
    */
-  .stage { --demo: 8s; --demo-delay: 1.4s; }
+  .stage { --demo: 8s; --demo-delay: 1s; }
   .stage .panel {
     position: absolute; right: 3%; top: 8%; width: 25%;
     border-radius: 14px;
@@ -362,13 +370,12 @@
     .flow::before { display: none; }
     .feature, .feature.rev { grid-template-columns: 1fr; gap: 32px; margin-top: 72px; }
     .feature.rev .text { order: 0; }
-    .stage .screen { transform: none; }
     nav { padding: 12px 18px; }
-    .hero { min-height: auto; padding: 110px 20px 40px; }
+    .hero { padding: 0 20px 40px; }
     h1 { font-size: 32px; }
     .sub { font-size: 16px; }
     .badge { font-size: 12px; }
-    .stage { margin-top: 40px; }
+
     section { padding: 72px 20px; }
     .manifesto { padding: 20px; }
     .sieve { font-size: 12px; padding: 12px; }
@@ -396,12 +403,14 @@
 </nav>
 
 <header class="hero">
-  <span class="badge"><span class="dot"></span><span data-i18n="badge">为 Vibe Coding 时代的代码 Review 而生 · macOS</span></span>
-  <h1 data-i18n="heroTitle">AI 写代码，<br><span class="grad-text">但你得看懂自己的项目</span></h1>
-  <p class="sub" data-i18n="heroSub">Asurada 的出发点是帮你<mark>滤掉噪音</mark>，<mark>提高你的 Review 效率</mark>，尤其是在<mark>多个项目之间穿插</mark>时，开发体验更加丝滑。</p>
-  <div class="cta">
-    <a class="btn primary" href="https://github.com/LuckyYunPeng/asurada/releases/latest" data-i18n="ctaDownload">免费下载 macOS 版</a>
-    <a class="btn ghost" href="https://github.com/LuckyYunPeng/asurada" data-i18n="ctaGithub">在 GitHub 上查看</a>
+  <div class="hero-intro">
+    <span class="badge"><span class="dot"></span><span data-i18n="badge">为 Vibe Coding 时代的代码 Review 而生 · macOS</span></span>
+    <h1 data-i18n="heroTitle">AI 写代码，<br><span class="grad-text">但你得看懂自己的项目</span></h1>
+    <p class="sub" data-i18n="heroSub">Asurada 的出发点是帮你<mark>滤掉噪音</mark>，<mark>提高你的 Review 效率</mark>，尤其是在<mark>多个项目之间穿插</mark>时，开发体验更加丝滑。</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/LuckyYunPeng/asurada/releases/latest" data-i18n="ctaDownload">免费下载 macOS 版</a>
+      <a class="btn ghost" href="https://github.com/LuckyYunPeng/asurada" data-i18n="ctaGithub">在 GitHub 上查看</a>
+    </div>
   </div>
 
   <div class="stage">
@@ -734,15 +743,28 @@
   addEventListener('scroll', onScrollNav, { passive: true });
   onScrollNav();
 
-  // Hero 截图随滚动放平
-  const screen = document.querySelector('.stage .screen');
-  addEventListener('scroll', () => {
-    if (innerWidth <= 860) {
-      return;
+  // 电脑屏幕演示：滚动到可见时才开始播放
+  const stage = document.querySelector('.stage');
+  const stageObserver = new IntersectionObserver(([entry]) => {
+    if (entry.isIntersecting) {
+      stage.classList.add('is-playing');
+      stageObserver.disconnect();
     }
-    const deg = Math.max(0, 14 - scrollY / 25);
-    screen.style.transform = `rotateX(${deg}deg)`;
-  }, { passive: true });
+  }, { threshold: .3 });
+  stageObserver.observe(stage);
+
+  // 电脑屏幕随滚动放大：顶部进入视口底部时 0.8，滚到视口上 1/4 时 1.08
+  const isReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function onScrollZoom() {
+    const top = stage.offsetTop - scrollY;
+    const progress = Math.min(1, Math.max(0, (innerHeight - top) / (innerHeight * .75)));
+    stage.style.setProperty('--zoom', (0.8 + progress * 0.28).toFixed(3));
+  }
+  if (!isReducedMotion) {
+    addEventListener('scroll', onScrollZoom, { passive: true });
+    addEventListener('resize', onScrollZoom);
+    onScrollZoom();
+  }
 </script>
 </body>
 </html>
