@@ -486,3 +486,92 @@ fn commit_push(app: &tauri::AppHandle, id: &str) -> Result<CommitPushResult, Str
         error: None,
     })
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenWithApp {
+    pub name: String,
+    /// .app 包路径，打开时原样传回
+    pub path: String,
+    pub is_default: bool,
+}
+
+/// 能打开该文件的应用（系统「打开方式」里的那些），默认应用排第一，其余按名称排序
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub fn list_open_with_apps(path: String) -> Vec<OpenWithApp> {
+    use objc2_app_kit::NSWorkspace;
+    use objc2_foundation::{NSFileManager, NSString, NSURL};
+
+    let workspace = NSWorkspace::sharedWorkspace();
+    let file_manager = NSFileManager::defaultManager();
+    let file_url = NSURL::fileURLWithPath(&NSString::from_str(&path));
+    let default_path = workspace
+        .URLForApplicationToOpenURL(&file_url)
+        .and_then(|url| url.path())
+        .map(|p| p.to_string());
+    let mut apps: Vec<OpenWithApp> = workspace
+        .URLsForApplicationsToOpenURL(&file_url)
+        .iter()
+        .filter_map(|url| url.path())
+        .map(|app_path| {
+            let name = file_manager.displayNameAtPath(&app_path).to_string();
+            let app_path = app_path.to_string();
+            OpenWithApp {
+                name: name.trim_end_matches(".app").to_string(),
+                is_default: default_path.as_deref() == Some(app_path.as_str()),
+                path: app_path,
+            }
+        })
+        .collect();
+    // 同一个应用可能装了多份（如 /Applications 和 ~/Applications），按路径去重即可
+    apps.sort_by(|a, b| b.is_default.cmp(&a.is_default).then_with(|| a.name.cmp(&b.name)));
+    apps.dedup_by(|a, b| a.path == b.path);
+    apps
+}
+
+/// 用指定应用打开文件。不走 opener 插件的 openPath(with)：它要在权限里逐个列出允许的程序
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub fn open_with_app(path: String, app: String) -> Result<(), String> {
+    let status = std::process::Command::new("open")
+        .args(["-a", &app, &path])
+        .status()
+        .map_err(|e| format!("无法打开文件: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("用 {app} 打开失败"))
+    }
+}
+
+/// 写入系统剪贴板。右键菜单的回调不算用户手势，WebView 里的 navigator.clipboard 可能被拒
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub fn copy_text(text: String) -> Result<(), String> {
+    use objc2_app_kit::{NSPasteboard, NSPasteboardTypeString};
+    use objc2_foundation::NSString;
+
+    let pasteboard = NSPasteboard::generalPasteboard();
+    pasteboard.clearContents();
+    if pasteboard.setString_forType(&NSString::from_str(&text), unsafe { NSPasteboardTypeString }) {
+        Ok(())
+    } else {
+        Err("写入剪贴板失败".to_string())
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod open_with_tests {
+    use super::*;
+
+    #[test]
+    fn lists_apps_with_single_default_first() {
+        let apps = list_open_with_apps(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml").to_string());
+        assert!(!apps.is_empty(), "文本文件至少有一个应用能打开");
+        assert!(apps.iter().filter(|a| a.is_default).count() <= 1);
+        if apps.iter().any(|a| a.is_default) {
+            assert!(apps[0].is_default);
+        }
+    }
+}

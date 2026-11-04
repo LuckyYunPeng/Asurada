@@ -58,6 +58,12 @@ pub fn run() {
             commands::get_project_diff,
             commands::open_diff_window,
             commands::get_diff_project_id,
+            #[cfg(target_os = "macos")]
+            commands::list_open_with_apps,
+            #[cfg(target_os = "macos")]
+            commands::open_with_app,
+            #[cfg(target_os = "macos")]
+            commands::copy_text,
             commands::get_diff_window_size,
             commands::set_diff_window_size,
             #[cfg(target_os = "macos")]

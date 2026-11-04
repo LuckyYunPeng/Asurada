@@ -30,7 +30,8 @@ uuid = { version = "1", features = ["v4"] }
 tauri-nspanel = { git = "https://github.com/ahkohd/tauri-nspanel", branch = "v2.1" }
 block2 = "0.6"
 dispatch2 = "0.3"
-objc2-app-kit = { version = "0.3", features = ["NSEvent", "block2"] }
+objc2-app-kit = { version = "0.3", features = ["NSEvent", "block2", "NSWorkspace", "NSPasteboard"] }
+objc2-foundation = { version = "0.3", features = ["NSFileManager", "NSURL", "NSArray", "NSString"] }
 rfd = "0.17"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-autostart = "2"

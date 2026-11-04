@@ -1,7 +1,8 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { Menu } from "@tauri-apps/api/menu";
+import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { isConfirmCommitEnabled } from "./commitConfirm";
 import {
@@ -227,6 +228,68 @@ function DiffCount({ additions, deletions }: { additions: number; deletions: num
   );
 }
 
+interface IOpenWithApp {
+  name: string;
+  path: string;
+  isDefault: boolean;
+}
+
+/** 文件 / 目录行的右键菜单，用系统原生菜单。relPath 是相对项目根的路径，删除的文件没有「打开」类操作 */
+async function popupPathMenu(root: string, relPath: string, kind: "file" | "dir", isDeleted: boolean) {
+  const absPath = `${root}/${relPath}`;
+  const run = (label: string, action: () => Promise<unknown>) => () => {
+    action().catch((e) => console.error(`${label}失败`, e));
+  };
+  try {
+    const apps =
+      kind === "file" && !isDeleted
+        ? await invoke<IOpenWithApp[]>("list_open_with_apps", { path: absPath })
+        : [];
+    const openItems =
+      kind === "file" && !isDeleted
+        ? [
+            { text: "打开", action: run("打开文件", () => openPath(absPath)) },
+            {
+              text: "打开方式",
+              enabled: apps.length > 0,
+              items: apps.map((app) => ({
+                text: app.isDefault ? `${app.name}（默认）` : app.name,
+                action: run("打开文件", () =>
+                  invoke("open_with_app", { path: absPath, app: app.path }),
+                ),
+              })),
+            },
+            { item: "Separator" as const },
+          ]
+        : [];
+    const menu = await Menu.new({
+      items: [
+        ...openItems,
+        {
+          text: "在访达中显示",
+          enabled: !isDeleted,
+          action: run("在访达中显示", () => revealItemInDir(absPath)),
+        },
+        { item: "Separator" },
+        { text: "复制路径", action: run("复制路径", () => invoke("copy_text", { text: absPath })) },
+        {
+          text: "复制相对路径",
+          action: run("复制相对路径", () => invoke("copy_text", { text: relPath })),
+        },
+        {
+          text: "复制名称",
+          action: run("复制名称", () =>
+            invoke("copy_text", { text: relPath.slice(relPath.lastIndexOf("/") + 1) }),
+          ),
+        },
+      ],
+    });
+    await menu.popup();
+  } catch (e) {
+    console.error("打开右键菜单失败", e);
+  }
+}
+
 // 文件多时每次切换都会重渲染整个列表；只有选中态变化的两行需要更新
 const FileItem = memo(function FileItem({
   entry,
@@ -235,6 +298,7 @@ const FileItem = memo(function FileItem({
   isActive,
   onSelect,
   onPrefetch,
+  onContextMenu,
 }: {
   entry: IDiffEntry;
   name: string;
@@ -242,6 +306,7 @@ const FileItem = memo(function FileItem({
   isActive: boolean;
   onSelect: (name: string) => void;
   onPrefetch: (entry: IDiffEntry) => void;
+  onContextMenu: (relPath: string, kind: "file" | "dir", isDeleted: boolean) => void;
 }) {
   return (
     <li>
@@ -254,6 +319,10 @@ const FileItem = memo(function FileItem({
         title={entry.file.name}
         onClick={() => onSelect(entry.file.name)}
         onPointerEnter={() => onPrefetch(entry)}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          onContextMenu(entry.file.name, "file", entry.status === "D");
+        }}
       >
         <span className={`dw-status is-${entry.status}`}>{entry.status}</span>
         {/* 开头省略：保留结尾的文件名和扩展名。外层 rtl 让省略号落在左边，bdi 保证文字本身仍按从左到右排 */}
@@ -272,12 +341,14 @@ function DirItem({
   depth,
   isCollapsed,
   onToggle,
+  onContextMenu,
 }: {
   path: string;
   name: string;
   depth: number;
   isCollapsed: boolean;
   onToggle: (path: string) => void;
+  onContextMenu: (relPath: string, kind: "file" | "dir", isDeleted: boolean) => void;
 }) {
   return (
     <li>
@@ -288,6 +359,10 @@ function DirItem({
         title={path}
         aria-expanded={!isCollapsed}
         onClick={() => onToggle(path)}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          onContextMenu(path, "dir", false);
+        }}
       >
         <ChevronRight className={`dw-dir-chevron${isCollapsed ? "" : " is-open"}`} aria-hidden />
         <Folder className="dw-dir-icon" aria-hidden />
@@ -416,6 +491,17 @@ function DiffView({ projectId }: { projectId: string }) {
     handle.addEventListener("pointerup", onUp);
     handle.addEventListener("pointercancel", onUp);
   }
+
+  const projectRoot = diff?.path;
+  // 传给 memo 的行组件，引用要稳定
+  const onPathContextMenu = useCallback(
+    (relPath: string, kind: "file" | "dir", isDeleted: boolean) => {
+      if (projectRoot) {
+        void popupPathMenu(projectRoot, relPath, kind, isDeleted);
+      }
+    },
+    [projectRoot],
+  );
 
   async function onOpenInEditor(name: string) {
     if (!diff) {
@@ -719,6 +805,7 @@ function DiffView({ projectId }: { projectId: string }) {
                     depth={row.depth}
                     isCollapsed={collapsedDirs.has(row.path)}
                     onToggle={onToggleDir}
+                    onContextMenu={onPathContextMenu}
                   />
                 ) : (
                   <FileItem
@@ -729,6 +816,7 @@ function DiffView({ projectId }: { projectId: string }) {
                     isActive={row.entry === selected}
                     onSelect={setSelectedName}
                     onPrefetch={onPrefetch}
+                    onContextMenu={onPathContextMenu}
                   />
                 ),
               )}
