@@ -49,18 +49,16 @@ export const mockPreflightOk: PreflightResult = {
   ready: true,
   summary: "环境就绪",
   checks: [
-    { id: "pi_path", ok: true, message: "pi 已在 PATH 中" },
-    { id: "pi_print", ok: true, message: "pi --print 可非交互启动" },
+    { id: "agent", ok: true, message: "pi" },
     { id: "git", ok: true, message: "git version 2.43.0" },
   ],
 };
 
 export const mockPreflightFail: PreflightResult = {
   ready: false,
-  summary: "pi 未找到：请安装 pi 并确保在终端可执行（PATH）",
+  summary: "AI Agent 不可用：没有检测到可用的 AI Agent，请安装 pi、Claude Code、Codex 等任意一个",
   checks: [
-    { id: "pi_path", ok: false, message: "请安装 pi 并确保在终端可执行（PATH）" },
-    { id: "pi_print", ok: false, message: "未检测：请先将 pi 安装并加入 PATH" },
+    { id: "agent", ok: false, message: "没有检测到可用的 AI Agent，请安装 pi、Claude Code、Codex 等任意一个" },
     { id: "git", ok: true, message: "git version 2.43.0" },
   ],
 };

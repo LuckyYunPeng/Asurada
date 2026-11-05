@@ -1,8 +1,13 @@
 use crate::git::{
-    git_add_commit_push, git_discard, git_is_clean, git_pull, git_last_commit_subject, git_working_diff, run_pi_print,
+    git_add_commit_push, git_discard, git_is_clean, git_pull, git_last_commit_subject, git_working_diff,
 };
 use crate::preflight::{self, PreflightResult};
-use crate::settings::{load_diff_window_size, save_diff_window_size, MIN_DIFF_WINDOW_SIZE};
+use crate::agents::{self, AgentInfo};
+use crate::commit_prompt;
+use crate::scan;
+use crate::settings::{
+    load_agent, load_diff_window_size, save_agent, save_diff_window_size, MIN_DIFF_WINDOW_SIZE,
+};
 use crate::store::{default_display_name, load_projects, save_projects, StoredProject};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -114,6 +119,75 @@ pub async fn add_project(app: tauri::AppHandle, path: String) -> Result<ProjectV
     projects.push(stored.clone());
     save_projects(&dir, &projects)?;
     Ok(to_view(&stored))
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScannedRepo {
+    pub path: String,
+    pub name: String,
+    /// 相对扫描目录的路径，同名仓库靠它区分
+    pub relative_path: String,
+    pub is_added: bool,
+}
+
+/// 扫描 root 下的 git 仓库，标出已在列表里的
+#[tauri::command]
+pub async fn scan_git_repos(app: tauri::AppHandle, root: String) -> Result<Vec<ScannedRepo>, String> {
+    let root = normalize_path(&root);
+    let added: HashSet<String> = load_projects(&app_data_dir(&app)?)?
+        .iter()
+        .map(|p| normalize_path(&p.path))
+        .collect();
+    let repos = tauri::async_runtime::spawn_blocking({
+        let root = root.clone();
+        move || scan::find_git_repos(std::path::Path::new(&root))
+    })
+    .await
+    .map_err(|e| format!("扫描失败: {e}"))?;
+    Ok(repos
+        .into_iter()
+        .map(|path| {
+            let path = normalize_path(&path.to_string_lossy());
+            ScannedRepo {
+                name: default_display_name(&path),
+                relative_path: path
+                    .strip_prefix(&root)
+                    .map(|p| p.trim_start_matches('/'))
+                    .filter(|p| !p.is_empty())
+                    .unwrap_or(".")
+                    .to_string(),
+                is_added: added.contains(&path),
+                path,
+            }
+        })
+        .collect())
+}
+
+/// 批量添加；已在列表里或不是文件夹的跳过，返回实际新增的
+#[tauri::command]
+pub async fn add_projects(app: tauri::AppHandle, paths: Vec<String>) -> Result<Vec<ProjectView>, String> {
+    let dir = app_data_dir(&app)?;
+    let mut projects = load_projects(&dir)?;
+    let mut existing: HashSet<String> = projects.iter().map(|p| normalize_path(&p.path)).collect();
+    let mut added = Vec::new();
+    for path in paths {
+        let path = normalize_path(path.trim());
+        if !PathBuf::from(&path).is_dir() || !existing.insert(path.clone()) {
+            continue;
+        }
+        let stored = StoredProject {
+            id: Uuid::new_v4().to_string(),
+            display_name: default_display_name(&path),
+            path,
+        };
+        added.push(to_view(&stored));
+        projects.push(stored);
+    }
+    if !added.is_empty() {
+        save_projects(&dir, &projects)?;
+    }
+    Ok(added)
 }
 
 #[tauri::command]
@@ -400,13 +474,43 @@ pub async fn set_diff_window_size(
 }
 
 #[tauri::command]
-pub async fn check_environment() -> PreflightResult {
-    preflight::check_environment()
+pub async fn preflight(app: tauri::AppHandle) -> Result<PreflightResult, String> {
+    Ok(preflight::check_environment(load_agent(&app_data_dir(&app)?).as_deref()))
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentList {
+    pub agents: Vec<AgentInfo>,
+    /// 当前生效的 Agent（选过且还装着的，否则按默认优先级）；一个都没装时为空
+    pub current: Option<&'static str>,
+    /// 用户是否亲自选过；没选过时引导结束后先让用户选
+    pub is_chosen: bool,
 }
 
 #[tauri::command]
-pub async fn preflight() -> PreflightResult {
-    preflight::check_environment()
+pub async fn list_agents(app: tauri::AppHandle) -> Result<AgentList, String> {
+    #[cfg(target_os = "macos")]
+    crate::inherit_shell_path();
+    let saved = load_agent(&app_data_dir(&app)?);
+    Ok(AgentList {
+        agents: agents::list(),
+        current: agents::resolve(saved.as_deref()).map(|a| a.id),
+        is_chosen: saved.is_some(),
+    })
+}
+
+#[tauri::command]
+pub async fn set_agent(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    agents::find(&id).ok_or_else(|| format!("不支持的 Agent：{id}"))?;
+    save_agent(&app_data_dir(&app)?, &id)
+}
+
+/// 用指定 Agent 跑一次最短的提示词，验证能用（登录、额度、网络）
+#[tauri::command]
+pub async fn test_agent(id: String) -> Result<(), String> {
+    let spec = agents::find(&id).ok_or_else(|| format!("不支持的 Agent：{id}"))?;
+    agents::run_agent(spec, agents::PROBE_PROMPT, agents::PROBE_TIMEOUT).map(|_| ())
 }
 
 /// 正在提交的项目。主面板和 diff 窗口都能发起提交，以后端为准，两边状态才一致
@@ -506,7 +610,10 @@ fn commit_push(
         });
     }
 
-    let commit_message = run_pi_print(&path, language, paths)?;
+    let spec = agents::resolve(load_agent(&app_data_dir(app)?).as_deref())
+        .ok_or_else(|| "没有可用的 AI Agent，请在设置里选择".to_string())?;
+    let prompt = commit_prompt::build(&path, language, paths)?;
+    let commit_message = agents::run_agent(spec, &prompt, agents::COMMIT_TIMEOUT)?;
     let push_output = git_add_commit_push(&path, &commit_message, paths)?;
 
     Ok(CommitPushResult {

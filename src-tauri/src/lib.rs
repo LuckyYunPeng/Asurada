@@ -1,15 +1,19 @@
+mod agents;
 mod commands;
+mod commit_prompt;
 mod git;
 mod preflight;
+mod scan;
 mod settings;
 mod store;
 
 #[cfg(target_os = "macos")]
 mod macos_panel;
 
-/// Finder 启动的 App 只有系统默认 PATH，找不到 pi / nvm 的 node；从用户交互式登录 shell 取一次完整 PATH
+/// Finder 启动的 App 只有系统默认 PATH，找不到 pi / nvm 的 node；从用户交互式登录 shell 取一次完整 PATH。
+/// 检测 Agent 时也会重新取：用户刚装好的 Agent 往往会把自己的目录加进 shell 配置
 #[cfg(target_os = "macos")]
-fn inherit_shell_path() {
+pub(crate) fn inherit_shell_path() {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
     // 用标记截取，避开 .zshrc 里可能打印的其它输出
     match std::process::Command::new(shell)
@@ -51,10 +55,14 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::list_projects,
             commands::add_project,
+            commands::add_projects,
+            commands::scan_git_repos,
             commands::remove_project,
             commands::refresh_project_status,
-            commands::check_environment,
             commands::preflight,
+            commands::list_agents,
+            commands::set_agent,
+            commands::test_agent,
             commands::run_commit_push,
             commands::run_pull,
             commands::discard_changes,

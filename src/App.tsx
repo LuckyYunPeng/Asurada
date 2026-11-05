@@ -29,8 +29,10 @@ import {
   Check,
   ChevronRight,
   CloudDownload,
+  Copy,
   CloudUpload,
   FolderOpen,
+  FolderSearch,
   Info,
   Loader2,
   Monitor,
@@ -45,6 +47,13 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ThemeModeEnum, useThemeMode } from "./theme";
@@ -59,6 +68,8 @@ import {
 } from "@/components/ui/select";
 import type {
   CommitPushResult,
+  IAgentList,
+  IScannedRepo,
   ICommitPushEvent,
   PreflightItem,
   PreflightResult,
@@ -264,6 +275,101 @@ function SettingsDiffSizeRow({ active, skipInvoke }: { active: boolean; skipInvo
           ))}
         </SelectContent>
       </Select>
+    </div>
+  );
+}
+
+/** 选生成提交信息的 Agent；只列本机已安装的。onChange 后由调用方决定是否重新检查 */
+function AgentSelect({
+  list,
+  onChange,
+}: {
+  list: IAgentList;
+  onChange: (id: string) => void;
+}) {
+  const { t } = useLanguage();
+  return (
+    <Select value={list.current ?? ""} onValueChange={onChange}>
+      <SelectTrigger size="sm" className="min-w-32 text-xs" aria-label={t.agentTip}>
+        <SelectValue placeholder={t.agentNone} />
+      </SelectTrigger>
+      <SelectContent position="popper" align="end">
+        {list.agents
+          .filter((a) => a.isInstalled)
+          .map((a) => (
+            <SelectItem key={a.id} value={a.id}>
+              {a.name}
+            </SelectItem>
+          ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+async function fetchAgents() {
+  return invoke<IAgentList>("list_agents");
+}
+
+async function saveAgent(id: string) {
+  await invoke("set_agent", { id });
+}
+
+function SettingsAgentRow({ active, skipInvoke }: { active: boolean; skipInvoke?: boolean }) {
+  const [list, setList] = useState<IAgentList | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
+  const { t } = useLanguage();
+
+  useEffect(() => {
+    if (!active || skipInvoke || !isTauri) {
+      return;
+    }
+    fetchAgents()
+      .then(setList)
+      .catch((e) => console.error("读取 Agent 列表失败", e));
+  }, [active, skipInvoke]);
+
+  async function onChangeAgent(id: string) {
+    try {
+      await saveAgent(id);
+      setList((prev) => (prev ? { ...prev, current: id } : prev));
+    } catch (e) {
+      console.error("保存 Agent 失败", e);
+      showToast("err", t.agentFailed, String(e));
+    }
+  }
+
+  async function onTestAgent() {
+    if (!list?.current) {
+      return;
+    }
+    const name = list.agents.find((a) => a.id === list.current)?.name ?? list.current;
+    setIsTesting(true);
+    try {
+      await invoke("test_agent", { id: list.current });
+      showToast("ok", t.agentOk(name));
+    } catch (e) {
+      console.error("测试 Agent 失败", e);
+      showToast("err", t.agentFailed, String(e));
+    }
+    setIsTesting(false);
+  }
+
+  return (
+    <div className={SETTINGS_ROW_CLASS}>
+      <span>{t.agent}</span>
+      <div className="flex items-center gap-1.5">
+        {list ? <AgentSelect list={list} onChange={(id) => void onChangeAgent(id)} /> : null}
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-xs"
+          disabled={!list?.current || isTesting}
+          onClick={() => void onTestAgent()}
+        >
+          {isTesting ? <Loader2 className="animate-spin" /> : null}
+          {t.testAgent}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -687,12 +793,41 @@ function App() {
     }
   }, []);
 
+  // 引导结束后：没亲自选过 Agent 的先选，选好再做环境检查
+  const [agentPickList, setAgentPickList] = useState<IAgentList | null>(null);
+  const loadAgentPick = useCallback(async () => {
+    try {
+      const list = await fetchAgents();
+      if (list.isChosen) {
+        setAgentPickList(null);
+        void runPreflight();
+      } else {
+        setAgentPickList(list);
+      }
+    } catch (e) {
+      console.error("读取 Agent 列表失败", e);
+      // 读不到列表就照常检查，检查失败页里也能换 Agent
+      void runPreflight();
+    }
+  }, [runPreflight]);
+
   useEffect(() => {
     if (captureBoot) return;
     if (introComplete && !inIntro) {
-      void runPreflight();
+      void loadAgentPick();
     }
-  }, [introComplete, inIntro, runPreflight]);
+  }, [introComplete, inIntro, loadAgentPick]);
+
+  async function onConfirmAgent(id: string) {
+    try {
+      await saveAgent(id);
+      setAgentPickList(null);
+      void runPreflight();
+    } catch (e) {
+      console.error("保存 Agent 失败", e);
+      showToast("err", t.agentFailed, String(e));
+    }
+  }
 
   // 启动后静默检查一次更新：有新版本只提示，不自动安装（会重启，可能打断正在进行的提交）
   const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null);
@@ -939,15 +1074,49 @@ function App() {
     setIntroStep(0);
   }
 
-  async function handleAddProject() {
-    if (!inMain) return;
+  /** 选目录期间面板失焦不能收起 */
+  async function pickDirectory(title: string) {
     isPickingRef.current = true;
-    let selected: string | null = null;
     try {
-      selected = await invoke<string | null>("pick_project_directory");
+      return await invoke<string | null>("pick_project_directory", { title });
     } finally {
       isPickingRef.current = false;
     }
+  }
+
+  const [scanResult, setScanResult] = useState<{ root: string; repos: IScannedRepo[] } | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+
+  async function onScanFolder() {
+    if (!inMain) return;
+    const root = await pickDirectory(t.pickScanRootTitle);
+    if (root == null) return;
+    setSettingsOpen(false);
+    setIsScanning(true);
+    try {
+      setScanResult({ root, repos: await invoke<IScannedRepo[]>("scan_git_repos", { root }) });
+    } catch (e) {
+      console.error("扫描 git 仓库失败", e);
+      setToast({ title: t.scanFailed, message: String(e), kind: "err" });
+    }
+    setIsScanning(false);
+  }
+
+  async function onAddScanned(paths: string[]) {
+    try {
+      const added = await invoke<ProjectView[]>("add_projects", { paths });
+      setRows((prev) => [...prev, ...added.map((project) => ({ project, uiState: "idle" as const }))]);
+      setScanResult(null);
+      setToast({ title: t.addedCount(added.length), message: "", kind: "ok" });
+    } catch (e) {
+      console.error("批量添加项目失败", e);
+      setLoadError(String(e));
+    }
+  }
+
+  async function handleAddProject() {
+    if (!inMain) return;
+    const selected = await pickDirectory(t.pickRepoTitle);
     if (selected == null) return;
     try {
       const added = await invoke<ProjectView>("add_project", { path: selected });
@@ -1123,15 +1292,23 @@ function App() {
             </div>
             <div className="flex items-center gap-0.5 text-muted-foreground">
               {showHeaderAdd ? (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t.addProject}
-                  title={t.addProject}
-                  onClick={() => void handleAddProject()}
-                >
-                  <Plus />
-                </Button>
+                <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon-sm" aria-label={t.addProject} title={t.addProject}>
+                      <Plus />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => void handleAddProject()}>
+                      <FolderOpen />
+                      {t.addSingleProject}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => void onScanFolder()}>
+                      <FolderSearch />
+                      {t.scanFolder}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               ) : null}
               {inMain ? (
                 <Button
@@ -1194,6 +1371,17 @@ function App() {
                 }
                 onStart={finishIntro}
               />
+            ) : isScanning ? (
+              <p className="flex items-center justify-center gap-2 p-6 text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+                {t.scanning}
+              </p>
+            ) : scanResult && inMain ? (
+              <ScanView
+                result={scanResult}
+                onCancel={() => setScanResult(null)}
+                onAdd={(paths) => void onAddScanned(paths)}
+              />
             ) : settingsOpen && inMain ? (
               <div>
                 <div className="flex flex-col gap-0.5 rounded-xl border bg-card p-1.5">
@@ -1206,6 +1394,7 @@ function App() {
                   />
                   <SettingsThemeRow />
                   <SettingsLanguageRow />
+                  <SettingsAgentRow active={settingsOpen} skipInvoke={captureBoot?.skipInvoke} />
                   <SettingsDiffSizeRow
                     active={settingsOpen}
                     skipInvoke={captureBoot?.skipInvoke}
@@ -1228,6 +1417,12 @@ function App() {
                   </Button>
                 </div>
               </div>
+            ) : agentPickList ? (
+              <AgentPickView
+                list={agentPickList}
+                onRescan={() => void loadAgentPick()}
+                onConfirm={(id) => void onConfirmAgent(id)}
+              />
             ) : preflightLoading ? (
               <PreflightGateView loading checks={preflight?.checks} />
             ) : isCheckOpen && isEnvFailed && preflight ? (
@@ -1245,9 +1440,14 @@ function App() {
                 <p className={`${LEAD_CLASS} text-center`}>
                   {t.emptyLead}
                 </p>
-                <Button disabled={!inMain} onClick={() => void handleAddProject()}>
-                  {t.addProject}
-                </Button>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button disabled={!inMain} onClick={() => void handleAddProject()}>
+                    {t.addProject}
+                  </Button>
+                  <Button variant="outline" disabled={!inMain} onClick={() => void onScanFolder()}>
+                    {t.scanFolder}
+                  </Button>
+                </div>
               </div>
             ) : (
               <ul className="flex flex-col gap-2">
@@ -1273,6 +1473,88 @@ function App() {
 
       {/* 收起时用云朵提示，展开时才挂 sonner */}
       {panelOpen ? <Toaster duration={captureBoot ? Infinity : 4200} /> : null}
+    </div>
+  );
+}
+
+/** 扫描结果：未添加的默认勾选，已添加的灰掉 */
+function ScanView({
+  result,
+  onCancel,
+  onAdd,
+}: {
+  result: { root: string; repos: IScannedRepo[] };
+  onCancel: () => void;
+  onAdd: (paths: string[]) => void;
+}) {
+  const { t } = useLanguage();
+  const [checkedPaths, setCheckedPaths] = useState(
+    () => new Set(result.repos.filter((r) => !r.isAdded).map((r) => r.path)),
+  );
+
+  function onToggleRepo(path: string) {
+    setCheckedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  }
+
+  return (
+    <div className="px-1 pt-2 pb-3">
+      <h2 className={`${HEADING_CLASS} text-center`}>
+        {result.repos.length ? t.scanTitle(result.repos.length) : t.scanEmpty}
+      </h2>
+      {/* 完整路径太长会被截断、看起来不居中；只显示文件夹名，悬停看完整路径 */}
+      <p className="mb-3 truncate text-center text-xs text-muted-foreground" title={result.root}>
+        {t.scanLead(result.root.slice(result.root.lastIndexOf("/") + 1))}
+      </p>
+      {result.repos.length ? (
+        <ul className={`${CHECKS_CLASS} flex flex-col gap-0.5 px-1.5 py-1.5`}>
+          {result.repos.map((repo) => (
+            <li key={repo.path}>
+              <label
+                className={`flex items-center gap-2.5 rounded-lg px-2 py-1.5 ${
+                  repo.isAdded ? "opacity-50" : "cursor-pointer hover:bg-accent"
+                }`}
+                title={repo.path}
+              >
+                <Checkbox
+                  checked={repo.isAdded || checkedPaths.has(repo.path)}
+                  disabled={repo.isAdded}
+                  onCheckedChange={() => onToggleRepo(repo.path)}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-(--ink-strong)">{repo.name}</span>
+                  {/* 选的目录本身就是仓库时相对路径是「.」，不显示 */}
+                  {repo.relativePath !== repo.name && repo.relativePath !== "." ? (
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {repo.relativePath}
+                    </span>
+                  ) : null}
+                </span>
+                {repo.isAdded ? (
+                  <span className="flex-none text-xs text-muted-foreground">{t.scanAdded}</span>
+                ) : null}
+              </label>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="flex justify-center gap-2">
+        <Button variant="ghost" className="text-muted-foreground" onClick={onCancel}>
+          {result.repos.length ? t.cancel : t.back}
+        </Button>
+        {result.repos.length ? (
+          <Button disabled={!checkedPaths.size} onClick={() => onAdd([...checkedPaths])}>
+            {t.addSelected(checkedPaths.size)}
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -1320,6 +1602,155 @@ function IntroView({
   );
 }
 
+/** 各 Agent 官方文档里 macOS 的安装命令（2026-11 核对），顺序同 agents.rs */
+const AGENT_INSTALL_COMMANDS: Record<string, string> = {
+  pi: "curl -fsSL https://pi.dev/install.sh | sh",
+  claude: "curl -fsSL https://claude.ai/install.sh | bash",
+  codex: "curl -fsSL https://chatgpt.com/codex/install.sh | sh",
+  grok: "curl -fsSL https://x.ai/cli/install.sh | bash",
+  opencode: "curl -fsSL https://opencode.ai/v2/install | bash",
+  cursor: "curl -fsSL https://cursor.com/install | bash",
+  kimi: "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash",
+};
+
+async function copyText(text: string) {
+  // 打包后用系统剪贴板命令；开发模式的网页预览里没有 Tauri，退回浏览器剪贴板
+  if (isTauri) {
+    await invoke("copy_text", { text });
+  } else {
+    await navigator.clipboard.writeText(text);
+  }
+}
+
+/** 一个都没装时：列出官方安装命令，点击复制 */
+function AgentInstallList({ list }: { list: IAgentList }) {
+  const { t } = useLanguage();
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  async function onCopyCommand(id: string) {
+    try {
+      await copyText(AGENT_INSTALL_COMMANDS[id]);
+      setCopiedId(id);
+      window.setTimeout(() => setCopiedId((current) => (current === id ? null : current)), 1500);
+    } catch (e) {
+      console.error("复制安装命令失败", e);
+    }
+  }
+
+  return (
+    <div className={`${CHECKS_CLASS} flex flex-col gap-0.5 px-1.5 py-1.5`}>
+      {list.agents.map((a) => (
+        <button
+          key={a.id}
+          type="button"
+          className="group flex min-w-0 items-center gap-3 rounded-lg px-2.5 py-2 text-left hover:bg-accent"
+          aria-label={`${t.copyCommand}：${a.name}`}
+          title={AGENT_INSTALL_COMMANDS[a.id]}
+          onClick={() => void onCopyCommand(a.id)}
+        >
+          <span className="w-24 flex-none text-sm font-medium text-(--ink-strong)">{a.name}</span>
+          <code className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+            {AGENT_INSTALL_COMMANDS[a.id]}
+          </code>
+          <span className="flex flex-none items-center gap-1 text-xs text-muted-foreground group-hover:text-(--ink-strong)">
+            {copiedId === a.id ? (
+              <>
+                <Check className="size-3.5" aria-hidden />
+                {t.copied}
+              </>
+            ) : (
+              <Copy className="size-3.5" aria-hidden />
+            )}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** 首次使用选 Agent：只列已安装的，默认选中推荐的那个；一个都没装时给安装命令 */
+function AgentPickView({
+  list,
+  onRescan,
+  onConfirm,
+}: {
+  list: IAgentList;
+  onRescan: () => void;
+  onConfirm: (id: string) => void;
+}) {
+  const { t } = useLanguage();
+  const [selectedId, setSelectedId] = useState(list.current);
+  const [isScanning, setIsScanning] = useState(false);
+
+  // 列表刷新后（重新检测）默认选中新的推荐项
+  useEffect(() => {
+    setSelectedId(list.current);
+    setIsScanning(false);
+  }, [list]);
+
+  function onRescanAgents() {
+    setIsScanning(true);
+    onRescan();
+  }
+
+  if (!list.current) {
+    return (
+      <div className={GATE_CLASS}>
+        <LogoHero badge="!" />
+        <h2 className={HEADING_CLASS}>{t.agentNoneTitle}</h2>
+        <p className={`${LEAD_CLASS} text-center`}>{t.agentNoneLead}</p>
+        <AgentInstallList list={list} />
+        <Button disabled={isScanning} onClick={onRescanAgents}>
+          {isScanning ? <Loader2 className="animate-spin" /> : null}
+          {t.agentRescan}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={GATE_CLASS}>
+      <LogoHero />
+      <h2 className={HEADING_CLASS}>{t.agentPickTitle}</h2>
+      <p className={`${LEAD_CLASS} text-center`}>{t.agentPickLead}</p>
+      {/* 只列本机已安装的，圆形胶囊，可换行 */}
+      <div className="mb-3.5 flex flex-wrap justify-center gap-2" role="radiogroup">
+        {list.agents
+          .filter((a) => a.isInstalled)
+          .map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              role="radio"
+              aria-checked={a.id === selectedId}
+              className={`inline-flex h-8 items-center rounded-full border px-3.5 text-sm transition-colors ${
+                a.id === selectedId
+                  ? "border-transparent bg-primary font-medium text-primary-foreground"
+                  : "bg-card text-(--ink-2) hover:bg-accent"
+              }`}
+              onClick={() => setSelectedId(a.id)}
+            >
+              {a.name}
+            </button>
+          ))}
+      </div>
+      <div className="flex flex-wrap justify-center gap-2">
+        <Button
+          variant="ghost"
+          className="text-muted-foreground"
+          disabled={isScanning}
+          onClick={onRescanAgents}
+        >
+          {t.agentRescan}
+        </Button>
+        <Button disabled={!selectedId} onClick={() => selectedId && onConfirm(selectedId)}>
+          {t.continue}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function PreflightGateView({
   loading,
   checks,
@@ -1331,8 +1762,7 @@ function PreflightGateView({
   const items = checks?.length
     ? checks
     : [
-        { id: "pi_path", ok: false, message: "" },
-        { id: "pi_print", ok: false, message: "" },
+        { id: "agent", ok: false, message: "" },
         { id: "git", ok: false, message: "" },
       ];
 
@@ -1369,6 +1799,17 @@ function PreflightFailView({
   onBack: () => void;
 }) {
   const { t } = useLanguage();
+  const [agentList, setAgentList] = useState<IAgentList | null>(null);
+
+  useEffect(() => {
+    if (!isTauri) {
+      return;
+    }
+    fetchAgents()
+      .then(setAgentList)
+      .catch((e) => console.error("读取 Agent 列表失败", e));
+  }, [result]);
+
   return (
     <div className={GATE_CLASS}>
       <LogoHero badge="!" />
@@ -1379,6 +1820,20 @@ function PreflightFailView({
           <PreflightCheckRow key={c.id} item={c} loading={false} />
         ))}
       </div>
+      {/* Agent 不可用时可以直接换一个已安装的，换完自动重新检查 */}
+      {agentList && result.checks.some((c) => c.id === "agent" && !c.ok) ? (
+        <div className="mb-3.5 flex items-center gap-2 text-xs text-muted-foreground">
+          <span>{t.agentSwitch}</span>
+          <AgentSelect
+            list={agentList}
+            onChange={(id) =>
+              void saveAgent(id)
+                .then(onRecheck)
+                .catch((e) => console.error("保存 Agent 失败", e))
+            }
+          />
+        </div>
+      ) : null}
       <div className="flex flex-wrap justify-center gap-2">
         <Button variant="ghost" className="text-muted-foreground" onClick={onBack}>
           {t.back}

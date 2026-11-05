@@ -1269,11 +1269,12 @@ mod outside_click {
 
 /// 独立模态选目录，不挂到面板上。挂成 sheet 时 AppKit 会挪动父窗口。
 #[tauri::command]
-pub async fn pick_project_directory(app: tauri::AppHandle) -> Result<Option<String>, String> {
+/// title 是对话框标题，前端按语言传入
+pub async fn pick_project_directory(app: tauri::AppHandle, title: String) -> Result<Option<String>, String> {
     IS_FILE_DIALOG_OPEN.store(true, Ordering::SeqCst);
-    let picked = tauri::async_runtime::spawn_blocking(|| {
+    let picked = tauri::async_runtime::spawn_blocking(move || {
         rfd::FileDialog::new()
-            .set_title("选择本地 git 仓库")
+            .set_title(title)
             .pick_folder()
     })
     .await;

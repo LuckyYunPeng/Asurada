@@ -1,10 +1,6 @@
 use std::path::Path;
 use std::process::Command;
 
-/// `pi --print` 的提示词，按设置里的语言选；中文版也是预检的基准提示词
-pub const PI_COMMIT_PROMPT: &str = r#"你是 Asurada 提交助手。请根据当前仓库的 git status 与 git diff（含已暂存与未暂存）生成一条 Conventional Commits 格式的提交标题：type 使用英文（如 feat、fix、chore、docs），冒号后使用简体中文简述变更。只输出一行提交信息，不要引号、不要解释、不要 Markdown。"#;
-const PI_COMMIT_PROMPT_EN: &str = r#"You are the Asurada commit assistant. Based on the current repository's git status and git diff (staged and unstaged), write one Conventional Commits subject line: an English type (feat, fix, chore, docs, etc.), then a concise English description of the change after the colon. Output only that one line: no quotes, no explanation, no Markdown."#;
-
 pub fn git_is_clean(project_path: &Path) -> Result<bool, String> {
     let output = Command::new("git")
         .args(["-C", project_path.to_string_lossy().as_ref(), "status", "--porcelain"])
@@ -39,45 +35,6 @@ pub fn git_last_commit_subject(project_path: &Path) -> Option<String> {
     } else {
         Some(subject)
     }
-}
-
-/// language 是前端当前生效的语言："zh" 用中文提交信息，其他一律英文；paths 有值时只描述这些文件
-pub fn run_pi_print(
-    project_path: &Path,
-    language: &str,
-    paths: Option<&[String]>,
-) -> Result<String, String> {
-    let mut prompt = (if language == "zh" { PI_COMMIT_PROMPT } else { PI_COMMIT_PROMPT_EN }).to_string();
-    if let Some(paths) = paths {
-        prompt.push_str(if language == "zh" {
-            "\n本次只提交以下文件，只描述它们的改动，忽略其他文件：\n"
-        } else {
-            "\nOnly these files are being committed; describe only their changes and ignore other files:\n"
-        });
-        prompt.push_str(&paths.join("\n"));
-    }
-    let output = Command::new("pi")
-        .args(["--no-session", "--print", &prompt])
-        .current_dir(project_path)
-        .output()
-        .map_err(|e| format!("无法执行 pi（请确认已安装并在 PATH 中）: {e}"))?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-
-    if !output.status.success() {
-        return Err(if stderr.is_empty() {
-            format!("pi 退出码 {}", output.status.code().unwrap_or(-1))
-        } else {
-            stderr
-        });
-    }
-
-    if stdout.is_empty() {
-        return Err("pi 未返回提交信息".to_string());
-    }
-
-    Ok(stdout.lines().next().unwrap_or(&stdout).trim().to_string())
 }
 
 fn git_output(project_path: &Path, args: &[&str]) -> Result<std::process::Output, String> {

@@ -10,6 +10,27 @@ export interface PreflightResult {
   summary: string;
 }
 
+export interface IAgentInfo {
+  id: string;
+  name: string;
+  isInstalled: boolean;
+}
+
+export interface IAgentList {
+  agents: IAgentInfo[];
+  /** 当前生效的 Agent；一个都没装时为空 */
+  current: string | null;
+  /** 用户是否亲自选过 */
+  isChosen: boolean;
+}
+
+export interface IScannedRepo {
+  path: string;
+  name: string;
+  relativePath: string;
+  isAdded: boolean;
+}
+
 export type RowUiState = "idle" | "running" | "success" | "failure";
 
 export interface ProjectView {

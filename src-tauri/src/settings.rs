@@ -13,6 +13,9 @@ struct SettingsFile {
     /// 逻辑像素 [宽, 高]；用户拖拽或在设置里改过才有值
     #[serde(default, skip_serializing_if = "Option::is_none")]
     diff_window_size: Option<[f64; 2]>,
+    /// 生成提交信息用的 Agent id（见 agents.rs）；没选过时按默认优先级自动选
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    agent: Option<String>,
 }
 
 pub fn settings_path(app_data_dir: &Path) -> PathBuf {
@@ -73,6 +76,16 @@ pub fn save_diff_window_size(
     Ok(size)
 }
 
+pub fn load_agent(app_data_dir: &Path) -> Option<String> {
+    load_settings(app_data_dir).agent
+}
+
+pub fn save_agent(app_data_dir: &Path, agent: &str) -> Result<(), String> {
+    let mut file = load_settings(app_data_dir);
+    file.agent = Some(agent.to_string());
+    save_settings(app_data_dir, &file)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,6 +100,10 @@ mod tests {
         assert_eq!(save_diff_window_size(&dir, 1200.4, 300.0).unwrap(), (1200.0, 480.0));
         assert_eq!(load_diff_window_size(&dir), (1200.0, 480.0));
         assert_eq!(load_toggle_panel_shortcut(&dir), "Alt+Super+KeyK");
+        assert_eq!(load_agent(&dir), None);
+        save_agent(&dir, "claude").unwrap();
+        assert_eq!(load_agent(&dir).as_deref(), Some("claude"));
+        assert_eq!(load_diff_window_size(&dir), (1200.0, 480.0));
         assert!(save_diff_window_size(&dir, f64::NAN, 800.0).is_err());
         fs::remove_dir_all(dir).unwrap();
     }

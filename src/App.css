@@ -796,6 +796,12 @@ body {
   --seg-fg: #a1a1aa;
 }
 
+/* 深色下浅紫阴影看不见；窗口四周只留 10–22px 透明边，模糊半径控制在这之内免得被裁 */
+.dark .panel {
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.55),
+    0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
 .dark .cloud {
   --cloud-ink: #6fd99b;
   --cloud-tint: #1e3a2b;
