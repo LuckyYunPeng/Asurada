@@ -2,17 +2,13 @@
 
 ## v0.5.1（2026-11-05）
 
+### Features
+
+- Intel Macs are now supported alongside Apple Silicon. Download `*_aarch64.dmg` for Apple Silicon or `*_x64.dmg` for Intel; the in-app updater fetches the build for your Mac.
+
 ### 新功能
 
 - 新增 Intel 芯片 Mac 安装包，Apple Silicon 和 Intel 机型都能下载安装，App 内更新会自动下载对应芯片的版本。
-
-## Unreleased
-
-### Features
-- Intel Macs are supported alongside Apple Silicon. Releases include `*_aarch64.dmg` (Apple Silicon) and `*_x64.dmg` (Intel); the in-app updater downloads the package for that Mac.
-
-### 新功能
-- 同时支持 Intel 与 Apple Silicon 的 Mac。Release 提供 `*_aarch64.dmg`（Apple Silicon）和 `*_x64.dmg`（Intel），应用内更新会下载对应芯片的安装包。
 
 ## v0.5.0（2026-11-05）
 
