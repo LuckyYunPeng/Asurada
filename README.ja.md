@@ -67,7 +67,7 @@ Asurada は重要な部分だけをレビューするよう導き、残りの雑
 2. 開いて **Asurada** を「アプリケーション」にドラッグします。
 3. 初回起動時に短いガイドが表示され、実行環境が自動でチェックされます。
 
-`git` と、コミットメッセージを作成する AI エージェントの CLI（pi、Claude Code、Codex、Grok、OpenCode、Cursor Agent、Kimi のいずれか）がインストールされている必要があります。どれを使うかは設定で選べます。現在は Apple Silicon 搭載の Mac のみ対応しています。
+`git` と、コミットメッセージを作成する AI エージェントの CLI（pi、Claude Code、Codex、Grok、OpenCode、Kimi のいずれか）がインストールされている必要があります。どれを使うかは設定で選べます。現在は Apple Silicon 搭載の Mac のみ対応しています。
 
 ## ライセンス
 

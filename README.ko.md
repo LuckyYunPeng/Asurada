@@ -67,7 +67,7 @@ diff 창은 당신의 리뷰 데스크입니다. 노이즈는 접어 두고, 중
 2. 파일을 열고 **Asurada**를 '응용 프로그램' 폴더로 끌어다 놓습니다.
 3. 처음 실행하면 짧은 안내가 나오고, 실행 환경을 자동으로 확인합니다.
 
-`git`과 커밋 메시지를 작성할 AI 에이전트 CLI(pi, Claude Code, Codex, Grok, OpenCode, Cursor Agent, Kimi 중 하나)가 설치되어 있어야 합니다. 어떤 것을 쓸지는 설정에서 고를 수 있습니다. 현재는 Apple Silicon Mac만 지원합니다.
+`git`과 커밋 메시지를 작성할 AI 에이전트 CLI(pi, Claude Code, Codex, Grok, OpenCode, Kimi 중 하나)가 설치되어 있어야 합니다. 어떤 것을 쓸지는 설정에서 고를 수 있습니다. 현재는 Apple Silicon Mac만 지원합니다.
 
 ## 라이선스
 
