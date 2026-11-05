@@ -41,6 +41,8 @@ export interface ProjectView {
   gitClean: boolean;
   gitStatusLabel: string;
   lastCommitMessage: string | null;
+  /** 最近一次变动的 Unix 秒 */
+  updatedAt: number | null;
 }
 
 export interface CommitPushResult {

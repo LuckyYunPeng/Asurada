@@ -33,6 +33,7 @@ const mockProjectA: ProjectView = {
   gitClean: false,
   gitStatusLabel: "有未提交变更",
   lastCommitMessage: "feat: 调整落地页导航间距",
+  updatedAt: null,
 };
 
 const mockProjectB: ProjectView = {
@@ -43,6 +44,7 @@ const mockProjectB: ProjectView = {
   gitClean: true,
   gitStatusLabel: "工作区干净",
   lastCommitMessage: null,
+  updatedAt: null,
 };
 
 export const mockPreflightOk: PreflightResult = {

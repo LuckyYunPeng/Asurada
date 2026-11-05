@@ -26,6 +26,7 @@ import {
 import { showToast, type ToastKind } from "./Toast";
 import { Toaster } from "@/components/ui/sonner";
 import {
+  ArrowUpDown,
   Check,
   ChevronRight,
   CircleAlert,
@@ -53,6 +54,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Switch } from "@/components/ui/switch";
@@ -285,6 +288,79 @@ function SettingsDiffSizeRow({ active, skipInvoke }: { active: boolean; skipInvo
           ))}
         </SelectContent>
       </Select>
+    </div>
+  );
+}
+
+enum ProjectSortEnum {
+  Updated = "updated",
+  Dirty = "dirty",
+  Name = "name",
+  Added = "added",
+}
+
+const PROJECT_SORT_KEY = "asurada.projectSort";
+
+function readProjectSort(): ProjectSortEnum {
+  const stored = localStorage.getItem(PROJECT_SORT_KEY) as ProjectSortEnum | null;
+  return stored && Object.values(ProjectSortEnum).includes(stored)
+    ? stored
+    : ProjectSortEnum.Updated;
+}
+
+/** 按排序方式排出项目 id 顺序；「添加顺序」就是后端返回的顺序 */
+function sortProjectIds(rows: ProjectRowState[], sort: ProjectSortEnum) {
+  const byUpdated = (a: ProjectRowState, b: ProjectRowState) =>
+    (b.project.updatedAt ?? 0) - (a.project.updatedAt ?? 0);
+  const compare = {
+    [ProjectSortEnum.Updated]: byUpdated,
+    [ProjectSortEnum.Dirty]: (a: ProjectRowState, b: ProjectRowState) =>
+      Number(a.project.gitClean) - Number(b.project.gitClean) || byUpdated(a, b),
+    [ProjectSortEnum.Name]: (a: ProjectRowState, b: ProjectRowState) =>
+      a.project.displayName.localeCompare(b.project.displayName),
+    [ProjectSortEnum.Added]: () => 0,
+  }[sort];
+  return [...rows].sort(compare).map((r) => r.project.id);
+}
+
+/** 项目列表顶部：左边项目数，右边排序方式 */
+function ProjectListBar({
+  count,
+  sort,
+  onChangeSort,
+}: {
+  count: number;
+  sort: ProjectSortEnum;
+  onChangeSort: (sort: ProjectSortEnum) => void;
+}) {
+  const { t } = useLanguage();
+  const options = [
+    { value: ProjectSortEnum.Updated, label: t.sortUpdated },
+    { value: ProjectSortEnum.Dirty, label: t.sortDirty },
+    { value: ProjectSortEnum.Name, label: t.sortName },
+    { value: ProjectSortEnum.Added, label: t.sortAdded },
+  ];
+
+  return (
+    <div className="mb-1.5 flex items-center justify-between px-1 text-xs text-muted-foreground">
+      <span>{t.projectCount(count)}</span>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="xs" className="-mr-1.5 text-xs text-muted-foreground" aria-label={t.projectSort}>
+            <ArrowUpDown />
+            {options.find((o) => o.value === sort)?.label}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuRadioGroup value={sort} onValueChange={(v) => onChangeSort(v as ProjectSortEnum)}>
+            {options.map((o) => (
+              <DropdownMenuRadioItem key={o.value} value={o.value}>
+                {o.label}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
@@ -703,6 +779,7 @@ function App() {
   const bodyInnerRef = useRef<HTMLDivElement>(null);
   const [bodyHeight, setBodyHeight] = useState<number | null>(null);
   const [rowOrder, setRowOrder] = useState<string[]>([]);
+  const [projectSort, setProjectSort] = useState(readProjectSort);
   // 重复添加时闪烁高亮的已有项目
   const [flashId, setFlashId] = useState<string | null>(null);
   // 启动后首次拿到列表也排一次
@@ -824,19 +901,21 @@ function App() {
     void refreshList().then(() => setIsOrderPending(true));
   }, [panelOpen, inMain, refreshList]);
 
-  // 只在展开面板（及启动）时排一次：待提交在前；之后刷新、提交不再换位置
+  // 只在展开面板（及启动、改排序方式）时排一次；之后刷新、提交不再换位置，免得行在手下跳动
   useEffect(() => {
     // 列表还没加载时先等着，否则会拿空列表把这次排序用掉
     if (!isOrderPending || rows.length === 0) {
       return;
     }
     setIsOrderPending(false);
-    setRowOrder(
-      [...rows]
-        .sort((a, b) => Number(a.project.gitClean) - Number(b.project.gitClean))
-        .map((r) => r.project.id),
-    );
-  }, [isOrderPending, rows]);
+    setRowOrder(sortProjectIds(rows, projectSort));
+  }, [isOrderPending, rows, projectSort]);
+
+  function onChangeProjectSort(sort: ProjectSortEnum) {
+    localStorage.setItem(PROJECT_SORT_KEY, sort);
+    setProjectSort(sort);
+    setIsOrderPending(true);
+  }
 
   // 收起时定时刷新，让 Tag 上的待提交圆点跟上外部改动；展开时已由上面的 effect 刷新
   useEffect(() => {
@@ -1555,6 +1634,8 @@ function App() {
                 </div>
               </div>
             ) : (
+              <>
+              <ProjectListBar count={projectCount} sort={projectSort} onChangeSort={onChangeProjectSort} />
               <ul className="flex flex-col gap-2">
                 {sortedRows.map((row) => (
                   <ProjectRow
@@ -1570,6 +1651,7 @@ function App() {
                   />
                 ))}
               </ul>
+              </>
             )}
             </div>
           </div>

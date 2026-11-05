@@ -1,5 +1,5 @@
 use crate::git::{
-    git_add_commit_push, git_current_branch, git_discard, git_is_clean, git_pull, git_last_commit_subject, git_working_diff,
+    git_add_commit_push, git_current_branch, git_discard, git_updated_at, git_is_clean, git_pull, git_last_commit_subject, git_working_diff,
 };
 use crate::preflight::{self, PreflightResult};
 use crate::agents::{self, AgentInfo};
@@ -27,6 +27,8 @@ pub struct ProjectView {
     pub git_clean: bool,
     pub git_status_label: String,
     pub last_commit_message: Option<String>,
+    /// 最近一次变动的 Unix 秒，用于「最近更新」排序
+    pub updated_at: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,6 +75,7 @@ fn to_view(p: &StoredProject) -> ProjectView {
         git_clean,
         git_status_label,
         last_commit_message,
+        updated_at: git_updated_at(&path),
     }
 }
 

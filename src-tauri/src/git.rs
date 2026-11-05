@@ -37,6 +37,25 @@ pub fn git_last_commit_subject(project_path: &Path) -> Option<String> {
     }
 }
 
+/// 项目最近一次变动的时间（Unix 秒）：最后一次提交时间和未提交文件的修改时间取较晚的。
+/// 删除的文件没有修改时间，跳过；空仓库且没有改动时返回 None
+pub fn git_updated_at(project_path: &Path) -> Option<u64> {
+    let commit_time = git_output(project_path, &["log", "-1", "--format=%ct"])
+        .ok()
+        .and_then(|o| String::from_utf8_lossy(&o.stdout).trim().parse::<u64>().ok());
+    let status = git_output(project_path, &["status", "--porcelain", "-z"]).ok()?;
+    let stdout = String::from_utf8_lossy(&status.stdout);
+    // -z 格式：「XY 路径」，重命名后面再跟一段原路径（不以状态码开头，长度不够 3 或第 3 个字符不是空格时跳过）
+    let changed_time = stdout
+        .split('\0')
+        .filter_map(|entry| entry.get(3..).filter(|_| entry.as_bytes().get(2) == Some(&b' ')))
+        .filter_map(|path| project_path.join(path).metadata().ok()?.modified().ok())
+        .filter_map(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .max();
+    commit_time.max(changed_time)
+}
+
 /// 当前分支名；游离 HEAD 时返回短提交号，空仓库也能拿到分支名
 pub fn git_current_branch(project_path: &Path) -> Option<String> {
     let read = |args: &[&str]| {
@@ -255,6 +274,18 @@ mod tests {
         assert!(patch.contains("+changed"), "{patch}");
         assert!(patch.contains("b/新目录/笔记.md"), "{patch}");
         assert!(patch.contains("+hi"), "{patch}");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn updated_at_uses_latest_of_commit_and_changes() {
+        let (root, a) = setup("updated", "b.txt");
+        let committed = git_updated_at(&a).unwrap();
+        let file = a.join("new.txt");
+        fs::write(&file, "x").unwrap();
+        let later = std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(committed + 100);
+        fs::File::options().write(true).open(&file).unwrap().set_modified(later).unwrap();
+        assert_eq!(git_updated_at(&a), Some(committed + 100));
         fs::remove_dir_all(root).unwrap();
     }
 
