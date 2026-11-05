@@ -1,5 +1,25 @@
 # Changelog / 更新日志
 
+## v0.5.0（2026-11-05）
+
+### Features
+- Choose your AI agent for commit messages: Asurada detects Pi, Claude Code, Codex, Grok, OpenCode and Kimi on your Mac. Pick one on first launch, and switch or test it anytime in Settings. If none is installed, you'll see install commands you can copy.
+- Commit messages now cover only what you commit: Asurada reads the diff itself and sends it to the agent in a short, separate session, so partial commits are described accurately and lock files and generated files don't add noise.
+- Add many projects at once: the "+" button now offers "Scan a folder…", which finds every Git repository in a folder so you can tick the ones to add.
+
+### Improvements
+- A rewritten five-page introduction. Tap the page dots to jump to any page.
+- Tooltips are easier to read in dark mode.
+
+### 新功能
+- 自选 AI Agent 生成提交信息：自动检测本机的 Pi、Claude Code、Codex、Grok、OpenCode、Kimi，首次启动时选择，之后可在设置中随时切换和测试；一个都没装时会给出可复制的安装命令
+- 提交信息只描述你提交的内容：Asurada 自己读取改动交给 Agent，在独立短会话里生成，部分提交也能写准，lock 文件和生成文件不再干扰
+- 批量添加项目：「+」按钮新增「扫描文件夹…」，自动找出文件夹里的所有 Git 仓库，勾选后一次添加
+
+### 改进
+- 重写了五页新手引导，点击底部圆点可直接跳转
+- 深色模式下的提示框更易读
+
 ## v0.4.0（2026-11-05）
 
 ### Features
