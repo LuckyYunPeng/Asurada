@@ -22,6 +22,7 @@ import {
   CloudDownload,
   CloudUpload,
   Folder,
+  GitBranch,
   Loader2,
   RefreshCw,
 } from "lucide-react";
@@ -42,6 +43,7 @@ interface IProjectDiff {
   path: string;
   patch: string;
   untracked: string[];
+  branch: string | null;
 }
 
 interface IDiffEntry {
@@ -155,6 +157,7 @@ function isSameDiff(a: IProjectDiff, b: IProjectDiff) {
     a.patch === b.patch &&
     a.path === b.path &&
     a.displayName === b.displayName &&
+    a.branch === b.branch &&
     a.untracked.join("\0") === b.untracked.join("\0")
   );
 }
@@ -871,13 +874,21 @@ function DiffView({ projectId }: { projectId: string }) {
             <span className="title">ASURADA</span>
           </div>
           <span className="dw-divider" aria-hidden />
-          <strong>{diff?.displayName ?? t.loading}</strong>
-          {entries.length ? (
-            <>
-              <span className="dw-sub">{t.fileCount(countedEntries.length)}</span>
-              <DiffCount additions={totalAdditions} deletions={totalDeletions} />
-            </>
-          ) : null}
+          <div className="dw-name" data-tauri-drag-region>
+            <strong>{diff?.displayName ?? t.loading}</strong>
+            {diff?.branch ? (
+              <span className="dw-branch" title={diff.branch}>
+                <GitBranch className="size-3 flex-none self-center" aria-hidden />
+                <span className="truncate">{diff.branch}</span>
+              </span>
+            ) : null}
+            {entries.length ? (
+              <span className="dw-stats">
+                <span className="dw-sub">{t.fileCount(countedEntries.length)}</span>
+                <DiffCount additions={totalAdditions} deletions={totalDeletions} />
+              </span>
+            ) : null}
+          </div>
         </div>
         <div className="dw-actions">
           <Tooltip>

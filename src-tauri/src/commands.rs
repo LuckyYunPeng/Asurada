@@ -1,5 +1,5 @@
 use crate::git::{
-    git_add_commit_push, git_discard, git_is_clean, git_pull, git_last_commit_subject, git_working_diff,
+    git_add_commit_push, git_current_branch, git_discard, git_is_clean, git_pull, git_last_commit_subject, git_working_diff,
 };
 use crate::preflight::{self, PreflightResult};
 use crate::agents::{self, AgentInfo};
@@ -221,6 +221,7 @@ pub struct ProjectDiff {
     pub path: String,
     pub patch: String,
     pub untracked: Vec<String>,
+    pub branch: Option<String>,
 }
 
 fn find_project(app: &tauri::AppHandle, id: &str) -> Result<StoredProject, String> {
@@ -234,8 +235,10 @@ fn find_project(app: &tauri::AppHandle, id: &str) -> Result<StoredProject, Strin
 #[tauri::command]
 pub async fn get_project_diff(app: tauri::AppHandle, id: String) -> Result<ProjectDiff, String> {
     let project = find_project(&app, &id)?;
-    let (patch, untracked) = git_working_diff(&PathBuf::from(&project.path))?;
+    let path = PathBuf::from(&project.path);
+    let (patch, untracked) = git_working_diff(&path)?;
     Ok(ProjectDiff {
+        branch: git_current_branch(&path),
         display_name: project.display_name,
         path: project.path,
         patch,

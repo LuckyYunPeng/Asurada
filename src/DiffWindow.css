@@ -100,7 +100,7 @@
 .dw-title {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 16px;
   min-width: 0;
 }
 
@@ -121,12 +121,40 @@
   background: var(--hairline);
 }
 
+/* 项目名、文件数、增删行字号和字体不同，按基线对齐；整组再和左边的 logo 居中 */
+.dw-name {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  min-width: 0;
+}
+
+/* 文件数和增删行是一组，组内比组间紧 */
+.dw-stats {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
 .dw-title strong {
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.dw-branch {
+  display: inline-flex;
+  /* 让分支名参与基线对齐；否则 flex 容器用图标底边当基线，文字会被顶高 */
+  align-items: baseline;
+  gap: 5px;
+  max-width: 220px;
+  min-width: 0;
+  color: var(--ink-2);
+  font-family: var(--font-code);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .dw-sub {

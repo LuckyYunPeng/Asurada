@@ -37,6 +37,19 @@ pub fn git_last_commit_subject(project_path: &Path) -> Option<String> {
     }
 }
 
+/// 当前分支名；游离 HEAD 时返回短提交号，空仓库也能拿到分支名
+pub fn git_current_branch(project_path: &Path) -> Option<String> {
+    let read = |args: &[&str]| {
+        git_output(project_path, args)
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .filter(|s| !s.is_empty())
+    };
+    read(&["symbolic-ref", "--short", "-q", "HEAD"])
+        .or_else(|| read(&["rev-parse", "--short", "HEAD"]))
+}
+
 fn git_output(project_path: &Path, args: &[&str]) -> Result<std::process::Output, String> {
     Command::new("git")
         .args(["-c", "core.quotepath=off"])
