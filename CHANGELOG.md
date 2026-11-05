@@ -1,5 +1,29 @@
 # Changelog / 更新日志
 
+## v0.3.0（2026-11-05）
+
+### Features
+- New Pull button on project rows and in the diff window: fast-forward pulls remote commits in one click (never creates merge commits).
+
+### Improvements
+- Notifications have a new, cleaner look, consistent between the main panel and the diff window.
+- Project row actions now use outlined buttons with tooltips.
+- The diff window always uses a side-by-side layout; the layout toggle is removed.
+
+### Fixes
+- In colorblind mode, highlighted words in the diff have higher text contrast and are easier to read.
+
+### 新功能
+- 项目行和差异窗口新增「拉取」按钮：一键快进拉取远端新提交，不会产生合并提交
+
+### 改进
+- 提示消息换了更简洁的新样式，主面板和差异窗口保持一致
+- 项目行的操作按钮改为描边样式，并带悬停提示
+- 差异窗口固定为左右对比，去掉了对比方式切换
+
+### 修复
+- 色弱模式下，差异中高亮的词文字对比度更高，更容易看清
+
 ## v0.2.0 (2026-11-05)
 
 ### Features
