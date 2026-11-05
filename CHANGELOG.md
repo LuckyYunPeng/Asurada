@@ -1,5 +1,25 @@
 # Changelog / 更新日志
 
+## v0.4.0（2026-11-05）
+
+### Features
+- Commit only the files you pick: tick files or folders in the diff window to commit and push just those; everything else stays in your working tree. Test files hidden from view are still included.
+- Discard changes: right-click a file or folder in the diff window and choose "Discard Changes…" to revert it to the last commit (new files are deleted). This can't be undone.
+- Zoom the diff: press ⌘+ / ⌘- (or use the controls at the bottom) to resize code and the file list together; click the percentage or press ⌘0 to reset. Your zoom level is remembered.
+- The Settings button shows a red dot when a new version is available.
+
+### Improvements
+- Cleaner checkboxes in the diff window file list.
+
+### 新功能
+- 只提交选中的文件：在差异窗口勾选文件或目录，只提交并推送选中的部分，其余改动留在工作区；隐藏的测试文件照常一起提交
+- 丢弃改动：在差异窗口右键文件或目录，选择「丢弃改动…」即可恢复到上次提交的状态，新增的文件会被删除，无法撤销
+- 差异缩放：按 ⌘+ / ⌘-（或点底部的缩放按钮）同时放大缩小代码和文件列表，点击百分比或按 ⌘0 恢复，会记住上次的比例
+- 有新版本时，设置按钮上会显示红点提示
+
+### 改进
+- 差异窗口文件列表的勾选框换了更清爽的样式
+
 ## v0.3.0（2026-11-05）
 
 ### Features
