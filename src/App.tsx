@@ -1589,7 +1589,7 @@ function ProjectRow({
         </Tooltip>
       </div>
       <div
-        className={`col-span-full row-start-2 mr-14 flex min-w-0 gap-1.5 leading-snug ${
+        className={`col-span-full row-start-2 mr-16 flex min-w-0 gap-1.5 leading-snug ${
           pres.kind === "dirty" || pres.kind === "run" ? "items-center" : "items-start"
         } ${STATUS_CLASS[pres.kind].text}`}
       >
@@ -1601,27 +1601,35 @@ function ProjectRow({
       </div>
       {/* 提交中不允许打开/移除，直接不显示 */}
       {isRunning ? null : (
-      <div className="col-start-2 row-start-2 flex gap-0.5 self-center justify-self-end text-muted-foreground">
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100"
-          aria-label={t.openFolder}
-          title={t.openFolder}
-          onClick={onOpenFolder}
-        >
-          <FolderOpen />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 hover:bg-destructive/10 hover:text-destructive"
-          aria-label={t.removeProject}
-          title={t.removeProject}
-          onClick={() => setConfirmAction("remove")}
-        >
-          <Trash2 />
-        </Button>
+      <div className="col-start-2 row-start-2 flex gap-1 self-center justify-self-end text-muted-foreground">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              className="opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100"
+              aria-label={t.openFolder}
+              onClick={onOpenFolder}
+            >
+              <FolderOpen />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{t.openFolder}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              className="opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 hover:bg-destructive/10 hover:text-destructive"
+              aria-label={t.removeProject}
+              onClick={() => setConfirmAction("remove")}
+            >
+              <Trash2 />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{t.removeProject}</TooltipContent>
+        </Tooltip>
       </div>
       )}
       {isConfirming ? (
