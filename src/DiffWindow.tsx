@@ -16,7 +16,14 @@ import { FileDiff, Virtualizer, WorkerPoolContextProvider, useWorkerPool } from 
 import DiffsWorker from "@pierre/diffs/worker/worker-portable.js?worker";
 import logoUrl from "./assets/asurada-logo.png";
 import type { CommitPushResult, ICommitPushEvent } from "./types";
-import { ChevronRight, Folder, Loader2, RefreshCw } from "lucide-react";
+import {
+  ChevronRight,
+  CloudDownload,
+  CloudUpload,
+  Folder,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -381,6 +388,7 @@ function DiffView({ projectId }: { projectId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCommitting, setIsCommitting] = useState(false);
+  const [isPulling, setIsPulling] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [diffStyle, setDiffStyle] = useState<TDiffStyle>(
     () => (localStorage.getItem(DIFF_STYLE_KEY) as TDiffStyle | null) ?? "unified",
@@ -563,6 +571,19 @@ function DiffView({ projectId }: { projectId: string }) {
       console.error("提交并推送失败", e);
       setNotice({ kind: "err", text: String(e) });
     }
+  }
+
+  async function onPull() {
+    setIsPulling(true);
+    try {
+      const output = await invoke<string>("run_pull", { id: projectId });
+      setNotice({ kind: "ok", text: `${t.pulled}${output ? ` · ${output}` : ""}` });
+      void fetchDiff();
+    } catch (e) {
+      console.error("拉取失败", e);
+      setNotice({ kind: "err", text: String(e) });
+    }
+    setIsPulling(false);
   }
 
   const testCount = useMemo(
@@ -751,15 +772,41 @@ function DiffView({ projectId }: { projectId: string }) {
             </TooltipTrigger>
             <TooltipContent side="bottom">{t.refresh}</TooltipContent>
           </Tooltip>
-          <Button
-            size="sm"
-            className="px-4"
-            disabled={isCommitting || !entries.length}
-            onClick={() => void onCommit()}
-          >
-            {isCommitting ? <Loader2 className="animate-spin" /> : null}
-            {isCommitting ? t.committing : t.commitPush}
-          </Button>
+          <Tooltip>
+            {/* 禁用的按钮不响应鼠标，包一层 span 才能显示 tooltip */}
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label={isPulling ? t.pulling : t.pull}
+                  disabled={isPulling || isCommitting}
+                  onClick={() => void onPull()}
+                >
+                  {isPulling ? <Loader2 className="animate-spin" /> : <CloudDownload />}
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {isPulling ? t.pulling : t.pull}
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label={isCommitting ? t.committing : t.commitPush}
+                  disabled={isCommitting || isPulling || !entries.length}
+                  onClick={() => void onCommit()}
+                >
+                  {isCommitting ? <Loader2 className="animate-spin" /> : <CloudUpload />}
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{isCommitting ? t.committing : t.commitPush}</TooltipContent>
+          </Tooltip>
         </div>
       </header>
 

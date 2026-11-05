@@ -1,5 +1,5 @@
 use crate::git::{
-    git_add_commit_push, git_is_clean, git_last_commit_subject, git_working_diff, run_pi_print,
+    git_add_commit_push, git_is_clean, git_pull, git_last_commit_subject, git_working_diff, run_pi_print,
 };
 use crate::preflight::{self, PreflightResult};
 use crate::settings::{load_diff_window_size, save_diff_window_size, MIN_DIFF_WINDOW_SIZE};
@@ -466,6 +466,12 @@ pub async fn run_commit_push(
         CommitPushEvent { id, phase: "done", result: Some(result.clone()) },
     );
     Ok(result)
+}
+
+/// 返回 git pull 的输出；失败时返回 git 的报错
+#[tauri::command]
+pub async fn run_pull(app: tauri::AppHandle, id: String) -> Result<String, String> {
+    git_pull(&PathBuf::from(&find_project(&app, &id)?.path))
 }
 
 fn commit_push(app: &tauri::AppHandle, id: &str, language: &str) -> Result<CommitPushResult, String> {

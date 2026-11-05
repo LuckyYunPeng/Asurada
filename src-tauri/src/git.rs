@@ -114,6 +114,17 @@ pub fn git_working_diff(project_path: &Path) -> Result<(String, Vec<String>), St
     Ok((patch, untracked))
 }
 
+/// 只做 fast-forward：未提交的改动原样保留；会覆盖本地改动或与本地提交分叉时 git 直接拒绝，不留冲突
+pub fn git_pull(project_path: &Path) -> Result<String, String> {
+    let output = git_output(project_path, &["pull", "--ff-only"])?;
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !output.status.success() {
+        return Err(if stderr.is_empty() { stdout } else { stderr });
+    }
+    Ok(stdout)
+}
+
 pub fn git_add_commit_push(project_path: &Path, message: &str) -> Result<String, String> {
     // 只有远端有新提交导致的拒绝才 rebase 后重推；权限、hook 等其他拒绝直接报错，避免同一错误输出两遍。
     // rebase 冲突则撤回，保持本地提交不变

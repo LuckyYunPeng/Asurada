@@ -27,6 +27,8 @@ import { Toast, type ToastKind } from "./Toast";
 import {
   Check,
   ChevronRight,
+  CloudDownload,
+  CloudUpload,
   FolderOpen,
   Info,
   Loader2,
@@ -979,6 +981,23 @@ function App() {
     }
   }
 
+  async function pullProject(id: string) {
+    const t = getMessages();
+    try {
+      const output = await invoke<string>("run_pull", { id });
+      setToast({ title: t.pulled, message: output, kind: "ok" });
+    } catch (e) {
+      console.error("拉取失败", e);
+      setToast({ title: t.pullFailed, message: String(e), kind: "err" });
+    }
+    try {
+      const refreshed = await invoke<ProjectView>("refresh_project_status", { id });
+      setRows((prev) => prev.map((r) => (r.project.id === id ? { ...r, project: refreshed } : r)));
+    } catch (e) {
+      console.error("刷新项目状态失败", e);
+    }
+  }
+
   // 按展开时定下的顺序；之后新加的项目排在末尾
   const sortedRows = [...rows].sort(
     (a, b) =>
@@ -1226,6 +1245,7 @@ function App() {
                     row={row}
                     canCommit={inMain}
                     onCommit={() => void handleCommitPush(row)}
+                    onPull={() => pullProject(row.project.id)}
                     onRemove={() => void handleRemove(row.project.id)}
                     isFlashing={flashId === row.project.id}
                     onFlashEnd={() => setFlashId(null)}
@@ -1443,6 +1463,7 @@ function ProjectRow({
   row,
   canCommit,
   onCommit,
+  onPull,
   onRemove,
   isFlashing,
   onFlashEnd,
@@ -1451,6 +1472,7 @@ function ProjectRow({
   row: ProjectRowState;
   canCommit: boolean;
   onCommit: () => void;
+  onPull: () => Promise<void>;
   onRemove: () => void;
   isFlashing: boolean;
   onFlashEnd: () => void;
@@ -1459,6 +1481,7 @@ function ProjectRow({
   // 行内确认浮层：移除项目，或开了「提交前确认」时的提交
   const [confirmAction, setConfirmAction] = useState<"remove" | "commit" | null>(null);
   const isConfirming = confirmAction !== null;
+  const [isPulling, setIsPulling] = useState(false);
   const rowRef = useRef<HTMLLIElement>(null);
 
   useEffect(() => {
@@ -1516,26 +1539,55 @@ function ProjectRow({
       >
         {row.project.displayName}
       </div>
-      <Button
-        size="sm"
-        className={
-          pres.btnBusy
-            ? "disabled:bg-accent disabled:text-accent-foreground disabled:opacity-100"
-            : "disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
-        }
-        disabled={primaryDisabled}
-        title={pres.btnTitle}
-        onClick={() => {
-          if (isConfirmCommitEnabled()) {
-            setConfirmAction("commit");
-          } else {
-            onCommit();
-          }
-        }}
-      >
-        {pres.btnBusy ? <Loader2 className="animate-spin" /> : null}
-        {pres.btnBusy ? t.committing : t.commitPush}
-      </Button>
+      <div className="flex gap-1">
+        {/* 禁用的按钮不响应鼠标，包一层 span 才能显示 tooltip */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <Button
+                variant="outline"
+                size="icon-sm"
+                disabled={!canCommit || isRunning || isPulling}
+                aria-label={isPulling ? t.pulling : t.pull}
+                onClick={async () => {
+                  setIsPulling(true);
+                  await onPull();
+                  setIsPulling(false);
+                }}
+              >
+                {isPulling ? <Loader2 className="animate-spin" /> : <CloudDownload />}
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {isPulling ? t.pulling : t.pull}
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="inline-flex">
+              <Button
+                variant="outline"
+                size="icon-sm"
+                disabled={primaryDisabled || isPulling}
+                aria-label={pres.btnBusy ? t.committing : t.commitPush}
+                onClick={() => {
+                  if (isConfirmCommitEnabled()) {
+                    setConfirmAction("commit");
+                  } else {
+                    onCommit();
+                  }
+                }}
+              >
+                {pres.btnBusy ? <Loader2 className="animate-spin" /> : <CloudUpload />}
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {pres.btnBusy ? t.committing : (pres.btnTitle ?? t.commitPush)}
+          </TooltipContent>
+        </Tooltip>
+      </div>
       <div
         className={`col-span-full row-start-2 mr-14 flex min-w-0 gap-1.5 leading-snug ${
           pres.kind === "dirty" || pres.kind === "run" ? "items-center" : "items-start"
