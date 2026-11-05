@@ -31,6 +31,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useThemeMode } from "./theme";
 import { getMessages, readLanguage, useLanguage } from "./i18n";
+import { showToast } from "./Toast";
+import { Toaster } from "@/components/ui/sonner";
 import "./App.css";
 import "./DiffWindow.css";
 
@@ -393,7 +395,6 @@ function DiffView({ projectId }: { projectId: string }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isCommitting, setIsCommitting] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
-  const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [diffStyle, setDiffStyle] = useState<TDiffStyle>(
     () => (localStorage.getItem(DIFF_STYLE_KEY) as TDiffStyle | null) ?? "unified",
   );
@@ -541,14 +542,13 @@ function DiffView({ projectId }: { projectId: string }) {
       }
       setIsCommitting(payload.phase === "running");
       if (payload.phase === "running") {
-        setNotice(null);
         return;
       }
-      setNotice(
-        payload.result?.success
-          ? { kind: "ok", text: `${getMessages().pushed} · ${payload.result.commitMessage ?? ""}` }
-          : { kind: "err", text: payload.result?.error ?? getMessages().commitFailed },
-      );
+      if (payload.result?.success) {
+        showToast("ok", getMessages().pushed, payload.result.commitMessage ?? undefined);
+      } else {
+        showToast("err", getMessages().commitFailed, payload.result?.error ?? undefined);
+      }
       void fetchDiff();
     }).then((stop) => {
       unlisten = stop;
@@ -573,7 +573,7 @@ function DiffView({ projectId }: { projectId: string }) {
       await invoke<CommitPushResult>("run_commit_push", { id: projectId, language: readLanguage() });
     } catch (e) {
       console.error("提交并推送失败", e);
-      setNotice({ kind: "err", text: String(e) });
+      showToast("err", t.commitFailed, String(e));
     }
   }
 
@@ -581,11 +581,11 @@ function DiffView({ projectId }: { projectId: string }) {
     setIsPulling(true);
     try {
       const output = await invoke<string>("run_pull", { id: projectId });
-      setNotice({ kind: "ok", text: `${t.pulled}${output ? ` · ${output}` : ""}` });
+      showToast("ok", t.pulled, output || undefined);
       void fetchDiff();
     } catch (e) {
       console.error("拉取失败", e);
-      setNotice({ kind: "err", text: String(e) });
+      showToast("err", t.pullFailed, String(e));
     }
     setIsPulling(false);
   }
@@ -814,14 +814,7 @@ function DiffView({ projectId }: { projectId: string }) {
         </div>
       </header>
 
-      {notice ? (
-        <div className={`dw-notice is-${notice.kind}`} role="status">
-          <span>{notice.text}</span>
-          <button type="button" aria-label={t.close} onClick={() => setNotice(null)}>
-            ×
-          </button>
-        </div>
-      ) : null}
+      <Toaster />
 
       {error ? (
         <div className="dw-state">

@@ -23,7 +23,8 @@ import {
   DEFAULT_TOGGLE_SHORTCUT_DISPLAY,
   keyboardEventToShortcut,
 } from "./shortcutSettings";
-import { Toast, type ToastKind } from "./Toast";
+import { showToast, type ToastKind } from "./Toast";
+import { Toaster } from "@/components/ui/sonner";
 import {
   Check,
   ChevronRight,
@@ -838,6 +839,13 @@ function App() {
     void invoke("sync_dock_geometry", { expanded: false }).catch(() => {});
   }, [panelOpen]);
 
+  // 展开状态下的提示交给 sonner；展开面板时也补显还没过期的一条
+  useEffect(() => {
+    if (toast && panelOpen) {
+      showToast(toast.kind, toast.title, toast.message);
+    }
+  }, [toast, panelOpen]);
+
   useEffect(() => {
     if (!toast || captureBoot) {
       return;
@@ -1259,13 +1267,8 @@ function App() {
         </aside>
       ) : null}
 
-      {toast && panelOpen ? (
-        <Toast
-          message={`${toast.title} · ${toast.message}`}
-          kind={toast.kind}
-          onDismiss={() => setToast(null)}
-        />
-      ) : null}
+      {/* 收起时用云朵提示，展开时才挂 sonner */}
+      {panelOpen ? <Toaster duration={captureBoot ? Infinity : 4200} /> : null}
     </div>
   );
 }
