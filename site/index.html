@@ -68,7 +68,7 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,500;0,8..60,650;0,8..60,700;1,8..60,500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,500;0,8..60,650;0,8..60,700;1,8..60,500&family=Noto+Serif+SC:wght@500;600&display=swap">
 <style>
   /* 信纸风格：暖纸底色、墨色文字、火漆红点缀，不用渐变和发光 */
   :root {
@@ -80,7 +80,8 @@
     --line: #e3d6c4;
     --wax: #7f2d24;
     --radius: 1.25rem;
-    --serif: "Source Serif 4", Georgia, "Iowan Old Style", "Songti SC", "STSong", serif;
+    /* 对齐 someonewrote：标题 Source Serif 4，正文 Atkinson Hyperlegible；中文标题用思源宋体接住，保持信笺感 */
+    --serif: "Source Serif 4", "Noto Serif SC", "Songti SC", Georgia, serif;
     --sans: "Atkinson Hyperlegible", -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -89,14 +90,15 @@
     background: var(--paper);
     color: var(--ink);
     font-family: var(--sans);
-    font-size: 17px;
-    line-height: 1.65;
+    font-size: 19px;
+    line-height: 1.6;
     overflow-x: clip;
     -webkit-font-smoothing: antialiased;
   }
   a { color: inherit; text-decoration: none; }
   code, .mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; }
-  h1, h2, h3, .brand, .manifesto { font-family: var(--serif); font-weight: 650; }
+  /* 对方标题不加粗，只用 500 */
+  h1, h2, h3, .brand, .manifesto { font-family: var(--serif); font-weight: 500; }
 
   .hero { overflow-x: clip; }
 
@@ -144,12 +146,6 @@
     min-height: 100vh; min-height: 100svh; padding: 100px 0 60px;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
   }
-  .badge {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 4px 14px; border-radius: 999px; font-size: 14px; color: var(--muted);
-    border: 2px solid var(--line); background: var(--sheet);
-  }
-  .badge .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--wax); }
   h1 {
     margin-top: 28px; max-width: 15em; font-size: clamp(40px, 6vw, 72px); line-height: 1.12; letter-spacing: -.01em;
     text-wrap: balance;
@@ -341,7 +337,9 @@
 
   /* 收尾 CTA */
   .final { text-align: center; }
-  .final .logo-big { width: 112px; height: 112px; border-radius: 26px; margin: 0 auto; border: 2px solid var(--line); }
+  .final .seal { display: block; width: 104px; height: auto; margin: -100px auto 0; }
+  .final .letter { width: min(860px, 100%); }
+  .sign { margin-top: 28px; text-align: right; font-family: var(--serif); font-style: italic; font-size: 22px; color: var(--wax); }
   .final .lead { margin-left: auto; margin-right: auto; }
   .final .cta { margin-top: 32px; }
   .req { margin-top: 18px; color: var(--muted); font-size: 14px; }
@@ -350,6 +348,38 @@
 
   footer { padding: 32px 24px 40px; text-align: center; color: var(--muted); font-size: 14px; }
   footer::before { content: ""; display: block; width: min(1100px, 100%); margin: 0 auto 32px; border-top: 4px double var(--ink); }
+
+  /* 纸张颗粒：整页叠一层很淡的噪点 */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: 100; pointer-events: none; opacity: .35; mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .36 0 0 0 0 .25 0 0 0 .35 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* 信纸：生成的毛边旧纸图，用 border-image 九宫格拉伸，四边毛边不会随尺寸变形 */
+  .letter {
+    position: relative; width: min(860px, 100%); padding: 64px clamp(28px, 6vw, 76px) 56px;
+    text-align: left;
+    border: 40px solid transparent; border-image: url(./assets/paper.webp) 60 fill / 40px / 0 stretch;
+    filter: drop-shadow(0 14px 20px rgba(70, 48, 22, .22));
+  }
+  .hero-intro { width: 100%; }
+  .hero .letter { rotate: -.6deg; }
+  .hero .letter .cta { justify-content: flex-start; }
+  .hero .letter h1 { font-size: clamp(34px, 5vw, 60px); max-width: 12em; }
+  .salute { margin-top: 28px; font-family: var(--serif); font-style: italic; font-size: 24px; color: var(--wax); }
+  .salute + h1 { margin-top: 8px; }
+  .hero .seal { position: absolute; right: 56px; bottom: -34px; width: 92px; rotate: -12deg; }
+  .seal { filter: drop-shadow(0 5px 5px rgba(60, 20, 18, .35)); }
+
+  /* 卡片、题记也带横线 */
+  .card, .manifesto {
+    background:
+      repeating-linear-gradient(transparent 0 calc(1.6em - 1px), rgba(127, 45, 36, .1) calc(1.6em - 1px) 1.6em),
+      var(--sheet);
+    background-position: 0 1.2em;
+  }
+  .pains .card:nth-child(odd) { rotate: -.6deg; }
+  .pains .card:nth-child(even) { rotate: .5deg; }
 
   /* 滚动进入动画 */
   .reveal { opacity: 0; transform: translateY(24px); transition: opacity .8s ease, transform .8s cubic-bezier(.2, .8, .2, 1); }
@@ -368,7 +398,8 @@
     .hero { padding: 0 20px 40px; }
     h1 { font-size: 34px; }
     .sub { font-size: 17px; }
-    .badge { font-size: 12px; }
+    .letter { padding: 44px 22px 40px; }
+    .hero .seal { width: 68px; right: 24px; bottom: -26px; }
     .stage .screen { padding: 6px; }
 
     section { padding: 72px 20px; }
@@ -398,7 +429,9 @@
 
 <header class="hero">
   <div class="hero-intro">
-    <span class="badge"><span class="dot"></span><span data-i18n="badge">为 Vibe Coding 时代的代码 Review 而生 · macOS</span></span>
+   <article class="letter">
+    <img class="seal" src="./assets/seal.webp" alt="">
+    <p class="salute" data-i18n="salute">亲爱的开发者：</p>
     <h1 data-i18n="heroTitle">AI 写代码，<br><span class="grad-text">但你得看懂自己的项目</span></h1>
     <p class="sub" data-i18n="heroSub">Asurada 的出发点是帮你<mark>滤掉噪音</mark>，<mark>提高你的 Review 效率</mark>，尤其是在<mark>多个项目之间穿插</mark>时，开发体验更加丝滑。</p>
     <div class="cta">
@@ -406,6 +439,7 @@
       <a class="btn ghost" href="https://github.com/LuckyYunPeng/asurada" data-i18n="ctaGithub">在 GitHub 上查看</a>
     </div>
     <p class="req" data-i18n="ctaArch">Apple Silicon 与 Intel</p>
+   </article>
   </div>
 
   <div class="stage">
@@ -511,14 +545,15 @@
 </section>
 
 <section class="final">
-  <div class="wrap">
-    <img class="logo-big reveal" src="./assets/logo.png" alt="Asurada">
-    <h2 class="reveal d1" style="margin-top: 32px;" data-i18n="finalTitle">让 AI 写代码，<br><span class="grad-text">让你看懂项目</span></h2>
+  <div class="wrap letter">
+    <img class="seal reveal" src="./assets/seal.webp" alt="Asurada">
+    <h2 class="reveal d1" style="margin-top: 24px;" data-i18n="finalTitle">让 AI 写代码，<br><span class="grad-text">让你看懂项目</span></h2>
     <p class="lead reveal d2" data-i18n="finalLead">免费、开源，MIT 协议。</p>
     <div class="cta reveal d3">
       <a class="btn primary" href="https://github.com/LuckyYunPeng/asurada/releases/latest" data-i18n="ctaDownload">免费下载 macOS 版</a>
       <a class="btn ghost" href="https://github.com/LuckyYunPeng/asurada">Star on GitHub</a>
     </div>
+    <p class="sign reveal d3" data-i18n="sign">—— Asurada 敬上</p>
     <p class="req reveal d3" data-i18n="req">支持 Apple Silicon 与 Intel 的 Mac。在 Releases 中，Apple Silicon 下载 <code>*_aarch64.dmg</code>，Intel 下载 <code>*_x64.dmg</code>。请先安装 git 和任意一个 AI Agent（pi、Claude Code、Codex 等）。</p>
   </div>
 </section>
@@ -533,7 +568,8 @@
     navWhy: 'Why',
     navFeatures: 'Features',
     navDownload: 'Download',
-    badge: 'Built for code review in the Vibe Coding era · macOS',
+    salute: 'Dear developer,',
+    sign: '— Yours, Asurada',
     heroTitle: 'AI writes the code,<br><span class="grad-text">but you still need to understand your project</span>',
     heroSub: 'Asurada <mark>filters out the noise</mark> to <mark>make your reviews faster</mark>, so <mark>working across multiple projects</mark> feels effortlessly smooth.',
     ctaDownload: 'Download for macOS — Free',
