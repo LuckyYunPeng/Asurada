@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -26,6 +26,7 @@ import {
 import { showToast, type ToastKind } from "./Toast";
 import { Toaster } from "@/components/ui/sonner";
 import {
+  ChevronLeft,
   ArrowUpDown,
   Check,
   ChevronRight,
@@ -321,6 +322,16 @@ function sortProjectIds(rows: ProjectRowState[], sort: ProjectSortEnum) {
     [ProjectSortEnum.Added]: () => 0,
   }[sort];
   return [...rows].sort(compare).map((r) => r.project.id);
+}
+
+/** 设置里的一组：小标题 + 卡片 */
+function SettingsGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section>
+      <h3 className="mb-1 px-1 text-xs font-medium text-muted-foreground">{title}</h3>
+      <div className="flex flex-col gap-0.5 rounded-xl border bg-card p-1.5">{children}</div>
+    </section>
+  );
 }
 
 /** 项目列表顶部：左边项目数，右边排序方式 */
@@ -1444,6 +1455,21 @@ function App() {
           role="dialog" aria-label={t.panel}>
           <header className="chrome">
             <div className="title-wrap">
+              {settingsOpen || isCheckOpen ? (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="-ml-1.5 text-muted-foreground"
+                  aria-label={t.back}
+                  title={t.back}
+                  onClick={() => {
+                    setSettingsOpen(false);
+                    setIsCheckOpen(false);
+                  }}
+                >
+                  <ChevronLeft />
+                </Button>
+              ) : null}
               {/* 从设置、环境检查等子页回到项目列表 */}
               <button
                 type="button"
@@ -1566,8 +1592,10 @@ function App() {
                 onAdd={(paths) => void onAddScanned(paths)}
               />
             ) : settingsOpen && inMain ? (
-              <div>
-                <div className="flex flex-col gap-0.5 rounded-xl border bg-card p-1.5">
+              <div className="flex flex-col gap-3">
+                <SettingsGroup title={t.settingsGeneral}>
+                  <SettingsThemeRow />
+                  <SettingsLanguageRow />
                   <SettingsShortcutRow
                     active={settingsOpen}
                     initialDisplay={captureBoot?.toggleShortcutDisplay}
@@ -1575,16 +1603,18 @@ function App() {
                     onToast={setToast}
                     onRecordingChange={handleShortcutRecordingChange}
                   />
-                  <SettingsThemeRow />
-                  <SettingsLanguageRow />
-                  <SettingsAgentRow active={settingsOpen} skipInvoke={captureBoot?.skipInvoke} />
                   <SettingsDiffSizeRow
                     active={settingsOpen}
                     skipInvoke={captureBoot?.skipInvoke}
                   />
+                  <SettingsAutostartRow skipInvoke={captureBoot?.skipInvoke} />
+                </SettingsGroup>
+                <SettingsGroup title={t.settingsCommit}>
+                  <SettingsAgentRow active={settingsOpen} skipInvoke={captureBoot?.skipInvoke} />
                   <SettingsConfirmCommitRow />
                   <SettingsPrewarmCommitRow />
-                  <SettingsAutostartRow skipInvoke={captureBoot?.skipInvoke} />
+                </SettingsGroup>
+                <SettingsGroup title={t.settingsAbout}>
                   <SettingsUpdateRow
                     skipInvoke={captureBoot?.skipInvoke}
                     pendingUpdate={pendingUpdate}
@@ -1594,12 +1624,7 @@ function App() {
                     <span>{t.viewIntro}</span>
                     <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
                   </button>
-                </div>
-                <div className="mt-2.5 flex justify-end">
-                  <Button variant="secondary" onClick={() => setSettingsOpen(false)}>
-                    {t.back}
-                  </Button>
-                </div>
+                </SettingsGroup>
               </div>
             ) : agentPickList ? (
               <AgentPickView
