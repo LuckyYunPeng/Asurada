@@ -80,6 +80,10 @@ const DIFF_UNSAFE_CSS = `
 [data-line-type="change-deletion"][data-column-number] {
   --diffs-bg-deletion-number-override: var(--dw-del-number);
 }
+/* 色弱模式下改动词的蓝/橙高亮底较亮，灰色注释等语法色压在上面看不清，统一换成高对比文字色；--dw-emphasis-fg 只在色弱模式定义 */
+[data-diff-span], [data-diff-span] span {
+  color: var(--dw-emphasis-fg, inherit) !important;
+}
 /* 语法色降饱和，让红绿成为最显眼的颜色 */
 [data-code] [data-line] span:not([data-diff-span]) {
   filter: saturate(0.55);
