@@ -535,6 +535,11 @@ body {
   padding: 0 16px 16px;
 }
 
+/* 出现滚动条时，右边留白减去滚动条宽度，内容到面板右边缘的距离和左边一致 */
+.panel-body.is-scrollable .panel-body-inner {
+  padding-right: 10px;
+}
+
 /* Tauri macOS 的 WKWebView 走 webkit 伪元素 */
 .panel-body::-webkit-scrollbar {
   width: 6px;

@@ -353,7 +353,7 @@ function ProjectListBar({
   ];
 
   return (
-    <div className="mb-1.5 flex items-center justify-between px-1 text-xs text-muted-foreground">
+    <div className="-mt-1 mb-2.5 flex items-center justify-between px-1 text-xs text-muted-foreground">
       <span>{t.projectCount(count)}</span>
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
@@ -789,6 +789,7 @@ function App() {
   const cloudRef = useRef<HTMLDivElement>(null);
   const bodyInnerRef = useRef<HTMLDivElement>(null);
   const [bodyHeight, setBodyHeight] = useState<number | null>(null);
+  const [isBodyScrollable, setIsBodyScrollable] = useState(false);
   const [rowOrder, setRowOrder] = useState<string[]>([]);
   const [projectSort, setProjectSort] = useState(readProjectSort);
   // 重复添加时闪烁高亮的已有项目
@@ -1190,8 +1191,13 @@ function App() {
       setBodyHeight(null);
       return;
     }
-    const observer = new ResizeObserver(() => setBodyHeight(el.offsetHeight));
+    const body = el.parentElement!;
+    const observer = new ResizeObserver(() => {
+      setBodyHeight(el.offsetHeight);
+      setIsBodyScrollable(body.scrollHeight > body.clientHeight + 1);
+    });
     observer.observe(el);
+    observer.observe(body);
     return () => observer.disconnect();
   }, [panelOpen]);
 
@@ -1554,7 +1560,7 @@ function App() {
           ) : null}
 
           <div
-            className="panel-body"
+            className={`panel-body${isBodyScrollable ? " is-scrollable" : ""}`}
             style={bodyHeight === null ? undefined : { height: bodyHeight }}
           >
             <div ref={bodyInnerRef} className="panel-body-inner">
