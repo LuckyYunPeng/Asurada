@@ -7,7 +7,7 @@
 <meta name="description" content="Asurada 是停靠在 macOS 屏幕边缘的免费开源小工具：滤掉测试等噪音，只 Review AI 改动里的关键代码，看完一键生成提交信息并推送，多项目切换也顺滑。">
 <link rel="icon" href="./assets/logo.png">
 <link rel="apple-touch-icon" href="./assets/logo.png">
-<meta name="theme-color" content="#f4efe6">
+<meta name="theme-color" content="#e6d9bf">
 <!-- 语言靠 ?lang= 切换（见底部脚本）；不带参数时按浏览器语言 -->
 <link rel="canonical" href="https://asurada-4yq.pages.dev/">
 <link rel="alternate" hreflang="zh-CN" href="https://asurada-4yq.pages.dev/?lang=zh">
@@ -72,12 +72,12 @@
 <style>
   /* 信纸风格：暖纸底色、墨色文字、火漆红点缀，不用渐变和发光 */
   :root {
-    --paper: #f4efe6;
+    --paper: #e6d9bf; /* 信封色 */
     --sheet: #fffaf3;
     --ink: #1c1612;
     --note: #2a2420;
     --muted: #5a5048;
-    --line: #e3d6c4;
+    --line: #d4c3a3;
     --wax: #7f2d24;
     --radius: 1.25rem;
     /* 对齐 someonewrote：标题 Source Serif 4，正文 Atkinson Hyperlegible；中文标题用思源宋体接住，保持信笺感 */
@@ -111,7 +111,7 @@
     border-bottom: 1px solid transparent;
     transition: background .3s, border-color .3s;
   }
-  nav.is-scrolled { background: rgba(244, 239, 230, .94); border-bottom-color: var(--line); }
+  nav.is-scrolled { background: rgba(230, 217, 191, .94); border-bottom-color: var(--line); }
   .brand { display: flex; align-items: center; gap: 10px; font-size: 22px; letter-spacing: .02em; }
   .brand img { width: 30px; height: 30px; border-radius: 8px; }
   nav .links { display: flex; gap: 28px; color: var(--muted); font-size: 15px; align-items: center; }
