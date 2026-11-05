@@ -1,6 +1,20 @@
-# 更新日志
+# Changelog / 更新日志
 
-## v0.2.0（2026-11-05）
+## v0.2.0 (2026-11-05)
+
+### Features
+- UI supports Chinese and English (follows the system language by default; switchable in Settings). Generated commit messages follow the selected language.
+- Click the logo or brand name in the top-left to return to the project list.
+- New-user tip: on first use, a banner at the top of the panel says to click a project with changes to review the diff; it hides after you have used it.
+
+### Improvements
+- Default shortcut is now ⌃E (Control + E). Custom shortcuts already set are unchanged.
+- The “one click stages all changes, commits, and pushes” hint stops staying after the first successful commit.
+- More spacing in the diff window toolbar so English UI is less cramped.
+- Downloaded `.dmg` installers are Apple-notarized, so Gatekeeper no longer blocks opening them.
+
+### Fixes
+- Opening the diff window in dark mode no longer flashes white first.
 
 ### 新功能
 - 界面支持中文和英文，默认跟随系统语言，可在设置中切换；生成的提交信息也跟随所选语言
@@ -16,9 +30,24 @@
 ### 修复
 - 暗色模式下打开差异窗口时会先闪一下白色
 
-## v0.1.1（2026-11-05）
+## v0.1.1 (2026-11-05)
 
-首个公开发布版本。
+First public release.
+
+### Features
+- Edge-docked panel: expand/collapse, drag to reposition; global shortcut (default Option+Command+G, changeable in Settings).
+- One-click commit and push: `pi` writes the commit message; rejected pushes auto rebase and retry; conflicts are aborted safely.
+- Collapsed result bubble for commit outcomes, with running and pending-change status.
+- Diff window: directory tree of changed files, syntax highlighting and whole-word comparison; hide test files; color-vision-friendly mode.
+- Diff file context menu: Open, Open With, Reveal in Finder, copy path/name.
+- Settings: light / dark / system appearance, launch at login, confirm before commit.
+- In-app update check with one-click download, install, and restart.
+- Startup environment check for `pi`, `git`, and related tools.
+
+### Improvements
+- Apps launched from Finder can still find `pi` installed via nvm and similar tools.
+- Diff window stays pre-warmed for faster opens.
+- Neutral color palette and Geist typeface.
 
 ### 新功能
 - 屏幕边缘停靠面板：点击展开、收起，可拖动调整停靠位置；支持全局快捷键（默认 Option+Command+G，可在设置中修改）
