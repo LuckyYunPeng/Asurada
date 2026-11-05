@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Menu } from "@tauri-apps/api/menu";
@@ -9,6 +9,7 @@ import {
   isHighlighterLoaded,
   parsePatchFiles,
   preloadHighlighter,
+  DEFAULT_VIRTUAL_FILE_METRICS,
   type FileDiffMetadata,
   type SupportedLanguages,
 } from "@pierre/diffs";
@@ -126,6 +127,10 @@ function isTestFile(name: string) {
   return TEST_FILE_RE.test(name);
 }
 const SIDEBAR_WIDTH_KEY = "asurada.diffSidebarWidth";
+const CODE_ZOOM_KEY = "asurada.diffCodeZoom";
+// ⌘+ / ⌘- 只缩放代码字号，不用 WebView 整页缩放：整页缩放会让 diff 库的虚拟滚动反复重算，画面闪烁变形
+// 百分比，相对库默认的 13px 字号 / 20px 行高
+const CODE_ZOOMS = [80, 90, 100, 110, 125, 150];
 
 // 预热时先加载的语法，其余语言打开文件时按需加载
 const PRELOAD_LANGS: SupportedLanguages[] = ["typescript", "tsx", "javascript", "json", "css", "rust"];
@@ -174,6 +179,11 @@ function toEntries(diff: IProjectDiff): IDiffEntry[] {
       additions: file.hunks.reduce((n, h) => n + h.additionLines, 0),
       deletions: file.hunks.reduce((n, h) => n + h.deletionLines, 0),
     }));
+}
+
+/** 交给 git 的路径：重命名要带上旧路径，旧文件的删除才会一起提交 / 恢复 */
+function toPaths(entries: IDiffEntry[]) {
+  return entries.flatMap((e) => (e.file.prevName ? [e.file.name, e.file.prevName] : [e.file.name]));
 }
 
 interface ITreeDir {
@@ -244,8 +254,44 @@ interface IOpenWithApp {
   isDefault: boolean;
 }
 
+/** 勾选框；部分选中时显示横线（indeterminate 只能通过 DOM 属性设置） */
+function CommitCheck({
+  isChecked,
+  isMixed = false,
+  label,
+  onToggle,
+}: {
+  isChecked: boolean;
+  isMixed?: boolean;
+  label: string;
+  onToggle: () => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.indeterminate = isMixed;
+    }
+  }, [isMixed]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      className="dw-check"
+      aria-label={label}
+      checked={isChecked}
+      onChange={onToggle}
+    />
+  );
+}
+
 /** 文件 / 目录行的右键菜单，用系统原生菜单。relPath 是相对项目根的路径，删除的文件没有「打开」类操作 */
-async function popupPathMenu(root: string, relPath: string, kind: "file" | "dir", isDeleted: boolean) {
+async function popupPathMenu(
+  root: string,
+  relPath: string,
+  kind: "file" | "dir",
+  isDeleted: boolean,
+  onDiscard: (() => void) | null,
+) {
   const absPath = `${root}/${relPath}`;
   const t = getMessages();
   const run = (label: string, action: () => Promise<unknown>) => () => {
@@ -293,6 +339,9 @@ async function popupPathMenu(root: string, relPath: string, kind: "file" | "dir"
             invoke("copy_text", { text: relPath.slice(relPath.lastIndexOf("/") + 1) }),
           ),
         },
+        { item: "Separator" },
+        // 提交中不能丢弃
+        { text: t.menuDiscard, enabled: onDiscard !== null, action: () => onDiscard?.() },
       ],
     });
     await menu.popup();
@@ -307,6 +356,8 @@ const FileItem = memo(function FileItem({
   name,
   depth,
   isActive,
+  isChecked,
+  onToggleCheck,
   onSelect,
   onPrefetch,
   onContextMenu,
@@ -315,12 +366,19 @@ const FileItem = memo(function FileItem({
   name: string;
   depth: number;
   isActive: boolean;
+  isChecked: boolean;
+  onToggleCheck: (names: string[]) => void;
   onSelect: (name: string) => void;
   onPrefetch: (entry: IDiffEntry) => void;
   onContextMenu: (relPath: string, kind: "file" | "dir", isDeleted: boolean) => void;
 }) {
   return (
-    <li>
+    <li className="dw-row">
+      <CommitCheck
+        isChecked={isChecked}
+        label={getMessages().selectForCommit}
+        onToggle={() => onToggleCheck([entry.file.name])}
+      />
       <button
         type="button"
         className={isActive ? "is-active" : undefined}
@@ -351,18 +409,31 @@ function DirItem({
   name,
   depth,
   isCollapsed,
+  checkedCount,
+  names,
   onToggle,
+  onToggleCheck,
   onContextMenu,
 }: {
   path: string;
   name: string;
   depth: number;
   isCollapsed: boolean;
+  checkedCount: number;
+  /** 目录下全部文件，含隐藏的测试文件和被筛选掉的 */
+  names: string[];
   onToggle: (path: string) => void;
+  onToggleCheck: (names: string[]) => void;
   onContextMenu: (relPath: string, kind: "file" | "dir", isDeleted: boolean) => void;
 }) {
   return (
-    <li>
+    <li className="dw-row">
+      <CommitCheck
+        isChecked={checkedCount === names.length}
+        isMixed={checkedCount > 0 && checkedCount < names.length}
+        label={getMessages().selectForCommit}
+        onToggle={() => onToggleCheck(names)}
+      />
       <button
         type="button"
         className="dw-dir"
@@ -403,8 +474,14 @@ function DiffView({ projectId }: { projectId: string }) {
   const [isShowTests, setIsShowTests] = useState(
     () => localStorage.getItem(SHOW_TESTS_KEY) === "1",
   );
+  const [codeZoom, setCodeZoom] = useState(() => {
+    const saved = Number(localStorage.getItem(CODE_ZOOM_KEY));
+    return CODE_ZOOMS.includes(saved) ? saved : 100;
+  });
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [collapsedDirs, setCollapsedDirs] = useState<Set<string>>(() => new Set());
+  // 记取消勾选的文件而不是勾选的：AI 新改的文件默认勾上，刷新后用户取消的保持取消
+  const [uncheckedNames, setUncheckedNames] = useState<Set<string>>(() => new Set());
   // 首次语法高亮完成前，库会画灰色骨架线；用 logo 动画盖住。窗口已预热时高亮器早就加载好了
   const [isRendered, setIsRendered] = useState(isHighlighterLoaded);
   const { t } = useLanguage();
@@ -500,12 +577,58 @@ function DiffView({ projectId }: { projectId: string }) {
   // 传给 memo 的行组件，引用要稳定
   const onPathContextMenu = useCallback(
     (relPath: string, kind: "file" | "dir", isDeleted: boolean) => {
-      if (projectRoot) {
-        void popupPathMenu(projectRoot, relPath, kind, isDeleted);
+      if (!projectRoot) {
+        return;
       }
+      // 目录作用于下面所有文件，含隐藏的测试文件；重命名要连旧路径一起恢复
+      const targets = entries.filter((e) =>
+        kind === "file" ? e.file.name === relPath : e.file.name.startsWith(`${relPath}/`),
+      );
+      void popupPathMenu(
+        projectRoot,
+        relPath,
+        kind,
+        isDeleted,
+        isCommitting ? null : () => void onDiscard(targets),
+      );
     },
-    [projectRoot],
+    // onDiscard 每次渲染都会重建，只依赖 t、projectId、fetchDiff
+    [projectRoot, entries, isCommitting, t, projectId, fetchDiff],
   );
+
+  async function onDiscard(targets: IDiffEntry[]) {
+    try {
+      if (
+        !(await ask(t.confirmDiscardDetail, {
+          title: t.confirmDiscardTitle(targets.length),
+          kind: "warning",
+          okLabel: t.discard,
+          cancelLabel: t.cancel,
+        }))
+      ) {
+        return;
+      }
+      await invoke("discard_changes", { id: projectId, paths: toPaths(targets) });
+      showToast("ok", t.discarded);
+    } catch (e) {
+      console.error("丢弃改动失败", e);
+      showToast("err", t.discardFailed, String(e));
+    }
+    void fetchDiff();
+  }
+
+  const onToggleCheck = useCallback((names: string[]) => {
+    setUncheckedNames((prev) => {
+      const next = new Set(prev);
+      // 全部勾着就全取消，否则全勾上
+      if (names.every((n) => !prev.has(n))) {
+        names.forEach((n) => next.add(n));
+      } else {
+        names.forEach((n) => next.delete(n));
+      }
+      return next;
+    });
+  }, []);
 
   async function onOpenInEditor(name: string) {
     if (!diff) {
@@ -533,6 +656,7 @@ function DiffView({ projectId }: { projectId: string }) {
         return;
       }
       if (payload.result?.success) {
+        setUncheckedNames(new Set());
         showToast("ok", getMessages().pushed, payload.result.commitMessage ?? undefined);
       } else {
         showToast("err", getMessages().commitFailed, payload.result?.error ?? undefined);
@@ -549,7 +673,7 @@ function DiffView({ projectId }: { projectId: string }) {
       // diff 窗口是普通窗口，用系统确认框；附在本窗口上，不会抢走主面板
       if (
         isConfirmCommitEnabled() &&
-        !(await ask(t.confirmCommitDetail, {
+        !(await ask(isPartial ? t.confirmCommitSelectedDetail(checkedEntries.length) : t.confirmCommitDetail, {
           title: t.confirmCommitTitle,
           kind: "warning",
           okLabel: t.commit,
@@ -558,7 +682,12 @@ function DiffView({ projectId }: { projectId: string }) {
       ) {
         return;
       }
-      await invoke<CommitPushResult>("run_commit_push", { id: projectId, language: readLanguage() });
+      await invoke<CommitPushResult>("run_commit_push", {
+        id: projectId,
+        language: readLanguage(),
+        // 全选时走原来的「提交全部」，期间新出现的改动也会带上
+        paths: isPartial ? toPaths(checkedEntries) : null,
+      });
     } catch (e) {
       console.error("提交并推送失败", e);
       showToast("err", t.commitFailed, String(e));
@@ -577,6 +706,20 @@ function DiffView({ projectId }: { projectId: string }) {
     }
     setIsPulling(false);
   }
+
+  const checkedEntries = useMemo(
+    () => entries.filter((e) => !uncheckedNames.has(e.file.name)),
+    [entries, uncheckedNames],
+  );
+  const isPartial = checkedEntries.length < entries.length;
+  const hiddenCheckedCount = isShowTests
+    ? 0
+    : checkedEntries.filter((e) => isTestFile(e.file.name)).length;
+  const commitLabel = isCommitting
+    ? t.committing
+    : isPartial
+      ? t.commitSelected(checkedEntries.length, hiddenCheckedCount)
+      : t.commitPush;
 
   const testCount = useMemo(
     () => entries.filter((e) => isTestFile(e.file.name)).length,
@@ -650,8 +793,40 @@ function DiffView({ projectId }: { projectId: string }) {
     };
   }, [visibleEntries, workerPool]);
 
+  const dirNames = (path: string) =>
+    entries.filter((e) => e.file.name.startsWith(`${path}/`)).map((e) => e.file.name);
+
   const totalAdditions = countedEntries.reduce((n, e) => n + e.additions, 0);
   const totalDeletions = countedEntries.reduce((n, e) => n + e.deletions, 0);
+
+  // 虚拟滚动按 metrics.lineHeight 估算位置，必须和 CSS 行高一致
+  const codeLineHeight = Math.round((20 * codeZoom) / 100);
+
+  function onChangeCodeZoom(next: number) {
+    setCodeZoom(next);
+    localStorage.setItem(CODE_ZOOM_KEY, String(next));
+  }
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.metaKey) {
+        return;
+      }
+      const index = CODE_ZOOMS.indexOf(codeZoom);
+      if (event.key === "=" || event.key === "+") {
+        onChangeCodeZoom(CODE_ZOOMS[Math.min(index + 1, CODE_ZOOMS.length - 1)]);
+      } else if (event.key === "-") {
+        onChangeCodeZoom(CODE_ZOOMS[Math.max(index - 1, 0)]);
+      } else if (event.key === "0") {
+        onChangeCodeZoom(100);
+      } else {
+        return;
+      }
+      event.preventDefault();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [codeZoom]);
 
   // ↑/↓ 在当前筛选结果里切换文件；筛选框里输入时也可用
   useEffect(() => {
@@ -683,7 +858,16 @@ function DiffView({ projectId }: { projectId: string }) {
   }, [treeFiles, selected]);
 
   return (
-    <div className={isColorblind ? "dw is-colorblind" : "dw"}>
+    <div
+      className={isColorblind ? "dw is-colorblind" : "dw"}
+      style={
+        {
+          "--diffs-font-size": `${Math.round((13 * codeZoom) / 100)}px`,
+          "--diffs-line-height": `${codeLineHeight}px`,
+          "--dw-zoom": codeZoom / 100,
+        } as React.CSSProperties
+      }
+    >
       <header className="dw-top" data-tauri-drag-region>
         <div className="dw-title" data-tauri-drag-region>
           <div className="dw-brand" data-tauri-drag-region>
@@ -769,15 +953,15 @@ function DiffView({ projectId }: { projectId: string }) {
                 <Button
                   variant="outline"
                   size="icon-sm"
-                  aria-label={isCommitting ? t.committing : t.commitPush}
-                  disabled={isCommitting || isPulling || !entries.length}
+                  aria-label={commitLabel}
+                  disabled={isCommitting || isPulling || !checkedEntries.length}
                   onClick={() => void onCommit()}
                 >
                   {isCommitting ? <Loader2 className="animate-spin" /> : <CloudUpload />}
                 </Button>
               </span>
             </TooltipTrigger>
-            <TooltipContent side="bottom">{isCommitting ? t.committing : t.commitPush}</TooltipContent>
+            <TooltipContent side="bottom">{commitLabel}</TooltipContent>
           </Tooltip>
         </div>
       </header>
@@ -810,6 +994,19 @@ function DiffView({ projectId }: { projectId: string }) {
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
             />
+            <p className="dw-selected">
+              {t.selectedCount(checkedEntries.length, entries.length)}
+              <button
+                type="button"
+                onClick={() =>
+                  setUncheckedNames(
+                    isPartial ? new Set() : new Set(entries.map((e) => e.file.name)),
+                  )
+                }
+              >
+                {isPartial ? t.selectAll : t.deselectAll}
+              </button>
+            </p>
             <ul className="dw-files">
               {treeRows.map((row) =>
                 row.kind === "dir" ? (
@@ -819,7 +1016,10 @@ function DiffView({ projectId }: { projectId: string }) {
                     name={row.name}
                     depth={row.depth}
                     isCollapsed={collapsedDirs.has(row.path)}
+                    names={dirNames(row.path)}
+                    checkedCount={dirNames(row.path).filter((n) => !uncheckedNames.has(n)).length}
                     onToggle={onToggleDir}
+                    onToggleCheck={onToggleCheck}
                     onContextMenu={onPathContextMenu}
                   />
                 ) : (
@@ -829,6 +1029,8 @@ function DiffView({ projectId }: { projectId: string }) {
                     name={row.name}
                     depth={row.depth}
                     isActive={row.entry === selected}
+                    isChecked={!uncheckedNames.has(row.entry.file.name)}
+                    onToggleCheck={onToggleCheck}
                     onSelect={setSelectedName}
                     onPrefetch={onPrefetch}
                     onContextMenu={onPathContextMenu}
@@ -840,6 +1042,38 @@ function DiffView({ projectId }: { projectId: string }) {
           </aside>
 
           <div className="dw-diff">
+            {/* 浮在代码区底部正中，不占布局高度；两侧快捷键也能点 */}
+            <div className="dw-zoom">
+              <button
+                type="button"
+                aria-label={t.zoomOut}
+                disabled={codeZoom === CODE_ZOOMS[0]}
+                onClick={() => onChangeCodeZoom(CODE_ZOOMS[CODE_ZOOMS.indexOf(codeZoom) - 1])}
+              >
+                <kbd>⌘−</kbd>
+              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="dw-zoom-value"
+                    aria-label={t.codeZoomTip}
+                    onClick={() => onChangeCodeZoom(100)}
+                  >
+                    {codeZoom}%
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">{t.codeZoomTip}</TooltipContent>
+              </Tooltip>
+              <button
+                type="button"
+                aria-label={t.zoomIn}
+                disabled={codeZoom === CODE_ZOOMS[CODE_ZOOMS.length - 1]}
+                onClick={() => onChangeCodeZoom(CODE_ZOOMS[CODE_ZOOMS.indexOf(codeZoom) + 1])}
+              >
+                <kbd>⌘+</kbd>
+              </button>
+            </div>
             {isRendered ? null : (
               <div className="dw-loading">
                 <LogoLoading />
@@ -848,13 +1082,15 @@ function DiffView({ projectId }: { projectId: string }) {
             {selected ? (
             /* key 随文件变化，切换文件时滚动位置回到顶部 */
             <Virtualizer
-              key={selected.file.name}
+              // 字号变了要重建：库只在创建时读取 metrics
+              key={`${selected.file.name}:${codeZoom}`}
               className="dw-scroll"
               contentClassName="dw-content"
             >
               <section className="dw-file">
                 <FileDiff
                   fileDiff={selected.file}
+                  metrics={{ ...DEFAULT_VIRTUAL_FILE_METRICS, lineHeight: codeLineHeight }}
                   options={{
                     theme: DIFF_THEME,
                     themeType: isDark ? "dark" : "light",

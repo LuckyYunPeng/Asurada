@@ -94,6 +94,9 @@ const zh = {
   hiddenCount: (count: number) => `已隐藏 ${count}`,
   hideTestsTip: "只影响列表显示，提交时测试文件仍会一起提交",
   refresh: "刷新",
+  codeZoomTip: "点击恢复 100%（⌘0）",
+  zoomIn: "放大代码",
+  zoomOut: "缩小代码",
   loadDiffFailed: "读取变更失败",
   retry: "重试",
   workingTreeClean: "工作区很干净，没有要提交的变更",
@@ -111,6 +114,19 @@ const zh = {
   menuCopyPath: "复制路径",
   menuCopyRelativePath: "复制相对路径",
   menuCopyName: "复制名称",
+  menuDiscard: "丢弃改动…",
+  confirmDiscardTitle: (count: number) => `丢弃 ${count} 个文件的改动？`,
+  confirmDiscardDetail: "文件会恢复到上次提交时的样子，新增的文件会被删除。无法撤销。",
+  discard: "丢弃",
+  discarded: "已丢弃改动",
+  discardFailed: "丢弃失败",
+  selectForCommit: "选中以提交",
+  selectAll: "全选",
+  deselectAll: "全不选",
+  selectedCount: (count: number, total: number) => `已选 ${count}/${total}`,
+  commitSelected: (count: number, hiddenCount: number) =>
+    `提交选中的 ${count} 个文件并推送${hiddenCount ? `（含 ${hiddenCount} 个隐藏的测试文件）` : ""}`,
+  confirmCommitSelectedDetail: (count: number) => `只会提交选中的 ${count} 个文件并推送到远端，其余改动留在工作区。`,
   // 引导与环境检查
   introSteps: [
     {
@@ -215,6 +231,9 @@ const en: TMessages = {
   hiddenCount: (count) => `${count} hidden`,
   hideTestsTip: "Only affects the list; test files are still committed",
   refresh: "Refresh",
+  codeZoomTip: "Click to reset to 100% (⌘0)",
+  zoomIn: "Zoom in code",
+  zoomOut: "Zoom out code",
   loadDiffFailed: "Failed to load changes",
   retry: "Retry",
   workingTreeClean: "Working tree clean, nothing to commit",
@@ -232,6 +251,20 @@ const en: TMessages = {
   menuCopyPath: "Copy Path",
   menuCopyRelativePath: "Copy Relative Path",
   menuCopyName: "Copy Name",
+  menuDiscard: "Discard Changes…",
+  confirmDiscardTitle: (count) => (count === 1 ? "Discard changes in 1 file?" : `Discard changes in ${count} files?`),
+  confirmDiscardDetail: "Files go back to the last commit and new files are deleted. This can't be undone.",
+  discard: "Discard",
+  discarded: "Changes discarded",
+  discardFailed: "Discard failed",
+  selectForCommit: "Select for commit",
+  selectAll: "Select all",
+  deselectAll: "Deselect all",
+  selectedCount: (count, total) => `${count}/${total} selected`,
+  commitSelected: (count, hiddenCount) =>
+    `Commit and push ${count === 1 ? "1 selected file" : `${count} selected files`}${hiddenCount ? ` (incl. ${hiddenCount} hidden test files)` : ""}`,
+  confirmCommitSelectedDetail: (count) =>
+    `Only the ${count === 1 ? "selected file" : `${count} selected files`} will be committed and pushed; other changes stay in the working tree.`,
   introSteps: [
     {
       title: "Reviewing means switching projects",

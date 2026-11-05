@@ -1,5 +1,5 @@
 use crate::git::{
-    git_add_commit_push, git_is_clean, git_pull, git_last_commit_subject, git_working_diff, run_pi_print,
+    git_add_commit_push, git_discard, git_is_clean, git_pull, git_last_commit_subject, git_working_diff, run_pi_print,
 };
 use crate::preflight::{self, PreflightResult};
 use crate::settings::{load_diff_window_size, save_diff_window_size, MIN_DIFF_WINDOW_SIZE};
@@ -437,6 +437,7 @@ pub async fn run_commit_push(
     app: tauri::AppHandle,
     id: String,
     language: String,
+    paths: Option<Vec<String>>,
 ) -> Result<CommitPushResult, String> {
     let is_new = COMMITTING
         .lock()
@@ -451,7 +452,7 @@ pub async fn run_commit_push(
         CommitPushEvent { id: id.clone(), phase: "running", result: None },
     );
 
-    let result = commit_push(&app, &id, &language).unwrap_or_else(|e| CommitPushResult {
+    let result = commit_push(&app, &id, &language, paths.as_deref()).unwrap_or_else(|e| CommitPushResult {
         success: false,
         commit_message: None,
         push_output: String::new(),
@@ -474,7 +475,26 @@ pub async fn run_pull(app: tauri::AppHandle, id: String) -> Result<String, Strin
     git_pull(&PathBuf::from(&find_project(&app, &id)?.path))
 }
 
-fn commit_push(app: &tauri::AppHandle, id: &str, language: &str) -> Result<CommitPushResult, String> {
+/// 丢弃这些文件的改动，不可撤销；提交中的项目不允许丢弃
+#[tauri::command]
+pub async fn discard_changes(app: tauri::AppHandle, id: String, paths: Vec<String>) -> Result<(), String> {
+    let is_committing = COMMITTING
+        .lock()
+        .unwrap()
+        .as_ref()
+        .is_some_and(|set| set.contains(&id));
+    if is_committing {
+        return Err("该项目正在提交中".to_string());
+    }
+    git_discard(&PathBuf::from(&find_project(&app, &id)?.path), &paths)
+}
+
+fn commit_push(
+    app: &tauri::AppHandle,
+    id: &str,
+    language: &str,
+    paths: Option<&[String]>,
+) -> Result<CommitPushResult, String> {
     let project = find_project(app, id)?;
     let path = PathBuf::from(&project.path);
     if git_is_clean(&path)? {
@@ -486,8 +506,8 @@ fn commit_push(app: &tauri::AppHandle, id: &str, language: &str) -> Result<Commi
         });
     }
 
-    let commit_message = run_pi_print(&path, language)?;
-    let push_output = git_add_commit_push(&path, &commit_message)?;
+    let commit_message = run_pi_print(&path, language, paths)?;
+    let push_output = git_add_commit_push(&path, &commit_message, paths)?;
 
     Ok(CommitPushResult {
         success: true,

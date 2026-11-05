@@ -57,6 +57,7 @@ pub fn run() {
             commands::preflight,
             commands::run_commit_push,
             commands::run_pull,
+            commands::discard_changes,
             commands::get_committing_ids,
             commands::get_project_diff,
             commands::open_diff_window,
