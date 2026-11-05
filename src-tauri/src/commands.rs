@@ -4,6 +4,7 @@ use crate::git::{
 use crate::preflight::{self, PreflightResult};
 use crate::agents::{self, AgentInfo};
 use crate::commit_prompt;
+use crate::prewarm;
 use crate::scan;
 use crate::settings::{
     load_agent, load_diff_window_size, save_agent, save_diff_window_size, MIN_DIFF_WINDOW_SIZE,
@@ -613,7 +614,10 @@ fn commit_push(
     let spec = agents::resolve(load_agent(&app_data_dir(app)?).as_deref())
         .ok_or_else(|| "没有可用的 AI Agent，请在设置里选择".to_string())?;
     let prompt = commit_prompt::build(&path, language, paths)?;
-    let commit_message = agents::run_agent(spec, &prompt, agents::COMMIT_TIMEOUT)?;
+    let commit_message = match prewarm::take(id, prewarm::key(spec.id, &prompt)) {
+        Some(message) => message,
+        None => agents::run_agent(spec, &prompt, agents::COMMIT_TIMEOUT)?,
+    };
     let push_output = git_add_commit_push(&path, &commit_message, paths)?;
 
     Ok(CommitPushResult {
@@ -622,6 +626,43 @@ fn commit_push(
         push_output,
         error: None,
     })
+}
+
+/// 前端按设置里的间隔调用（可关）：改动停下来的项目在后台预生成提交信息，见 prewarm.rs
+#[tauri::command]
+pub async fn prewarm_commit_messages(app: tauri::AppHandle, language: String) -> Result<(), String> {
+    let Some(spec) = agents::resolve(load_agent(&app_data_dir(&app)?).as_deref()) else {
+        return Ok(());
+    };
+    for project in load_projects(&app_data_dir(&app)?)? {
+        if get_committing_ids().contains(&project.id) {
+            continue;
+        }
+        let path = PathBuf::from(&project.path);
+        if git_is_clean(&path).unwrap_or(true) {
+            prewarm::forget(&project.id);
+            continue;
+        }
+        let prompt = match commit_prompt::build(&path, &language, None) {
+            Ok(prompt) => prompt,
+            Err(e) => {
+                eprintln!("Asurada: 预生成读取改动失败 {} ({e})", project.path);
+                continue;
+            }
+        };
+        let hash = prewarm::key(spec.id, &prompt);
+        // 同时只跑一个 Agent，其余项目等下个周期（should_generate 在有进行中的任务时返回 false）
+        if prewarm::should_generate(&project.id, hash) {
+            std::thread::spawn(move || {
+                let result = agents::run_agent(spec, &prompt, agents::COMMIT_TIMEOUT);
+                if let Err(e) = &result {
+                    eprintln!("Asurada: 预生成提交信息失败 {} ({e})", project.path);
+                }
+                prewarm::finish(&project.id, hash, result.ok());
+            });
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize)]

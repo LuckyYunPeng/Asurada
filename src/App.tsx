@@ -28,6 +28,7 @@ import { Toaster } from "@/components/ui/sonner";
 import {
   Check,
   ChevronRight,
+  CircleAlert,
   CloudDownload,
   Copy,
   CloudUpload,
@@ -57,7 +58,16 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ThemeModeEnum, useThemeMode } from "./theme";
-import { CONFIRM_COMMIT_KEY, isConfirmCommitEnabled } from "./commitConfirm";
+import {
+  CONFIRM_COMMIT_KEY,
+  isConfirmCommitEnabled,
+  isPrewarmCommitEnabled,
+  PREWARM_COMMIT_KEY,
+  PREWARM_INTERVAL_KEY,
+  PREWARM_INTERVAL_RANGE,
+  readPrewarmInterval,
+} from "./commitConfirm";
+import { Slider } from "@/components/ui/slider";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Select,
@@ -426,6 +436,58 @@ function SettingsConfirmCommitRow() {
   );
 }
 
+function SettingsPrewarmCommitRow() {
+  const [isEnabled, setIsEnabled] = useState(isPrewarmCommitEnabled);
+  const [intervalSeconds, setIntervalSeconds] = useState(readPrewarmInterval);
+  const { t } = useLanguage();
+
+  function onTogglePrewarmCommit() {
+    localStorage.setItem(PREWARM_COMMIT_KEY, isEnabled ? "0" : "1");
+    setIsEnabled(!isEnabled);
+  }
+
+  function onChangePrewarmInterval([seconds]: number[]) {
+    localStorage.setItem(PREWARM_INTERVAL_KEY, String(seconds));
+    setIntervalSeconds(seconds);
+  }
+
+  return (
+    <>
+      <label className={`${SETTINGS_ROW_CLASS} cursor-pointer`}>
+        <span className="flex items-center gap-1">
+          {t.prewarmCommitMessage}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <CircleAlert className="size-3.5 text-(--ink-3)" aria-label={t.prewarmCommitMessageTip} />
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-[260px] whitespace-pre-wrap">
+              {t.prewarmCommitMessageTip}
+            </TooltipContent>
+          </Tooltip>
+        </span>
+        <Switch checked={isEnabled} onCheckedChange={onTogglePrewarmCommit} />
+      </label>
+      {isEnabled ? (
+        <div className={SETTINGS_ROW_CLASS}>
+          <span className="flex-none">{t.prewarmInterval}</span>
+          <Slider
+            className="max-w-[140px]"
+            min={PREWARM_INTERVAL_RANGE.min}
+            max={PREWARM_INTERVAL_RANGE.max}
+            step={PREWARM_INTERVAL_RANGE.step}
+            value={[intervalSeconds]}
+            onValueChange={onChangePrewarmInterval}
+            aria-label={t.prewarmInterval}
+          />
+          <span className="w-11 flex-none text-right tabular-nums">
+            {t.seconds(intervalSeconds)}
+          </span>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 /** 设置里的版本行：显示当前版本，点「检查更新」查 GitHub Release；有新版本时变成「更新到 x.y.z」，点了下载安装并重启 */
 function SettingsUpdateRow({
   skipInvoke,
@@ -786,6 +848,27 @@ function App() {
     }, 30_000);
     return () => window.clearInterval(timer);
   }, [panelOpen, introComplete, refreshList]);
+
+  // 后台预生成提交信息：后端只在改动连续两次不变时生成，没有改动不生成。
+  // 每轮现读设置里的间隔，改了下一轮生效
+  useEffect(() => {
+    if (captureBoot || !inMain) {
+      return;
+    }
+    let timer = 0;
+    function schedule() {
+      timer = window.setTimeout(() => {
+        if (isPrewarmCommitEnabled()) {
+          invoke("prewarm_commit_messages", { language: readLanguage() }).catch((e) =>
+            console.error("预生成提交信息失败", e),
+          );
+        }
+        schedule();
+      }, readPrewarmInterval() * 1000);
+    }
+    schedule();
+    return () => window.clearTimeout(timer);
+  }, [inMain]);
 
   const runPreflight = useCallback(async () => {
     if (captureBoot?.skipInvoke) return;
@@ -1421,6 +1504,7 @@ function App() {
                     skipInvoke={captureBoot?.skipInvoke}
                   />
                   <SettingsConfirmCommitRow />
+                  <SettingsPrewarmCommitRow />
                   <SettingsAutostartRow skipInvoke={captureBoot?.skipInvoke} />
                   <SettingsUpdateRow
                     skipInvoke={captureBoot?.skipInvoke}

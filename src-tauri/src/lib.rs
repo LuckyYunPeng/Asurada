@@ -3,6 +3,7 @@ mod commands;
 mod commit_prompt;
 mod git;
 mod preflight;
+mod prewarm;
 mod scan;
 mod settings;
 mod store;
@@ -64,6 +65,7 @@ pub fn run() {
             commands::set_agent,
             commands::test_agent,
             commands::run_commit_push,
+            commands::prewarm_commit_messages,
             commands::run_pull,
             commands::discard_changes,
             commands::get_committing_ids,

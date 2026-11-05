@@ -20,6 +20,11 @@ const zh = {
   customSize: "（自定义）",
   launchAtLogin: "开机自动启动",
   confirmBeforeCommit: "提交前确认",
+  prewarmCommitMessage: "后台预生成提交信息",
+  prewarmCommitMessageTip:
+    "项目有改动，并且在一个检查间隔内没再变时，提前在后台生成提交信息，点提交时直接使用，不用等 AI Agent。没有改动时不会生成。会额外调用 Agent，消耗一些额度。",
+  prewarmInterval: "检查间隔",
+  seconds: (count: number) => `${count} 秒`,
   appearance: "外观",
   themeLight: "亮色",
   themeDark: "深色",
@@ -197,6 +202,11 @@ const en: TMessages = {
   customSize: " (custom)",
   launchAtLogin: "Launch at login",
   confirmBeforeCommit: "Confirm before commit",
+  prewarmCommitMessage: "Pre-generate commit messages",
+  prewarmCommitMessageTip:
+    "When a project's changes stay the same for one check interval, Asurada writes the commit message in the background, so committing doesn't wait for your AI agent. Nothing is generated when there are no changes. This makes extra agent calls and uses some of your quota.",
+  prewarmInterval: "Check interval",
+  seconds: (count) => `${count}s`,
   appearance: "Appearance",
   themeLight: "Light",
   themeDark: "Dark",
