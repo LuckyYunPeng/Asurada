@@ -30,3 +30,8 @@ dist-ssr
 # 给 AI agent 的本地工作说明，不进开源仓库
 AGENTS.md
 CLAUDE.md
+
+# tsc 的构建产物（tsconfig.node.json 是 composite，会生成这些）
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
