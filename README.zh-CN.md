@@ -63,11 +63,11 @@ Asurada 引导你只 Review 重点，把剩下的杂事自动做完。
 
 ## 安装
 
-1. 从 [Releases](https://github.com/LuckyYunPeng/asurada/releases) 下载最新的 `.dmg`。
+1. 从 [Releases](https://github.com/LuckyYunPeng/asurada/releases) 下载最新的 `.dmg`。Apple Silicon 选 `*_aarch64.dmg`，Intel 选 `*_x64.dmg`。
 2. 打开后把 **Asurada** 拖进「应用程序」。
 3. 首次打开会有简短引导，并自动检查运行环境。
 
-使用前需要本机已安装 `git`，以及任意一个 AI Agent 命令行工具（用来生成提交信息）：pi、Claude Code、Codex、Grok、OpenCode 或 Kimi，可在设置里选择用哪个。目前仅支持 Apple Silicon 的 Mac。
+使用前需要本机已安装 `git`，以及任意一个 AI Agent 命令行工具（用来生成提交信息）：pi、Claude Code、Codex、Grok、OpenCode 或 Kimi，可在设置里选择用哪个。支持 Apple Silicon 与 Intel 的 Mac。
 
 ## 许可证
 
