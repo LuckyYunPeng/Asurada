@@ -26,3 +26,7 @@ dist-ssr
 # 签名证书和公证密钥，绝不能提交
 *.p8
 *.p12
+
+# 给 AI agent 的本地工作说明，不进开源仓库
+AGENTS.md
+CLAUDE.md
