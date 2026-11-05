@@ -27,7 +27,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useThemeMode } from "./theme";
 import { getMessages, readLanguage, useLanguage } from "./i18n";
@@ -42,8 +41,6 @@ interface IProjectDiff {
   patch: string;
   untracked: string[];
 }
-
-type TDiffStyle = "unified" | "split";
 
 interface IDiffEntry {
   file: FileDiffMetadata;
@@ -118,7 +115,6 @@ const WORKER_POOL_OPTIONS = {
 };
 const HIGHLIGHTER_OPTIONS = { theme: DIFF_THEME, lineDiffType: LINE_DIFF_TYPE } as const;
 
-const DIFF_STYLE_KEY = "asurada.diffStyle";
 const SHOW_TESTS_KEY = "asurada.diffShowTests";
 const COLORBLIND_KEY = "asurada.diffColorblind";
 
@@ -395,9 +391,6 @@ function DiffView({ projectId }: { projectId: string }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isCommitting, setIsCommitting] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
-  const [diffStyle, setDiffStyle] = useState<TDiffStyle>(
-    () => (localStorage.getItem(DIFF_STYLE_KEY) as TDiffStyle | null) ?? "unified",
-  );
   const [sidebarWidth, setSidebarWidth] = useState(
     () => Number(localStorage.getItem(SIDEBAR_WIDTH_KEY)) || 260,
   );
@@ -475,11 +468,6 @@ function DiffView({ projectId }: { projectId: string }) {
   function onToggleColorblind() {
     setIsColorblind(!isColorblind);
     localStorage.setItem(COLORBLIND_KEY, isColorblind ? "0" : "1");
-  }
-
-  function onChangeDiffStyle(style: TDiffStyle) {
-    setDiffStyle(style);
-    localStorage.setItem(DIFF_STYLE_KEY, style);
   }
 
   function onResizeStart(event: React.PointerEvent<HTMLDivElement>) {
@@ -742,26 +730,6 @@ function DiffView({ projectId }: { projectId: string }) {
               {t.hideTestsTip}
             </TooltipContent>
           </Tooltip>
-          <ToggleGroup
-            type="single"
-            size="sm"
-            variant="outline"
-            spacing={0}
-            value={diffStyle}
-            aria-label={t.diffLayout}
-            onValueChange={(v) => {
-              if (v) {
-                onChangeDiffStyle(v as TDiffStyle);
-              }
-            }}
-          >
-            <ToggleGroupItem value="unified" className="px-3 text-xs">
-              {t.diffUnified}
-            </ToggleGroupItem>
-            <ToggleGroupItem value="split" className="px-3 text-xs">
-              {t.diffSplit}
-            </ToggleGroupItem>
-          </ToggleGroup>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -890,7 +858,7 @@ function DiffView({ projectId }: { projectId: string }) {
                   options={{
                     theme: DIFF_THEME,
                     themeType: isDark ? "dark" : "light",
-                    diffStyle,
+                    diffStyle: "split",
                     overflow: "scroll",
                     // 行首用 +/- 号，不靠颜色也能分清增删
                     diffIndicators: "classic",
