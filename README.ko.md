@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://asurada-4yq.pages.dev/"><img src="https://img.shields.io/badge/%EC%9B%B9%EC%82%AC%EC%9D%B4%ED%8A%B8-asurada--4yq.pages.dev-8b5cf6" alt="웹사이트"></a>
-  <a href="https://github.com/LuckyYunPeng/asurada/actions/workflows/build-macos.yml"><img src="https://github.com/LuckyYunPeng/asurada/actions/workflows/build-macos.yml/badge.svg" alt="Build macOS"></a>
+  <a href="https://github.com/LuckyYunPeng/Asurada/releases/latest"><img src="https://img.shields.io/github/v/release/LuckyYunPeng/Asurada" alt="Latest release"></a>
   <a href="https://github.com/LuckyYunPeng/asurada/releases"><img src="https://img.shields.io/github/downloads/LuckyYunPeng/asurada/total" alt="Downloads"></a>
 </p>
 
