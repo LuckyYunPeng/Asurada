@@ -32,6 +32,7 @@ perl -0pi -e "s/^version = \"\Q$CURRENT\E\"/version = \"$VERSION\"/m" src-tauri/
 perl -0pi -e "s/(name = \"asurada\"\nversion = )\"\Q$CURRENT\E\"/\$1\"$VERSION\"/" src-tauri/Cargo.lock
 
 # 新版本说明放在最前面；CI 按「## vX.Y.Z」标题截取这一段作为 Release 正文和应用内更新说明
+# 以后的更新说明必须英中双语、先英后中，结构和 CHANGELOG.md 一致（### Features/Improvements/Fixes，然后 ### 新功能/改进/修复）。
 [[ -f CHANGELOG.md ]] || printf '# 更新日志\n' > CHANGELOG.md
 {
   sed -n '1p' CHANGELOG.md
