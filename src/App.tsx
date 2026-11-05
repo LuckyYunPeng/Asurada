@@ -1137,13 +1137,17 @@ function App() {
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  className="aria-pressed:bg-accent aria-pressed:text-accent-foreground"
-                  aria-label={t.settings}
-                  title={t.settings}
+                  className="relative aria-pressed:bg-accent aria-pressed:text-accent-foreground"
+                  aria-label={pendingUpdate ? `${t.settings} · ${t.newVersion(pendingUpdate.version)}` : t.settings}
+                  title={pendingUpdate ? t.newVersion(pendingUpdate.version) : t.settings}
                   aria-pressed={settingsOpen}
                   onClick={() => setSettingsOpen((o) => !o)}
                 >
                   <Settings />
+                  {/* 有新版本：红点提示去设置里更新，装完重启后自然消失 */}
+                  {pendingUpdate ? (
+                    <span className="absolute top-1 right-1 size-1.5 rounded-full bg-(--err) ring-2 ring-(--surface)" aria-hidden />
+                  ) : null}
                 </Button>
               ) : null}
               <Button
