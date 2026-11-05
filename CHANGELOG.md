@@ -1,5 +1,11 @@
 # Changelog / 更新日志
 
+## v0.5.1（2026-11-05）
+
+### 新功能
+
+- 新增 Intel 芯片 Mac 安装包，Apple Silicon 和 Intel 机型都能下载安装，App 内更新会自动下载对应芯片的版本。
+
 ## Unreleased
 
 ### Features

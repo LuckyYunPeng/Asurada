@@ -2,7 +2,7 @@
   "name": "asurada",
   "private": true,
   "packageManager": "pnpm@10.33.0",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "type": "module",
   "scripts": {
     "dev": "tauri dev",
