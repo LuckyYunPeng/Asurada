@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://asurada-4yq.pages.dev/sitemap.xml

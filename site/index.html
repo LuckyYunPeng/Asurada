@@ -4,8 +4,68 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Asurada · AI 写代码，但你得看懂自己的项目</title>
-<meta name="description" content="停靠在 macOS 屏幕边缘的小工具：帮你滤掉噪音，提高 Review 效率，在多个项目之间穿插时开发体验更丝滑。">
+<meta name="description" content="Asurada 是停靠在 macOS 屏幕边缘的免费开源小工具：滤掉测试等噪音，只 Review AI 改动里的关键代码，看完一键生成提交信息并推送，多项目切换也顺滑。">
 <link rel="icon" href="./assets/logo.png">
+<link rel="apple-touch-icon" href="./assets/logo.png">
+<meta name="theme-color" content="#0b0a14">
+<!-- 语言靠 ?lang= 切换（见底部脚本）；不带参数时按浏览器语言 -->
+<link rel="canonical" href="https://asurada-4yq.pages.dev/">
+<link rel="alternate" hreflang="zh-CN" href="https://asurada-4yq.pages.dev/?lang=zh">
+<link rel="alternate" hreflang="en" href="https://asurada-4yq.pages.dev/?lang=en">
+<link rel="alternate" hreflang="x-default" href="https://asurada-4yq.pages.dev/">
+<!-- 分享卡片：社交平台不执行 JS，只能读到这里的静态内容，图片必须是绝对地址 -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Asurada">
+<meta property="og:url" content="https://asurada-4yq.pages.dev/">
+<meta property="og:title" content="Asurada · AI 写代码，但你得看懂自己的项目">
+<meta property="og:description" content="停靠在 macOS 屏幕边缘的免费开源小工具：滤掉噪音只 Review 关键改动，看完一键提交推送。">
+<meta property="og:image" content="https://asurada-4yq.pages.dev/assets/desktop.jpg">
+<meta property="og:image:width" content="2000">
+<meta property="og:image:height" content="1299">
+<meta property="og:image:alt" content="Asurada 停靠在 macOS 屏幕边缘">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:locale:alternate" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Asurada · Review what matters in AI-written code">
+<meta name="twitter:description" content="A free, open-source macOS edge-dock app: filter the noise, review the key changes, then commit & push in one click.">
+<meta name="twitter:image" content="https://asurada-4yq.pages.dev/assets/desktop.jpg">
+<!-- 结构化数据：给搜索引擎和 AI 助手一个明确的「这是什么软件」的描述 -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Asurada",
+  "url": "https://asurada-4yq.pages.dev/",
+  "description": "A free, open-source macOS app that docks to the screen edge and helps developers review AI-written code changes: filter out noise such as test files, review only the key changes, then commit and push in one click with an auto-generated Conventional Commit message.",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "macOS (Apple Silicon)",
+  "softwareRequirements": "git and the pi coding agent installed locally",
+  "inLanguage": ["en", "zh-CN"],
+  "license": "https://opensource.org/licenses/MIT",
+  "isAccessibleForFree": true,
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "downloadUrl": "https://github.com/LuckyYunPeng/asurada/releases/latest",
+  "codeRepository": "https://github.com/LuckyYunPeng/asurada",
+  "sameAs": ["https://github.com/LuckyYunPeng/asurada"],
+  "image": "https://asurada-4yq.pages.dev/assets/desktop.jpg",
+  "screenshot": [
+    "https://asurada-4yq.pages.dev/assets/desktop.jpg",
+    "https://asurada-4yq.pages.dev/assets/panel.png",
+    "https://asurada-4yq.pages.dev/assets/diff.jpg"
+  ],
+  "featureList": [
+    "Diff window with directory tree, word-level inline diff and file filter",
+    "Hide test files while reviewing; they are still committed",
+    "One-click commit and push with an auto-generated Conventional Commit message in English or Chinese",
+    "Commit messages generated in a separate short-lived agent session, keeping the main AI chat clean",
+    "Automatic rebase and retry when the remote has new commits; rolls back on conflicts",
+    "All local git projects in one panel, projects with changes listed first",
+    "Docks as a small tab at the screen edge; global shortcut Control+E",
+    "Optional confirmation before commit",
+    "In-app automatic updates"
+  ]
+}
+</script>
 <style>
   :root {
     --bg: #07070b;
@@ -538,7 +598,7 @@
   // 国际化：HTML 里的中文即默认文案，这里只存英文；切回中文时用启动时记下的原文
   const EN = {
     title: 'Asurada · AI writes the code. You still need to understand your project.',
-    description: 'Filter out the noise and review faster, with a smooth flow even when juggling multiple projects.',
+    description: 'Asurada is a free, open-source macOS app that docks to your screen edge: filter out noise like test files, review only the key changes in AI-written code, then commit and push in one click.',
     navWhy: 'Why',
     navFeatures: 'Features',
     navDownload: 'Download',
