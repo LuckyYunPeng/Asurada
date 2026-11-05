@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## v0.5.2（2026-11-05）
+
+### Fixes
+
+- The entry button no longer jumps up when you open the panel.
+
+### 修复
+
+- 修复展开面板时入口按钮会往上跳一下的问题。
+
 ## v0.5.1（2026-11-05）
 
 ### Features
