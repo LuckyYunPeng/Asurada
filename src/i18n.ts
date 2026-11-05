@@ -81,6 +81,7 @@ const zh = {
   alreadyAddedMessage: "这个项目之前加过啦",
   skip: "跳过",
   next: "下一步",
+  introPage: (page: number) => `第 ${page} 页`,
   getStarted: "开始使用",
   checkingEnv: "正在检查本机环境",
   envCheck: "环境检查",
@@ -157,17 +158,27 @@ const zh = {
   // 引导与环境检查
   introSteps: [
     {
+      title: "AI 写代码，你得看懂项目",
+      sub: "别让项目变成黑盒",
+      lead: "Review 不是挑错，是让你始终最懂这个项目。",
+    },
+    {
+      title: "只看重点",
+      sub: "噪音收起，关键改动留下",
+      lead: "非重点文件一键收起，只提交勾选的文件。",
+    },
+    {
       title: "验收时，项目总在换",
-      lead: "本地同时盯着好几个仓库，改一批、验一批、再切下一个。节奏很快，提交却总打断手感。",
+      lead: "所有项目一屏看完，有改动的排在前面。",
     },
     {
       title: "主对话，留给真正的事",
-      lead: "让 Agent 代写 commit 很方便，但塞进主会话会弄脏上下文和历史记录。验收来回切时尤其烦。",
+      lead: "提交信息在独立短会话里生成，不弄脏你的上下文。",
     },
     {
       title: "贴在屏幕边，点一下就交",
-      sub: "验收完就交，别为了 commit 再开一场聊",
-      lead: "ASURADA 用独立短会话生成 Conventional Commit 并 push；交完就散，不留尾巴。",
+      sub: "⌃E 随时呼出",
+      lead: "一键提交并推送，冲突自动撤回。",
     },
   ] as { title: string; sub?: string; lead: string }[],
   preflightChecks: {
@@ -246,6 +257,7 @@ const en: TMessages = {
   alreadyAddedMessage: "This project is already in the list",
   skip: "Skip",
   next: "Next",
+  introPage: (page) => `Page ${page}`,
   getStarted: "Get started",
   checkingEnv: "Checking environment",
   envCheck: "Environment check",
@@ -320,17 +332,27 @@ const en: TMessages = {
     `Only the ${count === 1 ? "selected file" : `${count} selected files`} will be committed and pushed; other changes stay in the working tree.`,
   introSteps: [
     {
+      title: "AI writes the code, you own the project",
+      sub: "Don't let it turn into a black box",
+      lead: "Review isn't about catching mistakes. It keeps you the one who knows the project best.",
+    },
+    {
+      title: "Review only what matters",
+      sub: "Fold the noise, keep the key changes",
+      lead: "Fold away less important files and commit only the ones you pick.",
+    },
+    {
       title: "Reviewing means switching projects",
-      lead: "You're watching several repos at once: change a batch, check it, move on. The pace is fast, and committing keeps breaking the flow.",
+      lead: "All projects on one screen, changed ones on top.",
     },
     {
       title: "Keep the main chat for real work",
-      lead: "Letting an agent write commits is handy, but doing it in your main session clutters its context and history, especially while jumping between reviews.",
+      lead: "Commit messages come from a separate short session, so your context stays clean.",
     },
     {
       title: "On the screen edge, one click to commit",
-      sub: "Commit when the review is done, no extra chat needed",
-      lead: "ASURADA writes a Conventional Commit in a separate short session and pushes it. Nothing left behind.",
+      sub: "Press ⌃E anytime",
+      lead: "Commit and push in one click. Conflicts roll back automatically.",
     },
   ],
   preflightChecks: {

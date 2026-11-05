@@ -114,7 +114,7 @@ function LogoHero({ badge }: { badge?: "+" | "!" }) {
 
 /** 引导 / 环境检查 / 空态共用的标题与正文样式 */
 const HEADING_CLASS = "mb-1.5 text-[15px] font-semibold text-(--ink-strong)";
-const LEAD_CLASS = "mb-3.5 text-left leading-normal text-(--ink-2)";
+const LEAD_CLASS = "mb-3.5 text-center leading-normal text-(--ink-2)";
 
 /** 设置列表的一行 */
 const SETTINGS_ROW_CLASS =
@@ -1370,6 +1370,7 @@ function App() {
                   )
                 }
                 onStart={finishIntro}
+                onGoTo={setIntroStep}
               />
             ) : isScanning ? (
               <p className="flex items-center justify-center gap-2 p-6 text-muted-foreground">
@@ -1437,7 +1438,7 @@ function App() {
               <div className="px-1 pt-8 pb-3 text-center">
                 <LogoHero badge="+" />
                 <h2 className={HEADING_CLASS}>{t.emptyTitle}</h2>
-                <p className={`${LEAD_CLASS} text-center`}>
+                <p className={LEAD_CLASS}>
                   {t.emptyLead}
                 </p>
                 <div className="flex flex-wrap justify-center gap-2">
@@ -1564,30 +1565,53 @@ function IntroView({
   onSkip,
   onNext,
   onStart,
+  onGoTo,
 }: {
   step: number;
   onSkip: () => void;
   onNext: () => void;
   onStart: () => void;
+  onGoTo: (step: number) => void;
 }) {
   const { t } = useLanguage();
-  const content = t.introSteps[step];
   const isLast = step === t.introSteps.length - 1;
 
   return (
     <div className="px-1 pt-2 pb-3 text-center">
       <LogoHero />
-      <h2 className={HEADING_CLASS}>{content.title}</h2>
-      {content.sub ? (
-        <p className="mb-2 text-xs font-medium text-muted-foreground">{content.sub}</p>
-      ) : null}
-      <p className={LEAD_CLASS}>{content.lead}</p>
-      <div className="mb-3 flex justify-center gap-1.5" aria-hidden>
-        {t.introSteps.map((_, i) => (
-          <span
+      {/* 各页文案叠在同一格里，高度取最高的那页，切页时面板不跳；只显示当前页 */}
+      <div className="grid">
+        {t.introSteps.map((content, i) => (
+          <div
             key={i}
-            className={`h-[7px] rounded-full ${i === step ? "w-4 bg-ring" : "w-[7px] bg-(--dot-off)"}`}
-          />
+            className={`col-start-1 row-start-1 ${i === step ? "" : "invisible"}`}
+            aria-hidden={i !== step}
+          >
+            <h2 className={HEADING_CLASS}>{content.title}</h2>
+            {content.sub ? (
+              <p className="mb-2 text-xs font-medium text-muted-foreground">{content.sub}</p>
+            ) : null}
+            <p className={LEAD_CLASS}>{content.lead}</p>
+          </div>
+        ))}
+      </div>
+      {/* 圆点可点击切页；按钮带内边距，点击区域比 7px 的圆点大 */}
+      <div className="mb-3 flex justify-center">
+        {t.introSteps.map((_, i) => (
+          <button
+            key={i}
+            type="button"
+            className="group flex items-center p-[5px]"
+            aria-label={t.introPage(i + 1)}
+            aria-current={i === step ? "step" : undefined}
+            onClick={() => onGoTo(i)}
+          >
+            <span
+              className={`h-[7px] rounded-full transition-all ${
+                i === step ? "w-4 bg-ring" : "w-[7px] bg-(--dot-off) group-hover:bg-muted-foreground"
+              }`}
+            />
+          </button>
         ))}
       </div>
       <div className="flex items-center justify-end gap-2">
@@ -1698,7 +1722,7 @@ function AgentPickView({
       <div className={GATE_CLASS}>
         <LogoHero badge="!" />
         <h2 className={HEADING_CLASS}>{t.agentNoneTitle}</h2>
-        <p className={`${LEAD_CLASS} text-center`}>{t.agentNoneLead}</p>
+        <p className={LEAD_CLASS}>{t.agentNoneLead}</p>
         <AgentInstallList list={list} />
         <Button disabled={isScanning} onClick={onRescanAgents}>
           {isScanning ? <Loader2 className="animate-spin" /> : null}
@@ -1712,7 +1736,7 @@ function AgentPickView({
     <div className={GATE_CLASS}>
       <LogoHero />
       <h2 className={HEADING_CLASS}>{t.agentPickTitle}</h2>
-      <p className={`${LEAD_CLASS} text-center`}>{t.agentPickLead}</p>
+      <p className={LEAD_CLASS}>{t.agentPickLead}</p>
       {/* 只列本机已安装的，圆形胶囊，可换行 */}
       <div className="mb-3.5 flex flex-wrap justify-center gap-2" role="radiogroup">
         {list.agents
@@ -1779,7 +1803,7 @@ function PreflightGateView({
         </div>
       ) : null}
       <h2 className={HEADING_CLASS}>{loading ? t.checkingEnv : t.envCheck}</h2>
-      <p className={`${LEAD_CLASS} text-center`}>{t.envLead}</p>
+      <p className={LEAD_CLASS}>{t.envLead}</p>
       <div className={CHECKS_CLASS}>
         {items.map((c) => (
           <PreflightCheckRow key={c.id} item={c} loading={loading} />
@@ -1814,7 +1838,7 @@ function PreflightFailView({
     <div className={GATE_CLASS}>
       <LogoHero badge="!" />
       <h2 className={HEADING_CLASS}>{t.envFailTitle}</h2>
-      <p className={`${LEAD_CLASS} text-center`}>{t.envFailLead}</p>
+      <p className={LEAD_CLASS}>{t.envFailLead}</p>
       <div className={CHECKS_CLASS}>
         {result.checks.map((c) => (
           <PreflightCheckRow key={c.id} item={c} loading={false} />
