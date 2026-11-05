@@ -85,7 +85,7 @@ asurada/
 │   └── tauri.conf.json       # 透明贴边主窗、macOSPrivateApi、bundle
 ├── artifacts/                # 设计验收截图
 ├── .github/workflows/
-│   └── build-macos.yml       # macOS CI：未签名 .app/.dmg
+│   └── build-macos.yml       # macOS CI：Apple Silicon 与 Intel 的 .app/.dmg
 └── README.md                 # 安装、CI、脚本总览
 ```
 
@@ -154,7 +154,7 @@ asurada/
 ### 工程与分发
 
 - [x] Tauri 2 + React/Vite 可 dev / build
-- [x] GitHub Actions macOS 构建与 artifact 命名（`asurada-macos-<sha>`）
+- [x] GitHub Actions macOS 构建与 artifact 命名（`asurada-macos-<arch>-<sha>`，aarch64 与 x64）
 - [x] MIT + 仓库 URL 文档一致
 
 ---

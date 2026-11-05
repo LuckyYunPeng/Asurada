@@ -63,11 +63,11 @@ The diff window is your review desk: fold away the noise and read what matters l
 
 ## Install
 
-1. Download the latest `.dmg` from [Releases](https://github.com/LuckyYunPeng/asurada/releases).
+1. Download the latest `.dmg` from [Releases](https://github.com/LuckyYunPeng/asurada/releases). Apple Silicon Macs use `*_aarch64.dmg`; Intel Macs use `*_x64.dmg`.
 2. Open it and drag **Asurada** into Applications.
 3. On first launch you'll see a short intro, and Asurada checks your environment automatically.
 
-You need `git` and at least one AI agent CLI installed to write commit messages: pi, Claude Code, Codex, Grok, OpenCode, or Kimi. Pick which one in Settings. Only Apple Silicon Macs are supported for now.
+You need `git` and at least one AI agent CLI installed to write commit messages: pi, Claude Code, Codex, Grok, OpenCode, or Kimi. Pick which one in Settings. Apple Silicon and Intel Macs are both supported.
 
 ## License
 

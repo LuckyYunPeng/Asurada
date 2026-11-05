@@ -1,6 +1,8 @@
 name: Build macOS
 
-# 日常推送不跑；推 v* 标签发版，或在 Actions 页面手动运行打一个未签名验收包
+# 日常推送不跑；推 v* 标签发版，或在 Actions 页面手动运行打一个未签名验收包。
+# 同时打 Apple Silicon（aarch64）和 Intel（x86_64）两套原生包，不用 universal：
+# 各架构单独签名、公证 dmg，latest.json 也按 darwin-aarch64 / darwin-x86_64 指向各自的更新包。
 on:
   push:
     tags: ["v*"]
@@ -12,11 +14,22 @@ concurrency:
 
 jobs:
   build-macos:
+    name: macOS ${{ matrix.arch }}
     runs-on: macos-latest
     timeout-minutes: 60
     # 打 v* 标签时要创建 Release 并上传文件
     permissions:
       contents: write
+    strategy:
+      fail-fast: false
+      # tauri-action 会读-改-写同一份 latest.json。并行时后写的会盖掉另一架构，必须串行合并。
+      max-parallel: 1
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            arch: aarch64
+          - target: x86_64-apple-darwin
+            arch: x64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,11 +47,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+          targets: ${{ matrix.target }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          key: ${{ matrix.target }}
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
@@ -47,10 +62,10 @@ jobs:
       - name: cargo test (preflight)
         run: cargo test --manifest-path src-tauri/Cargo.toml "preflight::"
 
-      # 手动运行：只打包验收，不生成更新包（不需要私钥）
+      # 手动运行：只打包验收，不生成更新包（不需要私钥）。--target 后产物在 target/<triple>/ 下。
       - name: Build Tauri (unsigned)
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
-        run: pnpm tauri build --bundles app,dmg
+        run: pnpm tauri build --target ${{ matrix.target }} --bundles app,dmg
         env:
           CI: true
           # 验收包不签名；正式签名、公证只在下方打标签发版时进行
@@ -59,10 +74,10 @@ jobs:
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         uses: actions/upload-artifact@v4
         with:
-          name: asurada-macos-${{ github.sha }}
+          name: asurada-macos-${{ matrix.arch }}-${{ github.sha }}
           path: |
-            src-tauri/target/release/bundle/macos/*.app
-            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/${{ matrix.target }}/release/bundle/macos/*.app
+            src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
           if-no-files-found: error
           retention-days: 30
 
@@ -93,7 +108,8 @@ jobs:
             echo "__NOTES__"
           } >> "$GITHUB_ENV"
 
-      # 打 v* 标签：用个人 Developer ID 签名并公证，生成并签名更新包，发布 GitHub Release，附带 latest.json 供 App 内在线更新
+      # 打 v* 标签：用个人 Developer ID 签名并公证，生成并签名更新包，发布 GitHub Release，附带 latest.json 供 App 内在线更新。
+      # 两套架构串行跑：后一个 job 会把本架构合并进已有的 latest.json。
       - name: Build and publish release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: tauri-apps/tauri-action@v0
@@ -114,24 +130,96 @@ jobs:
             ${{ env.RELEASE_NOTES }}
 
             ---
-            下载 `.dmg` 安装（仅 Apple Silicon）；已安装的版本会在 App 内提示更新。
-          # 先发成草稿，dmg 公证并替换后再公开，避免用户下到未公证的 dmg
+            下载 `.dmg` 安装：Apple Silicon 选 `*_aarch64.dmg`，Intel 选 `*_x64.dmg`。已安装的版本会在 App 内按芯片下载对应更新。
+          # 先发成草稿，两个架构的 dmg 都公证并替换后再由 publish-release 公开
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
-          args: --bundles app,dmg --config '{"bundle":{"createUpdaterArtifacts":true}}'
+          args: --target ${{ matrix.target }} --bundles app,dmg --config '{"bundle":{"createUpdaterArtifacts":true}}'
 
-      # Tauri 只公证 .app，dmg 只签名不公证：这里补公证、附上公证凭证，替换 Release 里的 dmg 后再公开发布
-      - name: Notarize dmg and publish release
+      # Tauri 只公证 .app，dmg 只签名不公证：这里补公证、附上公证凭证，替换 Release 里的 dmg。先不公开。
+      - name: Notarize dmg
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          TAURI_TARGET: ${{ matrix.target }}
+        shell: bash
         run: |
-          dmg=$(ls src-tauri/target/release/bundle/dmg/*.dmg)
+          dmg_dir="src-tauri/target/${TAURI_TARGET}/release/bundle/dmg"
+          shopt -s nullglob
+          dmgs=("$dmg_dir"/*.dmg)
+          if [ "${#dmgs[@]}" -ne 1 ]; then
+            echo "expected exactly one dmg in ${dmg_dir}, found ${#dmgs[@]}"
+            printf '%s\n' "${dmgs[@]}"
+            exit 1
+          fi
+          dmg="${dmgs[0]}"
+          echo "notarizing ${dmg}"
           xcrun notarytool submit "$dmg" --key "$APPLE_API_KEY_PATH" --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait
           xcrun stapler staple "$dmg"
           xcrun stapler validate "$dmg"
           gh release upload "$GITHUB_REF_NAME" "$dmg" --clobber
+
+  # 两个架构都公证完，且 latest.json 同时包含 darwin-aarch64 与 darwin-x86_64，才公开 Release
+  publish-release:
+    name: Publish release
+    needs: build-macos
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && needs.build-macos.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Require both architectures, then publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          names=$(gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name')
+          echo "release assets:"
+          printf '%s\n' "$names"
+          require_asset() {
+            local suffix="$1"
+            local found=0 name
+            while IFS= read -r name; do
+              [ -z "$name" ] && continue
+              case "$name" in
+                *"$suffix") found=1 ;;
+              esac
+            done <<< "$names"
+            if [ "$found" -ne 1 ]; then
+              echo "missing release asset matching *${suffix}"
+              exit 1
+            fi
+          }
+          require_asset '_aarch64.dmg'
+          require_asset '_x64.dmg'
+          require_asset '_aarch64.app.tar.gz'
+          require_asset '_aarch64.app.tar.gz.sig'
+          require_asset '_x64.app.tar.gz'
+          require_asset '_x64.app.tar.gz.sig'
+          if ! printf '%s\n' "$names" | grep -qx 'latest.json'; then
+            echo "missing latest.json"
+            exit 1
+          fi
+          body=$(gh release view "$GITHUB_REF_NAME" --json body --jq .body)
+          if printf '%s\n' "$body" | grep -q '仅 Apple Silicon'; then
+            echo "release notes still tell users to download a single chip build"
+            exit 1
+          fi
+          gh release download "$GITHUB_REF_NAME" --pattern latest.json --dir "$RUNNER_TEMP"
+          echo "latest.json platforms:"
+          jq -r '.platforms | keys[]' "$RUNNER_TEMP/latest.json"
+          jq -e '
+            def ok(key; needle):
+              ((.platforms[key].url // "") | contains(needle))
+              and ((.platforms[key].signature // "") | length > 0);
+            ok("darwin-aarch64"; "_aarch64.app.tar.gz")
+            and ok("darwin-aarch64-app"; "_aarch64.app.tar.gz")
+            and ok("darwin-x86_64"; "_x64.app.tar.gz")
+            and ok("darwin-x86_64-app"; "_x64.app.tar.gz")
+          ' "$RUNNER_TEMP/latest.json"
           gh release edit "$GITHUB_REF_NAME" --draft=false --latest

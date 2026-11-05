@@ -38,7 +38,7 @@
   "url": "https://asurada-4yq.pages.dev/",
   "description": "A free, open-source macOS app that docks to the screen edge and helps developers review AI-written code changes: filter out noise such as test files, review only the key changes, then commit and push in one click with an auto-generated Conventional Commit message.",
   "applicationCategory": "DeveloperApplication",
-  "operatingSystem": "macOS (Apple Silicon)",
+  "operatingSystem": "macOS (Apple Silicon and Intel)",
   "softwareRequirements": "git and a local AI agent CLI (pi, Claude Code, Codex, Grok, OpenCode or Kimi)",
   "inLanguage": ["en", "zh-CN"],
   "license": "https://opensource.org/licenses/MIT",
@@ -414,6 +414,7 @@
   .final .lead { margin-left: auto; margin-right: auto; }
   .final .cta { margin-top: 32px; }
   .req { margin-top: 18px; color: var(--muted); font-size: 13px; }
+  .final .req { max-width: 640px; margin-left: auto; margin-right: auto; }
 
   footer { padding: 40px 24px; text-align: center; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); }
 
@@ -471,6 +472,7 @@
       <a class="btn primary" href="https://github.com/LuckyYunPeng/asurada/releases/latest" data-i18n="ctaDownload">免费下载 macOS 版</a>
       <a class="btn ghost" href="https://github.com/LuckyYunPeng/asurada" data-i18n="ctaGithub">在 GitHub 上查看</a>
     </div>
+    <p class="req" data-i18n="ctaArch">Apple Silicon 与 Intel</p>
   </div>
 
   <div class="stage">
@@ -588,7 +590,7 @@
       <a class="btn primary" href="https://github.com/LuckyYunPeng/asurada/releases/latest" data-i18n="ctaDownload">免费下载 macOS 版</a>
       <a class="btn ghost" href="https://github.com/LuckyYunPeng/asurada">⭐ Star on GitHub</a>
     </div>
-    <p class="req reveal d3" data-i18n="req">需要 Apple Silicon 的 Mac，并已安装 git 和任意一个 AI Agent（pi、Claude Code、Codex 等）</p>
+    <p class="req reveal d3" data-i18n="req">支持 Apple Silicon 与 Intel 的 Mac。在 Releases 中，Apple Silicon 下载 <code>*_aarch64.dmg</code>，Intel 下载 <code>*_x64.dmg</code>。请先安装 git 和任意一个 AI Agent（pi、Claude Code、Codex 等）。</p>
   </div>
 </section>
 
@@ -607,6 +609,7 @@
     heroSub: 'Asurada <mark>filters out the noise</mark> to <mark>make your reviews faster</mark>, so <mark>working across multiple projects</mark> feels effortlessly smooth.',
     ctaDownload: 'Download for macOS — Free',
     ctaGithub: 'View on GitHub',
+    ctaArch: 'Apple Silicon and Intel',
     altDesk: 'Asurada docked as a small tab at the edge of the screen',
     altPanel: 'The expanded project panel',
     whyEyebrow: 'Why we built it',
@@ -651,7 +654,7 @@
     altDock: 'Small tab docked at the edge of the screen',
     finalTitle: 'Let AI write the code,<br><span class="grad-text">and you understand the project</span>',
     finalLead: 'Free and open source under the MIT License.',
-    req: 'Requires an Apple Silicon Mac with git and an AI agent CLI (pi, Claude Code, Codex, etc.) installed',
+    req: 'Works on Apple Silicon and Intel Macs. On Releases, download <code>*_aarch64.dmg</code> for Apple Silicon or <code>*_x64.dmg</code> for Intel. Install git and an AI agent CLI (pi, Claude Code, Codex, etc.) first.',
   };
   const ZH = {
     title: document.title,
