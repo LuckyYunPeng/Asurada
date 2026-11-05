@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Menu } from "@tauri-apps/api/menu";
@@ -26,6 +26,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -254,7 +255,7 @@ interface IOpenWithApp {
   isDefault: boolean;
 }
 
-/** 勾选框；部分选中时显示横线（indeterminate 只能通过 DOM 属性设置） */
+/** 提交勾选框；部分选中时显示横线 */
 function CommitCheck({
   isChecked,
   isMixed = false,
@@ -266,20 +267,13 @@ function CommitCheck({
   label: string;
   onToggle: () => void;
 }) {
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (ref.current) {
-      ref.current.indeterminate = isMixed;
-    }
-  }, [isMixed]);
   return (
-    <input
-      ref={ref}
-      type="checkbox"
-      className="dw-check"
+    <Checkbox
+      // 默认点击热区左右各扩 12px，会盖住文件名开头；收窄到 4px
+      className="dw-check after:-inset-x-1"
       aria-label={label}
-      checked={isChecked}
-      onChange={onToggle}
+      checked={isMixed ? "indeterminate" : isChecked}
+      onCheckedChange={onToggle}
     />
   );
 }
@@ -994,19 +988,16 @@ function DiffView({ projectId }: { projectId: string }) {
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
             />
-            <p className="dw-selected">
+            {/* 和下面各行的勾选框同一列；点文字也能切换全选 */}
+            <label className="dw-selected">
+              <CommitCheck
+                isChecked={!isPartial}
+                isMixed={isPartial && checkedEntries.length > 0}
+                label={isPartial ? t.selectAll : t.deselectAll}
+                onToggle={() => onToggleCheck(entries.map((e) => e.file.name))}
+              />
               {t.selectedCount(checkedEntries.length, entries.length)}
-              <button
-                type="button"
-                onClick={() =>
-                  setUncheckedNames(
-                    isPartial ? new Set() : new Set(entries.map((e) => e.file.name)),
-                  )
-                }
-              >
-                {isPartial ? t.selectAll : t.deselectAll}
-              </button>
-            </p>
+            </label>
             <ul className="dw-files">
               {treeRows.map((row) =>
                 row.kind === "dir" ? (
