@@ -29,6 +29,8 @@ const CLOUD_WIDTH: f64 = 220.0;
 /// 和 CSS `.tag` 的 height、`.panel` 的 top/bottom 留白一致。
 const TAG_HEIGHT: f64 = 60.0;
 const PANEL_INSET: f64 = 10.0;
+/// 面板比标签多伸出去的一截，把入口包在里面，避免「面板在入口下方」的错觉。
+const PANEL_LIFT: f64 = 32.0;
 /// 宽度要放得下悬停放大 1.08 倍后的 Tag（34 × 1.08 ≈ 36.7）。
 const DOCK_COLLAPSED: LogicalSize<f64> = LogicalSize::new(37.0, 94.0);
 /// 宽度含 CSS `.panel` 右侧 22px 留白，面板本体 360pt。
@@ -217,16 +219,18 @@ fn place_frame(
             (visible.size.height * 0.36 - DOCK_EXPANDED.height / 2.0).clamp(HANDLE_BAND, collapsed_max)
         })
         .clamp(HANDLE_BAND, collapsed_max);
-    // 下面放得下整块面板时，面板顶边贴着标签顶边。放不下就改成底边贴着标签底边，往上长。
+    // 下面放得下整块面板时，面板顶边高出标签顶边 PANEL_LIFT。放不下就改成底边低于标签底边 PANEL_LIFT，往上长。
     // 窗口比面板上下各多 PANEL_INSET（CSS `.panel` 的 top/bottom），对齐时要扣掉。
-    let is_from_bottom =
-        expanded && raw - PANEL_INSET + DOCK_EXPANDED.height > visible.size.height;
+    let is_from_bottom = expanded
+        && raw - PANEL_INSET - PANEL_LIFT + DOCK_EXPANDED.height > visible.size.height;
     let top_from_work = if !expanded {
         (raw - HANDLE_BAND - cloud).max(0.0)
     } else if is_from_bottom {
-        ((raw + TAG_HEIGHT + PANEL_INSET).min(visible.size.height) - DOCK_EXPANDED.height).max(0.0)
+        ((raw + TAG_HEIGHT + PANEL_INSET + PANEL_LIFT).min(visible.size.height)
+            - DOCK_EXPANDED.height)
+            .max(0.0)
     } else {
-        (raw - PANEL_INSET).max(0.0)
+        (raw - PANEL_INSET - PANEL_LIFT).max(0.0)
     };
     window.setFrame_display(
         NSRect::new(
@@ -312,11 +316,18 @@ fn show_window_collapsed(window: &WebviewWindow) -> Result<(), String> {
 }
 
 pub fn apply_panel_open(app: &AppHandle, expanded: bool) -> Result<(), String> {
-    IS_PANEL_EXPANDED.store(expanded, Ordering::SeqCst);
+    let was_expanded = IS_PANEL_EXPANDED.swap(expanded, Ordering::SeqCst);
     let window = app
         .get_webview_window("main")
         .ok_or_else(|| "未找到主窗口".to_string())?;
 
+    // 窗口上移变大时 WebView 还在画旧内容，入口会跳一下。先整窗透明，前端挂好面板后调 reveal_dock 显示。
+    if expanded && !was_expanded {
+        set_dock_alpha(&window, 0.0)?;
+    }
+    if !expanded {
+        set_dock_alpha(&window, 1.0)?;
+    }
     if expanded {
         show_window_expanded(&window)?;
     } else {
@@ -326,6 +337,30 @@ pub fn apply_panel_open(app: &AppHandle, expanded: bool) -> Result<(), String> {
     let _ = app.emit("set-panel-open", expanded);
     outside_click::refresh_collapsed_cursor(&window);
     Ok(())
+}
+
+fn set_dock_alpha(window: &WebviewWindow, alpha: f64) -> Result<(), String> {
+    let ns_window = window
+        .ns_window()
+        .map_err(|e| format!("无法读取窗口: {e}"))? as usize;
+    let apply = move || {
+        let window = unsafe { &*(ns_window as *const objc2_app_kit::NSWindow) };
+        window.setAlphaValue(alpha);
+    };
+    if tauri_nspanel::objc2::MainThreadMarker::new().is_some() {
+        apply();
+    } else {
+        dispatch2::DispatchQueue::main().exec_sync(apply);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn reveal_dock(app: tauri::AppHandle) -> Result<(), String> {
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "未找到主窗口".to_string())?;
+    set_dock_alpha(&window, 1.0)
 }
 
 fn init_panel(app_handle: &AppHandle) -> Result<(), String> {

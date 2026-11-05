@@ -692,6 +692,20 @@ function App() {
     void invoke("sync_dock_geometry", { expanded: true }).then(show, show);
   }, []);
 
+  // 展开时 Rust 先把窗口设成透明再移动，面板画出来后再显示，避免入口跟着窗口往上跳
+  useEffect(() => {
+    if (!panelOpen || !isTauri || captureBoot) {
+      return;
+    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        invoke("reveal_dock").catch((error) => {
+          console.error("显示面板失败", error);
+        });
+      });
+    });
+  }, [panelOpen]);
+
   const [isCheckOpen, setIsCheckOpen] = useState(false);
   const envReady = preflight?.ready === true;
   const inIntro = introStep >= 0;
@@ -861,6 +875,12 @@ function App() {
           requestAnimationFrame(() => {
             requestAnimationFrame(() => setPanelOpen(true));
           });
+          // 收起动画没播完就再次展开时 panelOpen 不变，上面的 effect 不会跑，这里兜住，避免窗口一直透明
+          window.setTimeout(() => {
+            invoke("reveal_dock").catch((error) => {
+              console.error("显示面板失败", error);
+            });
+          }, 300);
         } else {
           onCollapsePanel();
         }

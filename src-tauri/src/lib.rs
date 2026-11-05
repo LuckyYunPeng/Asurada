@@ -85,6 +85,8 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             macos_panel::set_result_cloud,
             #[cfg(target_os = "macos")]
+            macos_panel::reveal_dock,
+            #[cfg(target_os = "macos")]
             macos_panel::pick_project_directory,
             #[cfg(target_os = "macos")]
             macos_panel::get_toggle_shortcut,
