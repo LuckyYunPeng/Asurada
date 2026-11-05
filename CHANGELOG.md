@@ -1,5 +1,31 @@
 # Changelog / 更新日志
 
+## v0.6.0（2026-11-06）
+
+### Features
+
+- Faster commits: once a project's changes stop changing, Asurada writes the commit message in the background, so clicking Commit only waits for git. Turn it on or off and set how often to check in Settings. Nothing is generated when there are no changes.
+- Sort projects: choose Recently updated, Uncommitted first, Name, or Date added from the top of the project list. Recently updated is the default, so the project you're working on stays on top.
+- The diff window shows the current branch next to the project name.
+
+### Improvements
+
+- Settings are grouped into General, Commit, and About, with a back arrow in the top-left corner.
+- Tidier diff window header: the project name, branch, and change counts line up and are easier to tell apart.
+- The project list no longer has extra space on the right when it scrolls.
+
+### 新功能
+
+- 提交更快：项目改动停下来后，Asurada 会在后台提前生成提交信息，点提交时只需等 git 推送。可以在设置中开关，并调整检查间隔；没有改动时不会生成。
+- 项目排序：在项目列表顶部选择「最近更新」「待提交优先」「名称」或「添加顺序」。默认按最近更新排列，正在改的项目排在最上面。
+- 差异窗口在项目名旁显示当前分支。
+
+### 改进
+
+- 设置页分为「通用」「提交」「关于」三组，左上角新增返回箭头。
+- 差异窗口标题栏更整齐：项目名、分支和改动统计对齐，层次更清楚。
+- 项目列表出现滚动条时，右侧不再多出留白。
+
 ## v0.5.2（2026-11-05）
 
 ### Fixes
