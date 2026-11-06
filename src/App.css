@@ -531,8 +531,9 @@ body {
   transition: height 0.24s ease;
 }
 
+/* 顶部留 4px，第一行控件（搜索框、排序按钮）的 3px 焦点环不会被 overflow 裁掉 */
 .panel-body-inner {
-  padding: 0 16px 16px;
+  padding: 4px 16px 16px;
 }
 
 /* 出现滚动条时，右边留白减去滚动条宽度，内容到面板右边缘的距离和左边一致 */

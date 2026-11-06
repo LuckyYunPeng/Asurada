@@ -363,7 +363,8 @@ function ProjectListBar({
             {options.find((o) => o.value === sort)?.label}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
+        {/* 关闭后不把焦点还给按钮，否则焦点环会被滚动区裁掉一截 */}
+        <DropdownMenuContent align="end" onCloseAutoFocus={(e) => e.preventDefault()}>
           <DropdownMenuRadioGroup value={sort} onValueChange={(v) => onChangeSort(v as ProjectSortEnum)}>
             {options.map((o) => (
               <DropdownMenuRadioItem key={o.value} value={o.value}>
