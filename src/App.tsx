@@ -2227,6 +2227,7 @@ function ProjectRow({
   const [confirmAction, setConfirmAction] = useState<"remove" | "commit" | null>(null);
   const isConfirming = confirmAction !== null;
   const [isPulling, setIsPulling] = useState(false);
+  const [isLogCopied, setIsLogCopied] = useState(false);
   const rowRef = useRef<HTMLLIElement>(null);
 
   useEffect(() => {
@@ -2244,6 +2245,16 @@ function ProjectRow({
       await openPath(row.project.path);
     } catch (error) {
       console.error("打开文件夹失败", error);
+    }
+  }
+
+  async function onCopyLog() {
+    try {
+      await copyText(`${row.project.path}\n\n${row.resultSummary ?? t.commitFailed}`);
+      setIsLogCopied(true);
+      window.setTimeout(() => setIsLogCopied(false), 1500);
+    } catch (error) {
+      console.error("复制失败日志失败", error);
     }
   }
 
@@ -2334,7 +2345,7 @@ function ProjectRow({
         </Tooltip>
       </div>
       <div
-        className={`col-span-full row-start-2 mr-16 flex min-w-0 gap-1.5 leading-snug ${
+        className={`col-span-full row-start-2 ${row.uiState === "failure" ? "mr-24" : "mr-16"} flex min-w-0 gap-1.5 leading-snug ${
           pres.kind === "dirty" || pres.kind === "run" ? "items-center" : "items-start"
         } ${STATUS_CLASS[pres.kind].text}`}
       >
@@ -2347,6 +2358,17 @@ function ProjectRow({
       {/* 提交中不允许打开/移除，直接不显示 */}
       {isRunning ? null : (
       <div className="col-start-2 row-start-2 flex gap-1 self-center justify-self-end text-muted-foreground">
+        {row.uiState === "failure" ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="icon-sm" aria-label={t.copyLog} onClick={() => void onCopyLog()}>
+                {/* Copy 图形撑满画布，比旁边图标显大，缩一档对齐视觉 */}
+                {isLogCopied ? <Check /> : <Copy className="size-3.5" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{isLogCopied ? t.copied : t.copyLog}</TooltipContent>
+          </Tooltip>
+        ) : null}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

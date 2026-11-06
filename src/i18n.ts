@@ -67,6 +67,7 @@ const zh = {
   agentNoneLead: "Asurada 用它生成提交信息。在终端运行下面任意一条命令安装，装好后点「重新检测」。",
   copyCommand: "复制安装命令",
   copied: "已复制",
+  copyLog: "复制日志",
   agentRescan: "重新检测",
   continue: "继续",
   // 主面板
@@ -261,6 +262,7 @@ const en: TMessages = {
   agentNoneLead: "Asurada uses one to write commit messages. Run any command below in Terminal, then click Rescan.",
   copyCommand: "Copy install command",
   copied: "Copied",
+  copyLog: "Copy log",
   agentRescan: "Rescan",
   continue: "Continue",
   panel: "ASURADA panel",
