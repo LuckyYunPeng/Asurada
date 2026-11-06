@@ -41,6 +41,7 @@ import {
   Monitor,
   Moon,
   Plus,
+  Search,
   Settings,
   Sun,
   Trash2,
@@ -792,6 +793,7 @@ function App() {
   const [isBodyScrollable, setIsBodyScrollable] = useState(false);
   const [rowOrder, setRowOrder] = useState<string[]>([]);
   const [projectSort, setProjectSort] = useState(readProjectSort);
+  const [projectQuery, setProjectQuery] = useState("");
   // 重复添加时闪烁高亮的已有项目
   const [flashId, setFlashId] = useState<string | null>(null);
   // 启动后首次拿到列表也排一次
@@ -1397,6 +1399,14 @@ function App() {
         : t.commitHint;
 
   const projectCount = rows.length;
+  const keyword = projectQuery.trim().toLowerCase();
+  const visibleRows = keyword
+    ? sortedRows.filter(
+        (r) =>
+          r.project.displayName.toLowerCase().includes(keyword) ||
+          r.project.path.toLowerCase().includes(keyword),
+      )
+    : sortedRows;
   const showHeaderAdd = inMain;
 
   return (
@@ -1669,9 +1679,38 @@ function App() {
               </div>
             ) : (
               <>
-              <ProjectListBar count={projectCount} sort={projectSort} onChangeSort={onChangeProjectSort} />
+              <label className="mb-2.5 flex h-8 items-center gap-2 rounded-lg border bg-card px-2.5 text-sm text-muted-foreground focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+                <Search className="size-3.5 shrink-0" />
+                <input
+                  className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground"
+                  placeholder={t.searchProjects}
+                  aria-label={t.searchProjects}
+                  value={projectQuery}
+                  onChange={(e) => setProjectQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape" && projectQuery) {
+                      e.stopPropagation();
+                      setProjectQuery("");
+                    }
+                  }}
+                />
+                {projectQuery ? (
+                  <button
+                    type="button"
+                    className="shrink-0 hover:text-foreground"
+                    aria-label={t.clearSearch}
+                    onClick={() => setProjectQuery("")}
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                ) : null}
+              </label>
+              <ProjectListBar count={visibleRows.length} sort={projectSort} onChangeSort={onChangeProjectSort} />
+              {visibleRows.length === 0 ? (
+                <p className="p-6 text-center text-sm text-muted-foreground">{t.noMatchingProjects}</p>
+              ) : null}
               <ul className="flex flex-col gap-2">
-                {sortedRows.map((row) => (
+                {visibleRows.map((row) => (
                   <ProjectRow
                     key={row.project.id}
                     row={row}
