@@ -87,9 +87,9 @@ const DIFF_UNSAFE_CSS = `
 [data-diff-span], [data-diff-span] span {
   color: var(--dw-emphasis-fg, inherit) !important;
 }
-/* 语法色降饱和，让红绿成为最显眼的颜色 */
+/* 语法色降饱和，让红绿成为最显眼的颜色。不用 filter: saturate：WebKit 会给每个 span 单独做滤镜绘制，改动多的文件滚动明显卡顿 */
 [data-code] [data-line] span:not([data-diff-span]) {
-  filter: saturate(0.55);
+  color: oklch(from light-dark(var(--diffs-token-light, var(--diffs-light)), var(--diffs-token-dark, var(--diffs-dark))) l calc(c * 0.55) h);
 }
 [data-code]::-webkit-scrollbar-thumb {
   background-color: rgba(128, 128, 140, 0.3);
