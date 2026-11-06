@@ -1,5 +1,17 @@
 # Changelog / 更新日志
 
+## v0.7.0（2026-11-06）
+
+### Features
+
+- Search projects: type in the box at the top of the project list to filter by name or path. Press Esc to clear it.
+- Copy log: when a commit fails, click the copy button on that row to copy the full error, which makes it easier to troubleshoot or share.
+
+### 新功能
+
+- 项目搜索：在项目列表顶部输入关键词，可按名称或路径筛选项目，按 Esc 清空。
+- 复制日志：提交失败时，点击该行的复制按钮即可复制完整报错，方便排查或发给别人看。
+
 ## v0.6.0（2026-11-06）
 
 ### Features
