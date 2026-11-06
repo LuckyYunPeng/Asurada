@@ -1613,7 +1613,10 @@ function App() {
                     active={settingsOpen}
                     skipInvoke={captureBoot?.skipInvoke}
                   />
-                  <SettingsAutostartRow skipInvoke={captureBoot?.skipInvoke} />
+                  {/* 开发版不注册 autostart 插件；截图模式仍显示以保持界面完整 */}
+                  {(!import.meta.env.DEV || captureBoot) && (
+                    <SettingsAutostartRow skipInvoke={captureBoot?.skipInvoke} />
+                  )}
                 </SettingsGroup>
                 <SettingsGroup title={t.settingsCommit}>
                   <SettingsAgentRow active={settingsOpen} skipInvoke={captureBoot?.skipInvoke} />

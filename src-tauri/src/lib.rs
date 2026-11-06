@@ -49,7 +49,11 @@ pub fn run() {
     {
         builder = builder.plugin(tauri_nspanel::init());
         builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
-        builder = builder.plugin(tauri_plugin_autostart::Builder::new().build());
+        // 开发版与正式版共用 ~/Library/LaunchAgents/Asurada.plist，dev 注册会把开机启动指向 target/debug
+        #[cfg(not(debug_assertions))]
+        {
+            builder = builder.plugin(tauri_plugin_autostart::Builder::new().build());
+        }
     }
 
     builder
