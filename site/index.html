@@ -68,7 +68,8 @@
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,500;0,8..60,650;0,8..60,700;1,8..60,500&family=Noto+Serif+SC:wght@500;600&display=swap">
+<!-- 国内（如微信内置浏览器）连不上 Google Fonts，阻塞式加载会让整页白屏，所以异步加载，失败时回退系统字体 -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,500;0,8..60,650;0,8..60,700;1,8..60,500&family=Noto+Serif+SC:wght@500;600&display=swap" media="print" onload="this.media='all'">
 <style>
   /* 信纸风格：暖纸底色、墨色文字、火漆红点缀，不用渐变和发光 */
   :root {
