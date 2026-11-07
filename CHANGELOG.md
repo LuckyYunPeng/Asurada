@@ -1,5 +1,17 @@
 # Changelog / 更新日志
 
+## v0.7.2（2026-11-07）
+
+### Improvements
+
+- Asurada no longer shows up in the Dock or the Command+Tab switcher. Open it from the tag on the screen edge or the menu bar icon.
+- Updated the app icon.
+
+### 改进
+
+- Asurada 不再出现在 Dock 和 Command+Tab 切换列表中，通过屏幕边缘的标签或菜单栏图标打开
+- 更新应用图标
+
 ## v0.7.1（2026-11-06）
 
 ### 修复

@@ -1,6 +1,6 @@
 [package]
 name = "asurada"
-version = "0.7.1"
+version = "0.7.2"
 description = "A macOS edge-dock app for reviewing AI-written changes: filter the noise, then commit & push in one click."
 authors = ["Asurada Contributors"]
 license = "MIT"
