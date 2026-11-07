@@ -494,7 +494,8 @@ pub fn setup_tray(app: &mut App) -> Result<(), String> {
 }
 
 pub fn setup(app: &mut App) -> Result<(), String> {
-    app.set_activation_policy(tauri::ActivationPolicy::Regular);
+    // 不进 Dock 和 Command+Tab，入口只留边缘 tag 与菜单栏图标；回退路径仍用 Regular 保证可见。
+    app.set_activation_policy(tauri::ActivationPolicy::Accessory);
     load_dock_offset(app.handle());
     let ready = match init_panel(app.handle()) {
         Ok(()) => Ok(()),
