@@ -1,5 +1,15 @@
 # Changelog / 更新日志
 
+## Unreleased
+
+### Features
+
+- Recent commits: each project row has a secondary 「最近提交」 control that opens a read-only list of the last 10 local commits (short hash, subject, relative time). Tap a row for the full message, author, and absolute time. Empty repositories, missing paths, and folders that are not git repos show a one-line explanation.
+
+### 新功能
+
+- 最近提交：每个项目行增加次要入口「最近提交」，只读查看最近 10 条本地提交（短哈希、标题、相对时间）。点一条可展开完整说明、作者和绝对时间。空仓库、路径不存在或不是 git 仓库时，用一行说明提示。
+
 ## v0.7.2（2026-11-07）
 
 ### Improvements

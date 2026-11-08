@@ -74,6 +74,7 @@ pub fn run() {
             commands::discard_changes,
             commands::get_committing_ids,
             commands::get_project_diff,
+            commands::recent_commits,
             commands::open_diff_window,
             commands::get_diff_project_id,
             #[cfg(target_os = "macos")]
