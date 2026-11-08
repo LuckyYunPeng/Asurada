@@ -14,7 +14,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { getVersion } from "@tauri-apps/api/app";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { bootstrapCapture, getCaptureScene } from "./captureMode";
+import { bootstrapCapture, getCaptureScene, type RecentCommitsPreview } from "./captureMode";
 import logoUrl from "./assets/asurada-logo.png";
 import { INTRO_STORAGE_KEY } from "./introContent";
 import { getMessages, LanguageEnum, readLanguage, setLanguage, useLanguage } from "./i18n";
@@ -90,6 +90,8 @@ import type {
   PreflightResult,
   ProjectRowState,
   ProjectView,
+  RecentCommit,
+  RecentCommitsResponse,
   ToggleShortcutInfo,
 } from "./types";
 import "./App.css";
@@ -768,6 +770,11 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(
     () => captureBoot?.settingsOpen ?? false,
   );
+  const [recentProject, setRecentProject] = useState<ProjectView | null>(() => {
+    const id = captureBoot?.recentProjectId;
+    if (!id) return null;
+    return captureBoot?.rows.find((row) => row.project.id === id)?.project ?? null;
+  });
   const shortcutRecordingRef = useRef(false);
   const handleShortcutRecordingChange = useCallback((recording: boolean) => {
     shortcutRecordingRef.current = recording;
@@ -1235,12 +1242,16 @@ function App() {
           setSettingsOpen(false);
           return;
         }
+        if (recentProject) {
+          setRecentProject(null);
+          return;
+        }
         onCollapsePanel();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCollapsePanel, settingsOpen]);
+  }, [onCollapsePanel, recentProject, settingsOpen]);
 
   useEffect(() => {
     if (captureBoot || !isTauri) return;
@@ -1472,37 +1483,67 @@ function App() {
           role="dialog" aria-label={t.panel}>
           <header className="chrome">
             <div className="title-wrap">
-              {settingsOpen || isCheckOpen ? (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="-ml-1.5 text-muted-foreground"
-                  aria-label={t.back}
-                  title={t.back}
-                  onClick={() => {
-                    setSettingsOpen(false);
-                    setIsCheckOpen(false);
-                  }}
-                >
-                  <ChevronLeft />
-                </Button>
-              ) : null}
-              {/* 从设置、环境检查等子页回到项目列表 */}
-              <button
-                type="button"
-                className="home"
-                aria-label={t.backToMain}
-                title={t.backToMain}
-                onClick={() => {
-                  setSettingsOpen(false);
-                  setIsCheckOpen(false);
-                }}
-              >
-                <span className="brand">
-                  <img src={logoUrl} alt="" />
-                </span>
-                <span className="title">ASURADA</span>
-              </button>
+              {recentProject ? (
+                <>
+                  {/* logo 在最左，返回紧挨子页标题，和「最近提交」同一行 */}
+                  <button
+                    type="button"
+                    className="home"
+                    aria-label={t.backToMain}
+                    title={t.backToMain}
+                    onClick={() => setRecentProject(null)}
+                  >
+                    <span className="brand">
+                      <img src={logoUrl} alt="" />
+                    </span>
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="-ml-1 text-muted-foreground"
+                    aria-label={t.back}
+                    title={t.back}
+                    onClick={() => setRecentProject(null)}
+                  >
+                    <ChevronLeft />
+                  </Button>
+                  <span className="title is-page">{t.recentCommits}</span>
+                </>
+              ) : (
+                <>
+                  {settingsOpen || isCheckOpen ? (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="-ml-1.5 text-muted-foreground"
+                      aria-label={t.back}
+                      title={t.back}
+                      onClick={() => {
+                        setSettingsOpen(false);
+                        setIsCheckOpen(false);
+                      }}
+                    >
+                      <ChevronLeft />
+                    </Button>
+                  ) : null}
+                  {/* 从设置、环境检查等子页回到项目列表 */}
+                  <button
+                    type="button"
+                    className="home"
+                    aria-label={t.backToMain}
+                    title={t.backToMain}
+                    onClick={() => {
+                      setSettingsOpen(false);
+                      setIsCheckOpen(false);
+                    }}
+                  >
+                    <span className="brand">
+                      <img src={logoUrl} alt="" />
+                    </span>
+                    <span className="title">ASURADA</span>
+                  </button>
+                </>
+              )}
               {isEnvFailed ? (
                 <Button
                   size="icon-xs"
@@ -1543,7 +1584,10 @@ function App() {
                   aria-label={pendingUpdate ? `${t.settings} · ${t.newVersion(pendingUpdate.version)}` : t.settings}
                   title={pendingUpdate ? t.newVersion(pendingUpdate.version) : t.settings}
                   aria-pressed={settingsOpen}
-                  onClick={() => setSettingsOpen((o) => !o)}
+                  onClick={() => {
+                    setRecentProject(null);
+                    setSettingsOpen((o) => !o);
+                  }}
                 >
                   <Settings />
                   {/* 有新版本：红点提示去设置里更新，装完重启后自然消失 */}
@@ -1575,7 +1619,7 @@ function App() {
             style={bodyHeight === null ? undefined : { height: bodyHeight }}
           >
             <div ref={bodyInnerRef} className="panel-body-inner">
-            {inMain && projectCount > 0 && !settingsOpen && topHint ? (
+            {inMain && projectCount > 0 && !settingsOpen && !recentProject && topHint ? (
               <div
                 role="status"
                 className="mb-3 flex items-center gap-1.5 px-1 text-xs leading-snug text-(--risk-fg)"
@@ -1607,6 +1651,11 @@ function App() {
                 result={scanResult}
                 onCancel={() => setScanResult(null)}
                 onAdd={(paths) => void onAddScanned(paths)}
+              />
+            ) : recentProject && inMain && !settingsOpen ? (
+              <RecentCommitsView
+                project={recentProject}
+                preview={captureBoot?.recentPreview}
               />
             ) : settingsOpen && inMain ? (
               <div className="flex flex-col gap-3">
@@ -1719,6 +1768,7 @@ function App() {
                     onCommit={() => void handleCommitPush(row)}
                     onPull={() => pullProject(row.project.id)}
                     onRemove={() => void handleRemove(row.project.id)}
+                    onOpenRecent={() => setRecentProject(row.project)}
                     isFlashing={flashId === row.project.id}
                     onFlashEnd={() => setFlashId(null)}
                     onDiffOpened={onDiffOpened}
@@ -2205,12 +2255,183 @@ function CommitTip({ text }: { text: string }) {
   );
 }
 
+function formatRelativeTime(unixSeconds: number, t: ReturnType<typeof useLanguage>["t"]): string {
+  const delta = Math.max(0, Math.floor(Date.now() / 1000) - unixSeconds);
+  if (delta < 60) return t.justNow;
+  const minutes = Math.floor(delta / 60);
+  if (minutes < 60) return t.minutesAgo(minutes);
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t.hoursAgo(hours);
+  const days = Math.floor(hours / 24);
+  if (days < 30) return t.daysAgo(days);
+  const months = Math.floor(days / 30);
+  if (months < 12) return t.monthsAgo(months);
+  return t.yearsAgo(Math.floor(days / 365));
+}
+
+function formatAbsoluteTime(unixSeconds: number, language: LanguageEnum): string {
+  return new Date(unixSeconds * 1000).toLocaleString(
+    language === LanguageEnum.Zh ? "zh-CN" : "en-US",
+    { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" },
+  );
+}
+
+function RecentCommitSkeleton() {
+  return (
+    <div className="flex items-center gap-2 px-2 py-2" aria-hidden>
+      <span className="h-3 w-14 shrink-0 animate-pulse rounded bg-muted" />
+      <span className="h-3 min-w-0 flex-1 animate-pulse rounded bg-muted" />
+      <span className="h-3 w-12 shrink-0 animate-pulse rounded bg-muted" />
+    </div>
+  );
+}
+
+/** 某个项目最近 10 条本地提交。顶栏返回离开；点一行展开，再点收起 */
+function RecentCommitsView({
+  project,
+  preview,
+}: {
+  project: ProjectView;
+  preview?: RecentCommitsPreview;
+}) {
+  const { t, language } = useLanguage();
+  const [load, setLoad] = useState<
+    { phase: "loading" } | { phase: "ready"; result: RecentCommitsResponse }
+  >(() => {
+    if (!preview || preview.loading) return { phase: "loading" };
+    if (preview.status === "ok") {
+      return { phase: "ready", result: { status: "ok", commits: preview.commits } };
+    }
+    return { phase: "ready", result: { status: preview.status } };
+  });
+  const [expanded, setExpanded] = useState<string | null>(preview?.expandedHash ?? null);
+
+  useEffect(() => {
+    if (preview) return;
+    let cancelled = false;
+    setLoad({ phase: "loading" });
+    setExpanded(null);
+    invoke<RecentCommitsResponse>("recent_commits", { id: project.id })
+      .then((result) => {
+        if (!cancelled) setLoad({ phase: "ready", result });
+      })
+      .catch((error) => {
+        console.error("读取最近提交失败", error);
+        if (!cancelled) setLoad({ phase: "ready", result: { status: "failed" } });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [preview, project.id]);
+
+  const note =
+    load.phase === "ready"
+      ? load.result.status === "empty"
+        ? t.recentCommitsEmpty
+        : load.result.status === "notRepo"
+          ? t.recentCommitsNotRepo
+          : load.result.status === "missing"
+            ? t.recentCommitsMissing
+            : load.result.status === "failed"
+              ? t.recentCommitsFailed
+              : null
+      : null;
+  const commits = load.phase === "ready" && load.result.status === "ok" ? load.result.commits : [];
+
+  return (
+    <div>
+      <h2 className="mb-2 truncate px-1 text-sm font-semibold text-(--ink-strong)" title={project.path}>
+        {project.displayName}
+      </h2>
+      {load.phase === "loading" ? (
+        <ul className="flex flex-col" aria-busy="true" aria-label={t.recentCommits}>
+          <span className="sr-only">{t.loading}</span>
+          {Array.from({ length: 4 }, (_, index) => (
+            <li key={index}>
+              <RecentCommitSkeleton />
+            </li>
+          ))}
+        </ul>
+      ) : note ? (
+        <p role="status" className="px-2 py-6 text-center text-sm text-muted-foreground">
+          {note}
+        </p>
+      ) : (
+        <ul className="flex flex-col" aria-label={t.recentCommits}>
+          {commits.map((commit) => (
+            <RecentCommitRow
+              key={commit.shortHash}
+              commit={commit}
+              open={expanded === commit.shortHash}
+              onToggle={() =>
+                setExpanded((current) => (current === commit.shortHash ? null : commit.shortHash))
+              }
+              relative={formatRelativeTime(commit.committedAt, t)}
+              absolute={formatAbsoluteTime(commit.committedAt, language)}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function RecentCommitRow({
+  commit,
+  open,
+  onToggle,
+  relative,
+  absolute,
+}: {
+  commit: RecentCommit;
+  open: boolean;
+  onToggle: () => void;
+  relative: string;
+  absolute: string;
+}) {
+  return (
+    <li>
+      <button
+        type="button"
+        aria-expanded={open}
+        className={`flex w-full min-w-0 items-baseline gap-1.5 rounded-lg px-2 py-2 text-left text-[13px] ${
+          open ? "bg-accent" : "hover:bg-accent"
+        }`}
+        onClick={onToggle}
+      >
+        <span className="shrink-0 font-mono text-[12px] text-muted-foreground">{commit.shortHash}</span>
+        <span className="shrink-0 text-muted-foreground" aria-hidden>
+          ·
+        </span>
+        <span className="min-w-0 flex-1 truncate text-(--ink-strong)">{commit.subject}</span>
+        <span className="shrink-0 text-muted-foreground" aria-hidden>
+          ·
+        </span>
+        <span className="shrink-0 text-xs text-muted-foreground">{relative}</span>
+      </button>
+      {open ? (
+        <div className="mx-2 mb-1.5 rounded-lg bg-(--surface-2) px-2.5 py-2">
+          <p className="whitespace-pre-wrap break-words text-[13px] leading-snug text-(--ink-2)">
+            {commit.message}
+          </p>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {commit.author}
+            <span aria-hidden> · </span>
+            {absolute}
+          </p>
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
 function ProjectRow({
   row,
   canCommit,
   onCommit,
   onPull,
   onRemove,
+  onOpenRecent,
   isFlashing,
   onFlashEnd,
   onDiffOpened,
@@ -2220,6 +2441,7 @@ function ProjectRow({
   onCommit: () => void;
   onPull: () => Promise<void>;
   onRemove: () => void;
+  onOpenRecent: () => void;
   isFlashing: boolean;
   onFlashEnd: () => void;
   onDiffOpened: () => void;
@@ -2346,7 +2568,7 @@ function ProjectRow({
         </Tooltip>
       </div>
       <div
-        className={`col-span-full row-start-2 ${row.uiState === "failure" ? "mr-24" : "mr-16"} flex min-w-0 gap-1.5 leading-snug ${
+        className={`col-start-1 row-start-2 flex min-w-0 gap-1.5 leading-snug ${
           pres.kind === "dirty" || pres.kind === "run" ? "items-center" : "items-start"
         } ${STATUS_CLASS[pres.kind].text}`}
       >
@@ -2356,50 +2578,63 @@ function ProjectRow({
         />
         <CommitTip text={pres.statusText} />
       </div>
-      {/* 提交中不允许打开/移除，直接不显示 */}
-      {isRunning ? null : (
+      {/* 提交中不允许打开/移除。最近提交是只读入口，不和「提交并推送」抢同一行 */}
       <div className="col-start-2 row-start-2 flex gap-1 self-center justify-self-end text-muted-foreground">
-        {row.uiState === "failure" ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="outline" size="icon-sm" aria-label={t.copyLog} onClick={() => void onCopyLog()}>
-                {/* Copy 图形撑满画布，比旁边图标显大，缩一档对齐视觉 */}
-                {isLogCopied ? <Check /> : <Copy className="size-3.5" />}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{isLogCopied ? t.copied : t.copyLog}</TooltipContent>
-          </Tooltip>
-        ) : null}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100"
-              aria-label={t.openFolder}
-              onClick={onOpenFolder}
-            >
-              <FolderOpen />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">{t.openFolder}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              className="opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 hover:bg-destructive/10 hover:text-destructive"
-              aria-label={t.removeProject}
-              onClick={() => setConfirmAction("remove")}
-            >
-              <Trash2 />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">{t.removeProject}</TooltipContent>
-        </Tooltip>
+        {isRunning ? null : (
+          <>
+            {row.uiState === "failure" ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon-sm" aria-label={t.copyLog} onClick={() => void onCopyLog()}>
+                    {/* Copy 图形撑满画布，比旁边图标显大，缩一档对齐视觉 */}
+                    {isLogCopied ? <Check /> : <Copy className="size-3.5" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{isLogCopied ? t.copied : t.copyLog}</TooltipContent>
+              </Tooltip>
+            ) : null}
+            {/* 平时不占位，悬停再出现，避免把「最近提交」和状态文字挤开 */}
+            <span className="hidden gap-1 group-focus-within/row:flex group-hover/row:flex">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    aria-label={t.openFolder}
+                    onClick={onOpenFolder}
+                  >
+                    <FolderOpen />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{t.openFolder}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    className="hover:bg-destructive/10 hover:text-destructive"
+                    aria-label={t.removeProject}
+                    onClick={() => setConfirmAction("remove")}
+                  >
+                    <Trash2 />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">{t.removeProject}</TooltipContent>
+              </Tooltip>
+            </span>
+          </>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          className="h-6 rounded-md px-1.5 text-xs font-normal text-muted-foreground"
+          onClick={onOpenRecent}
+        >
+          {t.recentCommits}
+        </Button>
       </div>
-      )}
       {isConfirming ? (
         <div
           className="absolute inset-0 z-2 flex items-center justify-end gap-2 rounded-[inherit] bg-(--surface)/95 px-3 text-xs text-(--ink-strong)"

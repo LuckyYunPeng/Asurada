@@ -1,5 +1,6 @@
 use crate::git::{
-    git_add_commit_push, git_current_branch, git_discard, git_updated_at, git_is_clean, git_pull, git_last_commit_subject, git_working_diff,
+    git_add_commit_push, git_current_branch, git_discard, git_is_clean, git_last_commit_subject,
+    git_pull, git_recent_commits, git_updated_at, git_working_diff, RecentCommitsResponse,
 };
 use crate::preflight::{self, PreflightResult};
 use crate::agents::{self, AgentInfo};
@@ -233,6 +234,13 @@ fn find_project(app: &tauri::AppHandle, id: &str) -> Result<StoredProject, Strin
         .into_iter()
         .find(|p| p.id == id)
         .ok_or_else(|| "未找到该项目".to_string())
+}
+
+/// 最近 10 条本地提交，只读，不拉远端
+#[tauri::command]
+pub async fn recent_commits(app: tauri::AppHandle, id: String) -> Result<RecentCommitsResponse, String> {
+    let project = find_project(&app, &id)?;
+    Ok(git_recent_commits(PathBuf::from(&project.path).as_path()))
 }
 
 #[tauri::command]

@@ -1,5 +1,32 @@
+use serde::Serialize;
 use std::path::Path;
 use std::process::Command;
+
+/// 只读列表最多取这么多条本地提交，不访问远端
+const RECENT_COMMIT_LIMIT: &str = "10";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentCommit {
+    pub short_hash: String,
+    pub subject: String,
+    /// 完整提交说明（标题加正文）
+    pub message: String,
+    pub author: String,
+    /// 提交时间，Unix 秒
+    pub committed_at: u64,
+}
+
+/// 最近提交的读取结果。预期情况（不是仓库、还没提交、路径不存在）也走这里，不往外抛。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "status", rename_all = "camelCase")]
+pub enum RecentCommitsResponse {
+    Ok { commits: Vec<RecentCommit> },
+    Empty,
+    NotRepo,
+    Missing,
+    Failed,
+}
 
 pub fn git_is_clean(project_path: &Path) -> Result<bool, String> {
     let output = Command::new("git")
@@ -67,6 +94,78 @@ pub fn git_current_branch(project_path: &Path) -> Option<String> {
     };
     read(&["symbolic-ref", "--short", "-q", "HEAD"])
         .or_else(|| read(&["rev-parse", "--short", "HEAD"]))
+}
+
+/// 最近若干条本地提交，新的在前。只跑本地 `git log`，不 fetch、不 pull。
+pub fn git_recent_commits(project_path: &Path) -> RecentCommitsResponse {
+    if !project_path.exists() {
+        return RecentCommitsResponse::Missing;
+    }
+    if !project_path.is_dir() {
+        return RecentCommitsResponse::NotRepo;
+    }
+
+    let output = match git_output(
+        project_path,
+        &[
+            "log",
+            "-n",
+            RECENT_COMMIT_LIMIT,
+            "-z",
+            "--pretty=format:%h%x1f%s%x1f%an%x1f%ct%x1f%B",
+        ],
+    ) {
+        Ok(output) => output,
+        Err(_) => return RecentCommitsResponse::Failed,
+    };
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("not a git repository") {
+            return RecentCommitsResponse::NotRepo;
+        }
+        if stderr.contains("does not have any commits") {
+            return RecentCommitsResponse::Empty;
+        }
+        return RecentCommitsResponse::Failed;
+    }
+
+    let commits = parse_recent_commits(&output.stdout);
+    if commits.is_empty() {
+        if output.stdout.iter().any(|byte| !byte.is_ascii_whitespace()) {
+            return RecentCommitsResponse::Failed;
+        }
+        return RecentCommitsResponse::Empty;
+    }
+    RecentCommitsResponse::Ok { commits }
+}
+
+fn parse_recent_commits(stdout: &[u8]) -> Vec<RecentCommit> {
+    String::from_utf8_lossy(stdout)
+        .split('\0')
+        .filter(|record| !record.is_empty())
+        .filter_map(parse_recent_commit)
+        .collect()
+}
+
+fn parse_recent_commit(record: &str) -> Option<RecentCommit> {
+    let mut parts = record.splitn(5, '\u{1f}');
+    let short_hash = parts.next()?.trim().to_string();
+    let subject = parts.next()?.trim().to_string();
+    let author = parts.next()?.trim().to_string();
+    let committed_at = parts.next()?.trim().parse().ok()?;
+    let message = parts.next()?.trim_end_matches(['\r', '\n']).to_string();
+    if short_hash.is_empty() {
+        return None;
+    }
+    let message = if message.is_empty() { subject.clone() } else { message };
+    Some(RecentCommit {
+        short_hash,
+        subject,
+        message,
+        author,
+        committed_at,
+    })
 }
 
 fn git_output(project_path: &Path, args: &[&str]) -> Result<std::process::Output, String> {
@@ -374,6 +473,83 @@ mod tests {
         assert!(err.contains("已取消 rebase"), "{err}");
         assert!(!a.join(".git/rebase-merge").exists());
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn recent_commits_reports_missing_not_repo_and_empty() {
+        let root = std::env::temp_dir().join(format!(
+            "asurada-git-recent-empty-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+
+        assert!(matches!(
+            git_recent_commits(&root.join("missing")),
+            RecentCommitsResponse::Missing
+        ));
+
+        let plain = root.join("plain");
+        fs::create_dir_all(&plain).unwrap();
+        assert!(matches!(
+            git_recent_commits(&plain),
+            RecentCommitsResponse::NotRepo
+        ));
+
+        let empty = root.join("empty");
+        fs::create_dir_all(&empty).unwrap();
+        git(&empty, &["init", "-q", "-b", "main"]);
+        assert!(matches!(
+            git_recent_commits(&empty),
+            RecentCommitsResponse::Empty
+        ));
+
+        fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn recent_commits_lists_ten_newest_first() {
+        let root = std::env::temp_dir().join(format!(
+            "asurada-git-recent-log-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        git(&root, &["init", "-q", "-b", "main"]);
+        git(&root, &["config", "user.email", "t@t"]);
+        git(&root, &["config", "user.name", "Ada"]);
+        for i in 0..12 {
+            fs::write(root.join("f.txt"), format!("{i}")).unwrap();
+            git(&root, &["add", "-A"]);
+            if i == 11 {
+                git(
+                    &root,
+                    &["commit", "-q", "-m", "feat: newest", "-m", "body line"],
+                );
+            } else if i == 10 {
+                git(&root, &["commit", "-qm", "修复：按钮间距"]);
+            } else {
+                let message = format!("commit {i}");
+                git(&root, &["commit", "-qm", &message]);
+            }
+        }
+
+        let RecentCommitsResponse::Ok { commits } = git_recent_commits(&root) else {
+            panic!("expected commits");
+        };
+        assert_eq!(commits.len(), 10);
+        assert_eq!(commits[0].subject, "feat: newest");
+        assert_eq!(commits[0].author, "Ada");
+        assert!(commits[0].committed_at > 0);
+        assert!(commits[0].short_hash.chars().all(|c| c.is_ascii_hexdigit()));
+        assert!(commits[0].message.contains("feat: newest"));
+        assert!(commits[0].message.contains("body line"));
+        assert_eq!(commits[1].subject, "修复：按钮间距");
+        assert_eq!(commits[9].subject, "commit 2");
+        assert!(commits[0].committed_at >= commits[9].committed_at);
+        assert!(commits.iter().all(|c| c.subject != "commit 0"));
+
+        fs::remove_dir_all(&root).unwrap();
     }
 }
 

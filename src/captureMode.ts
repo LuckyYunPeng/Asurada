@@ -2,6 +2,7 @@ import type {
   PreflightResult,
   ProjectRowState,
   ProjectView,
+  RecentCommit,
 } from "./types";
 
 export type CaptureScene =
@@ -16,7 +17,11 @@ export type CaptureScene =
   | "result"
   | "cloud-ok"
   | "cloud-err"
-  | "settings";
+  | "settings"
+  | "recent"
+  | "recent-open"
+  | "recent-loading"
+  | "recent-empty";
 
 export function getCaptureScene(): CaptureScene | null {
   if (!import.meta.env.DEV) return null;
@@ -77,7 +82,63 @@ export interface CaptureBootstrap {
   skipInvoke: boolean;
   settingsOpen?: boolean;
   toggleShortcutDisplay?: string;
+  recentProjectId?: string;
+  recentPreview?: RecentCommitsPreview;
 }
+
+export interface RecentCommitsPreview {
+  loading?: boolean;
+  status: "ok" | "empty" | "notRepo" | "missing" | "failed";
+  commits: RecentCommit[];
+  expandedHash?: string;
+}
+
+const recentNow = Math.floor(Date.now() / 1000);
+
+const mockRecentCommits: RecentCommit[] = [
+  {
+    shortHash: "a1b2c3d",
+    subject: "feat: 项目行增加只读最近提交",
+    message: "feat: 项目行增加只读最近提交\n\n只读查看最近 10 条本地提交，不访问远端。",
+    author: "Ada",
+    committedAt: recentNow - 12 * 60,
+  },
+  {
+    shortHash: "b2c3d4e",
+    subject: "fix: 面板顶部焦点框被裁切",
+    message: "fix: 面板顶部焦点框被裁切",
+    author: "Ada",
+    committedAt: recentNow - 3 * 60 * 60,
+  },
+  {
+    shortHash: "c3d4e5f",
+    subject: "feat: 项目搜索",
+    message: "feat: 项目搜索\n\n按名称或路径筛选，Esc 清空。",
+    author: "Lin",
+    committedAt: recentNow - 2 * 24 * 60 * 60,
+  },
+  {
+    shortHash: "d4e5f6a",
+    subject: "chore: 发布 v0.7.2",
+    message: "chore: 发布 v0.7.2",
+    author: "Ada",
+    committedAt: recentNow - 6 * 24 * 60 * 60,
+  },
+  {
+    shortHash: "e5f6a7b",
+    subject: "perf: 差异窗口滚动不再卡顿",
+    message: "perf: 差异窗口滚动不再卡顿",
+    author: "Lin",
+    committedAt: recentNow - 18 * 24 * 60 * 60,
+  },
+  {
+    shortHash: "f6a7b8c",
+    subject: "feat: 自选 AI Agent 写提交信息",
+    message: "feat: 自选 AI Agent 写提交信息",
+    author: "Ada",
+    committedAt: recentNow - 40 * 24 * 60 * 60,
+  },
+];
 
 export function bootstrapCapture(scene: CaptureScene): CaptureBootstrap {
   const base: CaptureBootstrap = {
@@ -201,6 +262,35 @@ export function bootstrapCapture(scene: CaptureScene): CaptureBootstrap {
         settingsOpen: true,
         toggleShortcutDisplay: "⌃E",
         skipInvoke: true,
+      };
+    case "recent":
+    case "recent-open":
+      return {
+        ...base,
+        rows: [
+          { project: mockProjectA, uiState: "idle" },
+          { project: mockProjectB, uiState: "idle" },
+        ],
+        recentProjectId: mockProjectB.id,
+        recentPreview: {
+          status: "ok",
+          commits: mockRecentCommits,
+          expandedHash: scene === "recent-open" ? mockRecentCommits[0].shortHash : undefined,
+        },
+      };
+    case "recent-loading":
+      return {
+        ...base,
+        rows: [{ project: mockProjectB, uiState: "idle" }],
+        recentProjectId: mockProjectB.id,
+        recentPreview: { loading: true, status: "ok", commits: [] },
+      };
+    case "recent-empty":
+      return {
+        ...base,
+        rows: [{ project: mockProjectB, uiState: "idle" }],
+        recentProjectId: mockProjectB.id,
+        recentPreview: { status: "empty", commits: [] },
       };
     default:
       return base;

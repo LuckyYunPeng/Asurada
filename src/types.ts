@@ -71,3 +71,21 @@ export interface ToggleShortcutInfo {
   shortcut: string;
   display: string;
 }
+
+/** 一条本地提交，只读列表用 */
+export interface RecentCommit {
+  shortHash: string;
+  subject: string;
+  /** 完整提交说明（标题加正文） */
+  message: string;
+  author: string;
+  /** 提交时间，Unix 秒 */
+  committedAt: number;
+}
+
+export type RecentCommitsResponse =
+  | { status: "ok"; commits: RecentCommit[] }
+  | { status: "empty" }
+  | { status: "notRepo" }
+  | { status: "missing" }
+  | { status: "failed" };
