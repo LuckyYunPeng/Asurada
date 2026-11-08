@@ -1483,39 +1483,67 @@ function App() {
           role="dialog" aria-label={t.panel}>
           <header className="chrome">
             <div className="title-wrap">
-              {settingsOpen || isCheckOpen || recentProject ? (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="-ml-1.5 text-muted-foreground"
-                  aria-label={t.back}
-                  title={t.back}
-                  onClick={() => {
-                    setSettingsOpen(false);
-                    setIsCheckOpen(false);
-                    setRecentProject(null);
-                  }}
-                >
-                  <ChevronLeft />
-                </Button>
-              ) : null}
-              {/* 从设置、环境检查等子页回到项目列表 */}
-              <button
-                type="button"
-                className="home"
-                aria-label={t.backToMain}
-                title={t.backToMain}
-                onClick={() => {
-                  setSettingsOpen(false);
-                  setIsCheckOpen(false);
-                  setRecentProject(null);
-                }}
-              >
-                <span className="brand">
-                  <img src={logoUrl} alt="" />
-                </span>
-                <span className="title">ASURADA</span>
-              </button>
+              {recentProject ? (
+                <>
+                  {/* logo 在最左，返回紧挨子页标题，和「最近提交」同一行 */}
+                  <button
+                    type="button"
+                    className="home"
+                    aria-label={t.backToMain}
+                    title={t.backToMain}
+                    onClick={() => setRecentProject(null)}
+                  >
+                    <span className="brand">
+                      <img src={logoUrl} alt="" />
+                    </span>
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="-ml-1 text-muted-foreground"
+                    aria-label={t.back}
+                    title={t.back}
+                    onClick={() => setRecentProject(null)}
+                  >
+                    <ChevronLeft />
+                  </Button>
+                  <span className="title is-page">{t.recentCommits}</span>
+                </>
+              ) : (
+                <>
+                  {settingsOpen || isCheckOpen ? (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="-ml-1.5 text-muted-foreground"
+                      aria-label={t.back}
+                      title={t.back}
+                      onClick={() => {
+                        setSettingsOpen(false);
+                        setIsCheckOpen(false);
+                      }}
+                    >
+                      <ChevronLeft />
+                    </Button>
+                  ) : null}
+                  {/* 从设置、环境检查等子页回到项目列表 */}
+                  <button
+                    type="button"
+                    className="home"
+                    aria-label={t.backToMain}
+                    title={t.backToMain}
+                    onClick={() => {
+                      setSettingsOpen(false);
+                      setIsCheckOpen(false);
+                    }}
+                  >
+                    <span className="brand">
+                      <img src={logoUrl} alt="" />
+                    </span>
+                    <span className="title">ASURADA</span>
+                  </button>
+                </>
+              )}
               {isEnvFailed ? (
                 <Button
                   size="icon-xs"

@@ -524,6 +524,11 @@ body {
   color: var(--ink-strong);
 }
 
+/* 子页标题是中文，不用品牌字距 */
+.title.is-page {
+  letter-spacing: 0;
+}
+
 .panel-body {
   flex: 0 1 auto;
   overflow: auto;
